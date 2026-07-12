@@ -46,20 +46,34 @@ final class OfferAdvisor
 		final long yourPrice = offer.getPrice();
 		final long marketBuy = live.getBuy();      // current low  - place a BUY here
 		final long marketSell = live.getSell();    // current high - place a SELL here
-		final long marketMargin = live.getProfit();// net(marketBuy, marketSell), post-tax
+		// A returned-but-unpriced item deserializes to 0 (Gson leaves a missing
+		// primitive at its default). Never derive a reprice target from that or
+		// we'd tell a seller to "drop to 0" and give the item away.
+		if (marketBuy <= 0 || marketSell <= 0)
+		{
+			return new OfferAdvice(slot, name, side, OfferAdvice.Kind.NO_DATA, "No live price yet", GREY);
+		}
+		final long marketMargin = live.getProfit(); // net(marketBuy, marketSell), post-tax
 
 		if (offer.isBuying())
 		{
-			// A dead market margin can't be rescued by repricing the bid.
+			// Loss states are RED and take precedence over the amber falling warning.
 			if (marketMargin <= 0)
 			{
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
 					"Margin gone (" + signed(marketMargin) + " at market) - cancel", RED);
 			}
+			final long yourMargin = GeTax.net(yourPrice, marketSell);
+			if (yourMargin <= 0)
+			{
+				// Bid so high it loses even sold at the market high — always report red.
+				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
+					"Bid too high - " + signed(yourMargin) + " if it fills, lower it", RED);
+			}
 			if (live.isFallingKnife())
 			{
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.FALLING,
-					"Price falling " + pct(live.getTrendPct()) + " - margin closing, watch it", AMBER);
+					"Price falling " + pct(Math.abs(live.getTrendPct())) + " - margin closing, watch it", AMBER);
 			}
 			// Your bid must sit at or above the current low or sellers won't hit it.
 			if (yourPrice < marketBuy)
@@ -67,13 +81,6 @@ final class OfferAdvisor
 				final long delta = marketBuy - yourPrice;
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.RAISE_BUY,
 					"Raise buy to " + full(marketBuy) + " (+" + gp(delta) + ") - margin " + signed(marketMargin), AMBER);
-			}
-			final long yourMargin = GeTax.net(yourPrice, marketSell);
-			if (yourMargin <= 0)
-			{
-				// Competitive bid, but priced so high it loses even at the market high.
-				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
-					"Bid too high - " + signed(yourMargin) + " if it fills, lower it", RED);
 			}
 			return new OfferAdvice(slot, name, side, OfferAdvice.Kind.ON_TRACK,
 				"On track - filling, " + signed(yourMargin) + " if sold at market", GREEN);

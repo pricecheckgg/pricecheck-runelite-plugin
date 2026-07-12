@@ -33,13 +33,15 @@ final class GeTax
 	static long breakevenSell(long buy)
 	{
 		long s = (long) Math.ceil(buy / 0.98D);
-		// Tax is floored, so the true minimum can sit a little below the naive guess.
-		while (s > buy && net(buy, s - 1) >= 0)
+		// The estimate is within a couple gp of the true breakeven (tax is floored),
+		// so both nudges are tiny — bounded so a bad input can never spin.
+		int guard = 0;
+		while (s > buy && net(buy, s - 1) >= 0 && guard++ < 128)
 		{
 			s--;
 		}
-		int guard = 0;
-		while (net(buy, s) < 0 && guard++ < 64)
+		guard = 0;
+		while (net(buy, s) < 0 && guard++ < 128)
 		{
 			s++;
 		}

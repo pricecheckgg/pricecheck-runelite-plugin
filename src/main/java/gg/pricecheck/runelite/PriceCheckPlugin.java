@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -59,8 +60,9 @@ public class PriceCheckPlugin extends Plugin
 	@Inject
 	private PriceCheckApiClient api;
 
-	@Inject
-	private ScheduledExecutorService executor;
+	// Our OWN single poller thread. Blocking HTTP must never run on RuneLite's
+	// shared ScheduledExecutorService — that would stall every other plugin.
+	private ScheduledExecutorService poller;
 
 	private PriceCheckPanel panel;
 	private NavigationButton navButton;
@@ -100,9 +102,15 @@ public class PriceCheckPlugin extends Plugin
 		advisorOverlay = new OfferAdvisorOverlay(this, config);
 		overlayManager.add(advisorOverlay);
 
+		poller = Executors.newSingleThreadScheduledExecutor(r ->
+		{
+			final Thread t = new Thread(r, "pricecheck-poller");
+			t.setDaemon(true);
+			return t;
+		});
 		clientThread.invokeLater(this::seedOffers);
-		panelTask = executor.scheduleWithFixedDelay(this::refreshPanel, 0, PANEL_REFRESH_SECONDS, TimeUnit.SECONDS);
-		advisorTask = executor.scheduleWithFixedDelay(this::refreshAdvisor, 1, ADVISOR_REFRESH_SECONDS, TimeUnit.SECONDS);
+		panelTask = poller.scheduleWithFixedDelay(this::refreshPanel, 0, PANEL_REFRESH_SECONDS, TimeUnit.SECONDS);
+		advisorTask = poller.scheduleWithFixedDelay(this::refreshAdvisor, 1, ADVISOR_REFRESH_SECONDS, TimeUnit.SECONDS);
 	}
 
 	@Override
@@ -117,6 +125,11 @@ public class PriceCheckPlugin extends Plugin
 		{
 			advisorTask.cancel(true);
 			advisorTask = null;
+		}
+		if (poller != null)
+		{
+			poller.shutdownNow();
+			poller = null;
 		}
 		if (navButton != null)
 		{
@@ -161,7 +174,7 @@ public class PriceCheckPlugin extends Plugin
 				}
 			}
 		}
-		executor.execute(this::refreshAdvisor);
+		poller.execute(this::refreshAdvisor);
 	}
 
 	@Subscribe
@@ -169,7 +182,7 @@ public class PriceCheckPlugin extends Plugin
 	{
 		// Fires on the client thread; snapshot immediately, then recompute off-thread.
 		tracked.set(event.getSlot(), TrackedOffer.of(event.getSlot(), event.getOffer()));
-		executor.execute(this::recomputeAdvice);
+		poller.execute(this::recomputeAdvice);
 	}
 
 	// Fetch live data for the items you have offers on, then recompute advice.
@@ -235,7 +248,7 @@ public class PriceCheckPlugin extends Plugin
 		final String key = e.getKey();
 		if ("apiKey".equals(key))
 		{
-			executor.execute(() ->
+			poller.execute(() ->
 			{
 				refreshPanel();
 				refreshAdvisor();
@@ -243,7 +256,7 @@ public class PriceCheckPlugin extends Plugin
 		}
 		else if ("minEvPerHrK".equals(key))
 		{
-			executor.execute(this::refreshPanel);
+			poller.execute(this::refreshPanel);
 		}
 		else if ("showPanel".equals(key) && navButton != null)
 		{

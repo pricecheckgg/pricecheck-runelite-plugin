@@ -13,7 +13,7 @@ version = '0.1.0'
 repositories {
     exclusiveContent {
         forRepository { maven { url = 'https://repo.runelite.net' } }
-        filter { includeGroupAndSubgroups 'net.runelite' }
+        filter { includeGroupByRegex 'net\\.runelite.*' }
     }
     mavenCentral()
 }
