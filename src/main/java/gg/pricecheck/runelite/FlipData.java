@@ -20,6 +20,8 @@ public class FlipData
 	private double roi;
 	private long evPerHr;
 	private boolean confirmed;
-	private Long limit;   // null = no published buy limit for this item
+	private boolean fallingKnife;   // price dropping vs its 1h average -> margin at risk
+	private double trendPct;        // mid vs 1h-avg, % (negative = falling)
+	private Long limit;             // null = no published buy limit for this item
 	private long vol1h;
 }

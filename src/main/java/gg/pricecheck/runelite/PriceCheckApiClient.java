@@ -2,8 +2,12 @@ package gg.pricecheck.runelite;
 
 import com.google.gson.Gson;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
@@ -100,5 +104,53 @@ public class PriceCheckApiClient
 		boolean ok;
 		long scannedAt;
 		List<FlipData> flips;
+	}
+
+	/** Live data for a set of item ids (the items in your active GE offers). */
+	Map<Integer, FlipData> getItems(String key, Collection<Integer> ids)
+	{
+		if (key == null || key.trim().isEmpty() || ids == null || ids.isEmpty())
+		{
+			return Collections.emptyMap();
+		}
+		final String idsCsv = ids.stream().map(String::valueOf).collect(Collectors.joining(","));
+		final HttpUrl url = BASE.newBuilder()
+			.addPathSegment("items")
+			.addQueryParameter("ids", idsCsv)
+			.build();
+		final Request req = new Request.Builder()
+			.url(url)
+			.header("Authorization", "Bearer " + key.trim())
+			.build();
+
+		try (Response res = http.newCall(req).execute())
+		{
+			if (!res.isSuccessful() || res.body() == null)
+			{
+				return Collections.emptyMap();
+			}
+			final ItemsResponse parsed = gson.fromJson(res.body().string(), ItemsResponse.class);
+			if (parsed == null || parsed.items == null)
+			{
+				return Collections.emptyMap();
+			}
+			final Map<Integer, FlipData> map = new HashMap<>(parsed.items.size());
+			for (FlipData f : parsed.items)
+			{
+				map.put(f.getGeId(), f);
+			}
+			return map;
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck items fetch failed", e);
+			return Collections.emptyMap();
+		}
+	}
+
+	private static final class ItemsResponse
+	{
+		long scannedAt;
+		List<FlipData> items;
 	}
 }

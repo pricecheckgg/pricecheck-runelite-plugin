@@ -42,4 +42,15 @@ public interface PriceCheckConfig extends Config
 	{
 		return 0;
 	}
+
+	@ConfigItem(
+		keyName = "showAdvisor",
+		name = "Offer advisor overlay",
+		description = "Show a live overlay that watches your active GE offers and tells you exactly when and how much to reprice, or when a margin has died.",
+		position = 4
+	)
+	default boolean showAdvisor()
+	{
+		return true;
+	}
 }
