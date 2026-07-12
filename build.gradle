@@ -1,0 +1,53 @@
+// PriceCheck RuneLite plugin — a THIN CLIENT. It ships no margin logic and no
+// data: it sends the user's plugin key to premium.pricecheck.gg/api/plugin and
+// draws what comes back. There are NO secrets in this repo (the key is entered
+// by the user at runtime), so the whole source is safe to publish to the Hub.
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
+
+group = 'gg.pricecheck'
+version = '0.1.0'
+
+repositories {
+    exclusiveContent {
+        forRepository { maven { url = 'https://repo.runelite.net' } }
+        filter { includeGroupAndSubgroups 'net.runelite' }
+    }
+    mavenCentral()
+}
+
+def runeLiteVersion = 'latest.release'
+
+dependencies {
+    // Provided at runtime by the RuneLite client — compileOnly, never bundled.
+    // This includes OkHttp + Gson + Guice, so the sideload JAR stays tiny and
+    // can't clash with the client's own copies.
+    compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
+    testImplementation 'org.projectlombok:lombok:1.18.30'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+// The sideloaded plugin JAR. RuneLite loads a fat JAR from
+// ~/.runelite/sideloaded-plugins/ in developer mode; signature files must be
+// stripped or the JVM rejects the merged archive.
+tasks.named('shadowJar') {
+    archiveClassifier.set('')
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+}
+
+tasks.named('jar') {
+    enabled = false
+    dependsOn 'shadowJar'
+}
