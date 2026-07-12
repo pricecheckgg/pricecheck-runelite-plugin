@@ -46,3 +46,20 @@ The sideloadable JAR lands in `build/libs/pricecheck-<version>.jar`.
 - Per-item lookup (`/api/plugin/item/:geId`, `/items?ids=`) when an item is examined/searched.
 
 Not affiliated with Jagex.
+
+## Dev launch on macOS + Jagex account (what actually works)
+`run-dev.sh` runs RuneLite in developer mode from the client the Jagex Launcher
+already downloaded (`~/.runelite/repository2`). Hard-won details baked in:
+- `-ea` (developer mode requires assertions) and `-Xmx2g`.
+- Classpath is jars only with **no trailing `:`** — a trailing empty entry makes
+  the JVM scan `$HOME` (crawls ~/Library/Mail etc.), which OOMs / hangs load.
+- No extra api jar: `--developer-mode` auto-loads DevTools, which wants a
+  `VarbitID` class the launcher's stripped runtime-api omits; adding the full
+  gameval jar fixes DevTools but is ~2000 classes to scan and drags load, so we
+  let DevTools fail (harmless — we don't use it).
+- Jagex login: run `RuneLite.app --insecure-write-credentials` once, log in, which
+  writes `~/.runelite/credentials.properties`; the dev client then auto-logs in.
+  Delete that file (or hit "End sessions" on runescape.com) when done — it bypasses your password.
+
+Usage: `./gradlew shadowJar` → copy the jar into `~/.runelite/sideloaded-plugins/`
+→ `./run-dev.sh`.
