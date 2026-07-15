@@ -331,6 +331,68 @@ public class PriceCheckApiClient
 		List<TrackedItem> tracked;
 	}
 
+	// ── Slot planner ──
+
+	static final class PlanResult
+	{
+		final AuthState state;
+		final PlanData plan;        // null unless state == OK
+		final boolean needCapital;  // server has no capital for you and none was sent
+
+		PlanResult(AuthState state, PlanData plan, boolean needCapital)
+		{
+			this.state = state;
+			this.plan = plan;
+			this.needCapital = needCapital;
+		}
+	}
+
+	/** Build a plan. capital < 0 means "use my last reported bank total". */
+	PlanResult getPlan(String key, long capital, int slots, int accounts)
+	{
+		if (key == null || key.trim().isEmpty())
+		{
+			return new PlanResult(AuthState.NO_KEY, null, false);
+		}
+		final HttpUrl.Builder url = BASE.newBuilder()
+			.addPathSegment("plan")
+			.addQueryParameter("slots", String.valueOf(slots))
+			.addQueryParameter("accounts", String.valueOf(accounts));
+		if (capital >= 0)
+		{
+			url.addQueryParameter("capital", String.valueOf(capital));
+		}
+		final Request req = new Request.Builder()
+			.url(url.build())
+			.header("Authorization", "Bearer " + key.trim())
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			switch (res.code())
+			{
+				case 401:
+					return new PlanResult(AuthState.INVALID_KEY, null, false);
+				case 403:
+					return new PlanResult(AuthState.NO_SUBSCRIPTION, null, false);
+				case 400:
+					return new PlanResult(AuthState.OK, null, true);
+				default:
+					break;
+			}
+			if (!res.isSuccessful() || res.body() == null)
+			{
+				return new PlanResult(AuthState.ERROR, null, false);
+			}
+			final PlanData parsed = gson.fromJson(res.body().string(), PlanData.class);
+			return new PlanResult(parsed != null ? AuthState.OK : AuthState.ERROR, parsed, false);
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck plan fetch failed", e);
+			return new PlanResult(AuthState.ERROR, null, false);
+		}
+	}
+
 	/** Report the player's liquid capital (coins + platinum tokens, bank +
 	 *  inventory) so the web planner can prefill. Best-effort. */
 	boolean postCapital(String key, long coins, long platTokens)

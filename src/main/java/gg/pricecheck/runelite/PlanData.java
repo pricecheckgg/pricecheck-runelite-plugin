@@ -1,0 +1,48 @@
+package gg.pricecheck.runelite;
+
+import java.util.List;
+import lombok.Data;
+
+/**
+ * A slot-planner result as served by GET /api/plugin/plan — the same engine the
+ * web dashboard uses. Field names match the server response exactly for Gson.
+ */
+@Data
+public class PlanData
+{
+	private long scannedAt;
+	private long capital;
+	private int slots;          // GE slots per account
+	private int accounts;
+	private int totalSlots;
+	private int usedSlots;
+	private String capitalSource;   // "detected" (your reported bank) or "manual"
+	private List<Row> plan;
+	private Totals totals;
+
+	@Data
+	public static class Row
+	{
+		private int slot;
+		private int geId;
+		private String name;
+		private long buy;
+		private long sell;
+		private long profit;
+		private long qty;
+		private long outlay;
+		private long estPerHr;
+		private int acctsUsed;      // GE slots this item takes, one per account
+		private long perAcct;       // quantity per account when acctsUsed > 1
+		private String confidence;  // high / med / low
+		private boolean confirmed;
+	}
+
+	@Data
+	public static class Totals
+	{
+		private long outlay;
+		private long leftover;
+		private long estPerHr;
+	}
+}

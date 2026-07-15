@@ -159,6 +159,20 @@ public class PriceCheckPlugin extends Plugin
 					}
 				});
 			}
+
+			@Override
+			public void onBuildPlan(long capital, int slots, int accounts)
+			{
+				poller.execute(() ->
+				{
+					final PriceCheckApiClient.PlanResult r = api.getPlan(config.apiKey(), capital, slots, accounts);
+					final PriceCheckPanel p = panel;
+					if (p != null)
+					{
+						p.setPlan(r);
+					}
+				});
+			}
 		}, itemManager, configManager, config);
 		navButton = NavigationButton.builder()
 			.tooltip("PriceCheck")
@@ -265,6 +279,12 @@ public class PriceCheckPlugin extends Plugin
 			invPlat = plat;
 		}
 		capitalDirty = true;
+		// Prefill the Plan tab live (only meaningful once the bank is readable).
+		final PriceCheckPanel p = panel;
+		if (p != null && bankSeen)
+		{
+			p.setDetectedCapital((bankCoins + invCoins) + (bankPlat + invPlat) * 1000L);
+		}
 	}
 
 	@Override

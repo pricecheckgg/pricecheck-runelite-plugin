@@ -59,6 +59,8 @@ class PriceCheckPanel extends PluginPanel
 		void onUntrack(int geId);
 		void onSearch(String query);
 		void onFetchAccount();     // fired when the Settings tab is opened / after a key save
+		// capital < 0 = "use my last reported bank total" (server-side fallback)
+		void onBuildPlan(long capital, int slots, int accounts);
 	}
 
 	private final Listener listener;
@@ -69,6 +71,17 @@ class PriceCheckPanel extends PluginPanel
 	// Flips tab
 	private final IconTextField search = new IconTextField();
 	private final JPanel list = new JPanel();
+
+	// Plan tab widgets
+	private final javax.swing.JTextField planCapital = new javax.swing.JTextField();
+	private final JSpinner planSlots = new JSpinner(new SpinnerNumberModel(8, 1, 8, 1));
+	private final JSpinner planAccts = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+	private final JButton planBuild = new JButton("Build plan");
+	private final JLabel planStatus = new JLabel(" ");
+	private final JPanel planList = new JPanel();
+	private boolean planCapitalEdited = false;   // stop auto-detect from clobbering typed capital
+	private boolean planCapitalMuted = false;    // programmatic set must not flip the edited flag
+	private long detectedCapital = -1;           // exact bank+inventory total; the field shows a display copy
 
 	// Settings tab widgets (built once, mutated in place)
 	private final JLabel acctName = new JLabel("Loading account…");
@@ -105,12 +118,14 @@ class PriceCheckPanel extends PluginPanel
 
 		final JPanel display = new JPanel(new BorderLayout());
 		final MaterialTabGroup tabGroup = new MaterialTabGroup(display);
-		tabGroup.setLayout(new GridLayout(1, 2, 8, 0));
+		tabGroup.setLayout(new GridLayout(1, 3, 8, 0));
 		tabGroup.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 		final MaterialTab flipsTab = new MaterialTab("Flips", tabGroup, buildFlipsView());
+		final MaterialTab planTab = new MaterialTab("Plan", tabGroup, buildPlanView());
 		settingsTab = new MaterialTab("Settings", tabGroup, buildSettingsView());
 		settingsTab.setOnSelectEvent(() -> { listener.onFetchAccount(); return true; });
 		tabGroup.addTab(flipsTab);
+		tabGroup.addTab(planTab);
 		tabGroup.addTab(settingsTab);
 		tabGroup.select(flipsTab);
 
@@ -165,6 +180,309 @@ class PriceCheckPanel extends PluginPanel
 		view.add(top, BorderLayout.NORTH);
 		view.add(scroll, BorderLayout.CENTER);
 		return view;
+	}
+
+	// ── Plan tab: split your capital across your GE slots ──
+	private JPanel buildPlanView()
+	{
+		final JPanel controls = new JPanel();
+		controls.setLayout(new BoxLayout(controls, BoxLayout.Y_AXIS));
+		controls.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+
+		// Capital. Left empty it uses your last reported bank total; the bank
+		// tracker fills it in live once your bank has been opened.
+		final JPanel capRow = row();
+		capRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+		final JLabel capLbl = new JLabel("Capital");
+		capLbl.setForeground(Palette.SUBTLE);
+		planCapital.setFont(FontManager.getRunescapeSmallFont());
+		planCapital.setToolTipText("Your roll, like 25m or 1.2b. Filled from your bank when detected.");
+		planCapital.setPreferredSize(new Dimension(90, 24));
+		planCapital.setMaximumSize(new Dimension(90, 24));
+		planCapital.getDocument().addDocumentListener(new DocumentListener()
+		{
+			private void edited() { if (!planCapitalMuted) { planCapitalEdited = true; } }
+			public void insertUpdate(DocumentEvent e) { edited(); }
+			public void removeUpdate(DocumentEvent e) { edited(); }
+			public void changedUpdate(DocumentEvent e) { edited(); }
+		});
+		final JPanel capWrap = new JPanel(new BorderLayout());
+		capWrap.setOpaque(false);
+		capWrap.add(planCapital, BorderLayout.EAST);
+		capRow.add(capLbl, BorderLayout.WEST);
+		capRow.add(capWrap, BorderLayout.EAST);
+		controls.add(capRow);
+		controls.add(gap(6));
+
+		// Slots per account + accounts. Buy limits are per account, so accounts
+		// multiply how much of each item the plan can move.
+		final JPanel slotRow = row();
+		slotRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+		final JLabel slotLbl = new JLabel("Slots / account");
+		slotLbl.setForeground(Palette.SUBTLE);
+		planSlots.setPreferredSize(new Dimension(56, 24));
+		planSlots.setMaximumSize(new Dimension(56, 24));
+		final JPanel slotWrap = new JPanel(new BorderLayout());
+		slotWrap.setOpaque(false);
+		slotWrap.add(planSlots, BorderLayout.EAST);
+		slotRow.add(slotLbl, BorderLayout.WEST);
+		slotRow.add(slotWrap, BorderLayout.EAST);
+		controls.add(slotRow);
+		controls.add(gap(6));
+
+		final JPanel acctRow = row();
+		acctRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+		final JLabel acctLbl = new JLabel("Accounts");
+		acctLbl.setForeground(Palette.SUBTLE);
+		planAccts.setToolTipText("Buy limits are per account, so more accounts move more of each item. Volume caps stay shared.");
+		planAccts.setPreferredSize(new Dimension(56, 24));
+		planAccts.setMaximumSize(new Dimension(56, 24));
+		final JPanel acctWrap = new JPanel(new BorderLayout());
+		acctWrap.setOpaque(false);
+		acctWrap.add(planAccts, BorderLayout.EAST);
+		acctRow.add(acctLbl, BorderLayout.WEST);
+		acctRow.add(acctWrap, BorderLayout.EAST);
+		controls.add(acctRow);
+		controls.add(gap(8));
+
+		// Restore the last-used shape.
+		try
+		{
+			final String s = configManager.getConfiguration(PriceCheckConfig.GROUP, "planSlots");
+			if (s != null) { planSlots.setValue(Math.min(Math.max(Integer.parseInt(s), 1), 8)); }
+			final String a = configManager.getConfiguration(PriceCheckConfig.GROUP, "planAccounts");
+			if (a != null) { planAccts.setValue(Math.min(Math.max(Integer.parseInt(a), 1), 100)); }
+		}
+		catch (NumberFormatException ignored)
+		{
+		}
+
+		planBuild.setFocusPainted(false);
+		planBuild.setAlignmentX(Component.LEFT_ALIGNMENT);
+		planBuild.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+		planBuild.addActionListener(e -> firePlan());
+		planCapital.addActionListener(e -> firePlan());
+		controls.add(planBuild);
+		controls.add(gap(6));
+
+		planStatus.setForeground(Palette.SUBTLE);
+		planStatus.setFont(planStatus.getFont().deriveFont(11f));
+		planStatus.setAlignmentX(Component.LEFT_ALIGNMENT);
+		controls.add(planStatus);
+
+		planList.setLayout(new BoxLayout(planList, BoxLayout.Y_AXIS));
+
+		final JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		controls.setAlignmentX(Component.LEFT_ALIGNMENT);
+		planList.setAlignmentX(Component.LEFT_ALIGNMENT);
+		body.add(controls);
+		body.add(planList);
+
+		final ScrollList wrap = new ScrollList();
+		wrap.add(body, BorderLayout.NORTH);
+		final JScrollPane scroll = new JScrollPane(wrap,
+			ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+		scroll.setBorder(null);
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
+		final JPanel holder = new JPanel(new BorderLayout());
+		holder.add(scroll, BorderLayout.CENTER);
+		return holder;
+	}
+
+	private void firePlan()
+	{
+		final String txt = planCapital.getText().trim();
+		long capital = -1;
+		if (!planCapitalEdited && detectedCapital >= 100_000)
+		{
+			// Untouched field = use the EXACT detected total, not the display
+			// string (formatting rounds up to 0.5%, which would plan gp the
+			// player doesn't have).
+			capital = detectedCapital;
+		}
+		else if (!txt.isEmpty())
+		{
+			capital = Fmt.parseGp(txt);
+			if (capital < 100_000)
+			{
+				planStatus.setText("Enter at least 100k. 25m and 1.2b formats work.");
+				planStatus.setForeground(Palette.AMBER);
+				return;
+			}
+		}
+		final int slots = (Integer) planSlots.getValue();
+		final int accounts = (Integer) planAccts.getValue();
+		configManager.setConfiguration(PriceCheckConfig.GROUP, "planSlots", String.valueOf(slots));
+		configManager.setConfiguration(PriceCheckConfig.GROUP, "planAccounts", String.valueOf(accounts));
+		planBuild.setEnabled(false);
+		planBuild.setText("Building…");
+		planStatus.setText(" ");
+		planStatus.setForeground(Palette.SUBTLE);
+		listener.onBuildPlan(capital, slots, accounts);
+	}
+
+	/** Live bank+inventory total from the capital tracker. Prefills the capital
+	 *  field until the user types their own number. */
+	void setDetectedCapital(long total)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			if (total >= 100_000)
+			{
+				detectedCapital = total;
+			}
+			if (planCapitalEdited || total < 100_000)
+			{
+				return;
+			}
+			planCapitalMuted = true;
+			planCapital.setText(Fmt.full(total));   // exact; parseGp strips the commas
+			planCapital.setToolTipText("From your bank + inventory: " + Fmt.full(total) + " gp. Type to override.");
+			planCapitalMuted = false;
+		});
+	}
+
+	void setPlan(PriceCheckApiClient.PlanResult result)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			planBuild.setEnabled(true);
+			planBuild.setText("Build plan");
+			planList.removeAll();
+
+			if (result == null || result.state == PriceCheckApiClient.AuthState.ERROR)
+			{
+				planStatus.setText("Couldn't reach PriceCheck. Try again.");
+				planStatus.setForeground(Palette.AMBER);
+			}
+			else if (result.state == PriceCheckApiClient.AuthState.NO_KEY)
+			{
+				planStatus.setText("Add your plugin key in Settings first.");
+				planStatus.setForeground(Palette.AMBER);
+			}
+			else if (result.state == PriceCheckApiClient.AuthState.INVALID_KEY)
+			{
+				planStatus.setText("Key rejected. Check it in Settings.");
+				planStatus.setForeground(Palette.RED);
+			}
+			else if (result.state == PriceCheckApiClient.AuthState.NO_SUBSCRIPTION)
+			{
+				planStatus.setText("Subscription inactive.");
+				planStatus.setForeground(Palette.RED);
+			}
+			else if (result.needCapital)
+			{
+				planStatus.setText("Enter your capital, or open your bank once in game.");
+				planStatus.setForeground(Palette.AMBER);
+			}
+			else if (result.plan == null || result.plan.getPlan() == null || result.plan.getPlan().isEmpty())
+			{
+				planStatus.setText("Nothing to allocate right now. Try again shortly.");
+				planStatus.setForeground(Palette.SUBTLE);
+			}
+			else
+			{
+				final PlanData d = result.plan;
+				planStatus.setText(" ");
+				planList.add(planTotals(d));
+				planList.add(gap(6));
+				for (PlanData.Row r : d.getPlan())
+				{
+					planList.add(planRow(r));
+					planList.add(gap(5));
+				}
+			}
+			planList.revalidate();
+			planList.repaint();
+		});
+	}
+
+	private JPanel planTotals(PlanData d)
+	{
+		final JPanel card = new JPanel();
+		card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+		card.setBackground(CARD);
+		card.setBorder(BorderFactory.createEmptyBorder(8, 9, 8, 9));
+		card.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		final JPanel l1 = row();
+		final JLabel exp = mono(Fmt.compact(d.getTotals().getEstPerHr()) + "/hr expected", Palette.GOLD);
+		l1.add(exp, BorderLayout.WEST);
+		card.add(l1);
+
+		final JPanel l2 = row();
+		final JLabel dep = mono("deployed " + Fmt.compact(d.getTotals().getOutlay())
+			+ " · left " + Fmt.compact(d.getTotals().getLeftover()), Palette.SUBTLE);
+		l2.add(dep, BorderLayout.WEST);
+		card.add(l2);
+
+		if (d.getAccounts() > 1)
+		{
+			final JPanel l3 = row();
+			final JLabel slots = mono("slots " + d.getUsedSlots() + "/" + d.getTotalSlots()
+				+ " across " + d.getAccounts() + " accounts", Palette.SUBTLE);
+			l3.add(slots, BorderLayout.WEST);
+			card.add(l3);
+		}
+		if ("detected".equals(d.getCapitalSource()))
+		{
+			final JPanel l4 = row();
+			final JLabel src = mono("capital from your bank: " + Fmt.compact(d.getCapital()), Palette.SUBTLE);
+			l4.add(src, BorderLayout.WEST);
+			card.add(l4);
+		}
+		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, card.getPreferredSize().height));
+		return card;
+	}
+
+	// One plan allocation: icon | name (wraps) / qty @ price / outlay | est per hr.
+	private JPanel planRow(PlanData.Row r)
+	{
+		final JPanel rowP = new JPanel(new BorderLayout(6, 0));
+		rowP.setBackground(CARD);
+		rowP.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+		rowP.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		final JLabel icon = new JLabel();
+		icon.setPreferredSize(new Dimension(28, 32));
+		icon.setHorizontalAlignment(SwingConstants.CENTER);
+		itemManager.getImage(r.getGeId()).addTo(icon);
+
+		final JLabel name = new JLabel("<html><body style='width:126px'><b>" + escHtml(r.getName()) + "</b></body></html>");
+		name.setForeground(Color.WHITE);
+		final JPanel line1 = row();
+		line1.add(name, BorderLayout.CENTER);
+
+		String qtyTxt = Fmt.full(r.getQty()) + " @ " + Fmt.compact(r.getBuy());
+		if (r.getAcctsUsed() > 1)
+		{
+			qtyTxt += " · " + Fmt.full(r.getPerAcct()) + " × " + r.getAcctsUsed() + " accts";
+		}
+		final JLabel qty = mono(qtyTxt, Palette.SUBTLE);
+		final JPanel line2 = row();
+		line2.add(qty, BorderLayout.CENTER);
+
+		final JLabel outlay = mono(Fmt.compact(r.getOutlay()) + " in", Palette.SUBTLE);
+		final JLabel ev = mono(Fmt.compact(r.getEstPerHr()) + "/hr", Palette.GOLD);
+		ev.setHorizontalAlignment(SwingConstants.RIGHT);
+		final JPanel line3 = row();
+		line3.add(outlay, BorderLayout.CENTER);
+		line3.add(ev, BorderLayout.EAST);
+
+		final JPanel center = new JPanel(new BorderLayout());
+		center.setOpaque(false);
+		center.add(line1, BorderLayout.NORTH);
+		final JPanel lower = new JPanel(new BorderLayout());
+		lower.setOpaque(false);
+		lower.add(line2, BorderLayout.NORTH);
+		lower.add(line3, BorderLayout.SOUTH);
+		center.add(lower, BorderLayout.SOUTH);
+
+		rowP.add(icon, BorderLayout.WEST);
+		rowP.add(center, BorderLayout.CENTER);
+		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
+		return rowP;
 	}
 
 	// ── Settings tab ──

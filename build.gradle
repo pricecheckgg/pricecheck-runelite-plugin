@@ -51,3 +51,13 @@ tasks.named('jar') {
     enabled = false
     dependsOn 'shadowJar'
 }
+
+// Auto-install: every build drops the fresh JAR into ~/.runelite/sideloaded-plugins,
+// so the "RuneLite Flip" desktop launcher (which loads whatever jar sits there)
+// always starts the latest build — no manual copy step to forget.
+tasks.register('sideload', Copy) {
+    dependsOn 'shadowJar'
+    from tasks.named('shadowJar').flatMap { it.archiveFile }
+    into "${System.properties['user.home']}/.runelite/sideloaded-plugins"
+}
+tasks.named('shadowJar') { finalizedBy 'sideload' }
