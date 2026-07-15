@@ -48,8 +48,13 @@ class GeChatboxHelper
 	private static final int SETUP_SIDE_CHILD = 20;      // "Buy offer" / "Sell offer"
 	private static final int MAX_SUGGESTIONS = 60;
 
-	private static final int GOLD = 0xe6c667;
-	private static final int WHITE = 0xffffff;
+	// The GE search proc only fires its searched event with a non-empty input,
+	// so suggestions ride a sentinel search string (Quest Helper's technique).
+	private static final String SENTINEL = "pc-flips";
+
+	// Chatbox parchment is light: dark ink reads, gold does not (device-tested).
+	private static final int INK = 0x800000;
+	private static final int INK_HOVER = 0x11128e;
 
 	private final Client client;
 	private final ClientThread clientThread;
@@ -84,7 +89,23 @@ class GeChatboxHelper
 
 	void onVarClientIntChanged(VarClientIntChanged e)
 	{
-		if (!config.gePriceButtons() || e.getIndex() != VARC_INPUT_TYPE)
+		if (e.getIndex() != VARC_INPUT_TYPE)
+		{
+			return;
+		}
+		// Search closed (item picked, escape, interface change): restore what the
+		// suggestions mode touched. MES_TEXT2 is a static widget, so a hidden
+		// flag would otherwise leak into the next thing that uses the chatbox.
+		if (suggestActive && client.getVarcIntValue(VARC_INPUT_TYPE) != INPUT_TYPE_GE_SEARCH)
+		{
+			suggestActive = false;
+			final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
+			if (echo != null)
+			{
+				echo.setHidden(false);
+			}
+		}
+		if (!config.gePriceButtons())
 		{
 			return;
 		}
@@ -127,14 +148,15 @@ class GeChatboxHelper
 		{
 			return;   // no live data yet — stay silent rather than suggest something wrong
 		}
-		// Right-aligned so they don't collide with other plugins' lines top-left.
-		addLine(parent, 5, "PriceCheck " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(price), price);
+		// Top-left, dark ink, exactly the proven layout — gold text washes out on
+		// the parchment and right-alignment clipped at the screen edge on device.
+		addLine(parent, 5, "set to PriceCheck " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(price) + " gp", price);
 		if (isSell)
 		{
 			final TrackedItem t = trackedFor(itemId);
 			if (t != null && t.getFloor() > 0)
 			{
-				addLine(parent, 21, "your floor: " + Fmt.full(t.getFloor()), t.getFloor());
+				addLine(parent, 20, "set to your break-even floor: " + Fmt.full(t.getFloor()) + " gp", t.getFloor());
 			}
 		}
 	}
@@ -143,18 +165,18 @@ class GeChatboxHelper
 	{
 		final Widget w = parent.createChild(-1, WidgetType.TEXT);
 		w.setText(label);
-		w.setTextColor(GOLD);
+		w.setTextColor(INK);
 		w.setFontId(FontID.VERDANA_11_BOLD);
 		w.setOriginalX(10);
 		w.setOriginalY(y);
 		w.setOriginalHeight(16);
-		w.setXTextAlignment(WidgetTextAlignment.RIGHT);
+		w.setXTextAlignment(WidgetTextAlignment.LEFT);
 		w.setWidthMode(WidgetSizeMode.MINUS);
 		w.setHasListener(true);
 		w.setAction(0, "Set price");
 		w.setOnOpListener((JavaScriptCallback) ev -> fillInput(price));
-		w.setOnMouseRepeatListener((JavaScriptCallback) ev -> w.setTextColor(WHITE));
-		w.setOnMouseLeaveListener((JavaScriptCallback) ev -> w.setTextColor(GOLD));
+		w.setOnMouseRepeatListener((JavaScriptCallback) ev -> w.setTextColor(INK_HOVER));
+		w.setOnMouseLeaveListener((JavaScriptCallback) ev -> w.setTextColor(INK));
 		w.revalidate();
 	}
 
@@ -183,6 +205,16 @@ class GeChatboxHelper
 	}
 
 	// ── 2) search suggestions ──
+	//
+	// The search proc only fires GrandExchangeSearched when the input is
+	// non-empty (device-confirmed), so a fresh-open auto-populate needs a
+	// sentinel search string: on open we put SENTINEL in the input buffer,
+	// hide the input echo (the player shouldn't see "pc-flips*"), replay the
+	// box's own key listener to run the search, and consume the event to feed
+	// our ids into the client's native result buffer. A dark-ink line under
+	// the title hands back to normal typing on click.
+
+	private boolean suggestActive = false;
 
 	void onScriptPostFired(ScriptPostFired e)
 	{
@@ -190,10 +222,73 @@ class GeChatboxHelper
 		{
 			return;
 		}
-		// The search box just opened. Replay its own key listener once so the
-		// search script runs with the (empty) input and our suggestions render
-		// immediately instead of waiting for the first keystroke.
-		clientThread.invokeLater(this::replaySearch);
+		// Defer one tick so the freshly built search layer is complete.
+		clientThread.invokeLater(this::activateSuggestions);
+	}
+
+	private void activateSuggestions()
+	{
+		if (client.getVarcIntValue(VARC_INPUT_TYPE) != INPUT_TYPE_GE_SEARCH)
+		{
+			return;
+		}
+		final String cur = client.getVarcStrValue(VARC_INPUT_TEXT);
+		if (cur != null && !cur.isEmpty() && !cur.equals(SENTINEL))
+		{
+			return;   // a real search is already in the buffer — don't hijack it
+		}
+		if (suggestionIds().length == 0)
+		{
+			return;   // nothing to show yet (no key / board still loading)
+		}
+		client.setVarcStrValue(VARC_INPUT_TEXT, SENTINEL);
+		suggestActive = true;
+		final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
+		if (echo != null)
+		{
+			echo.setHidden(true);
+		}
+		injectSearchBanner();
+		replaySearch();
+	}
+
+	// Back to vanilla: clear the sentinel, unhide the input, rerun the search
+	// so the normal "start typing" panel returns.
+	private void deactivateSuggestions()
+	{
+		suggestActive = false;
+		client.setVarcStrValue(VARC_INPUT_TEXT, "");
+		final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
+		if (echo != null)
+		{
+			echo.setText("*");
+			echo.setHidden(false);
+		}
+		replaySearch();
+	}
+
+	private void injectSearchBanner()
+	{
+		final Widget parent = client.getWidget(InterfaceID.Chatbox.MES_LAYER);
+		if (parent == null)
+		{
+			return;
+		}
+		final Widget w = parent.createChild(-1, WidgetType.TEXT);
+		w.setText("Your tracked items + best flips, ranked. Click here to type a search instead.");
+		w.setTextColor(INK);
+		w.setFontId(FontID.VERDANA_11_BOLD);
+		w.setOriginalX(10);
+		w.setOriginalY(4);
+		w.setOriginalHeight(15);
+		w.setXTextAlignment(WidgetTextAlignment.LEFT);
+		w.setWidthMode(WidgetSizeMode.MINUS);
+		w.setHasListener(true);
+		w.setAction(0, "Search normally");
+		w.setOnOpListener((JavaScriptCallback) ev -> deactivateSuggestions());
+		w.setOnMouseRepeatListener((JavaScriptCallback) ev -> w.setTextColor(INK_HOVER));
+		w.setOnMouseLeaveListener((JavaScriptCallback) ev -> w.setTextColor(INK));
+		w.revalidate();
 	}
 
 	private void replaySearch()
@@ -222,19 +317,36 @@ class GeChatboxHelper
 			return;   // another plugin (bank tags etc.) got there first
 		}
 		final String input = client.getVarcStrValue(VARC_INPUT_TEXT);
-		if (input != null && !input.trim().isEmpty())
+		if (SENTINEL.equals(input))
 		{
-			return;   // the player is searching — vanilla behavior
-		}
-		final short[] ids = suggestionIds();
-		if (ids.length == 0)
-		{
+			final short[] ids = suggestionIds();
+			if (ids.length == 0)
+			{
+				return;
+			}
+			e.consume();
+			client.setGeSearchResultIndex(0);
+			client.setGeSearchResultCount(ids.length);
+			client.setGeSearchResultIds(ids);
 			return;
 		}
-		e.consume();
-		client.setGeSearchResultIndex(0);
-		client.setGeSearchResultCount(ids.length);
-		client.setGeSearchResultIds(ids);
+		// If keystrokes reach the hidden input while suggestions are up, the
+		// buffer becomes "pc-flipsX". Strip the sentinel, restore the echo, and
+		// rerun so the player lands in a normal search for exactly what they
+		// typed (one repaint behind, corrected on the replay).
+		if (suggestActive && input != null && input.startsWith(SENTINEL))
+		{
+			final String typed = input.substring(SENTINEL.length());
+			suggestActive = false;
+			client.setVarcStrValue(VARC_INPUT_TEXT, typed);
+			final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
+			if (echo != null)
+			{
+				echo.setText(typed + "*");
+				echo.setHidden(false);
+			}
+			clientThread.invokeLater(this::replaySearch);
+		}
 	}
 
 	// Tracked positions first (you manage those), then the board by EV. The
