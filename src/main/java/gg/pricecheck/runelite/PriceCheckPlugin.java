@@ -455,6 +455,13 @@ public class PriceCheckPlugin extends Plugin
 			flipSyncTask.cancel(true);
 			flipSyncTask = null;
 		}
+		if (geHelper != null)
+		{
+			// Restores the GE search chatbox if suggestions were active; a
+			// hidden echo and the sentinel must not outlive the plugin.
+			geHelper.shutdown();
+			geHelper = null;
+		}
 		flipLog = null;
 		telemetry.clear();
 		if (poller != null)

@@ -8,9 +8,8 @@ import java.awt.Color;
  * no client or network calls — so it's deterministic and unit-testable.
  *
  * Market reference (matches the server): to BUY you place at FlipData.buy and to
- * SELL at FlipData.sell. The server already cuts both 1gp inside the last trades
- * (overcut the bids, undercut the asks) so an offer at these prices heads the
- * queue. Margins are post-GE-tax.
+ * SELL at FlipData.sell. The server's prices are already positioned so an offer
+ * at them heads the queue. Margins are post-GE-tax.
  */
 final class OfferAdvisor
 {

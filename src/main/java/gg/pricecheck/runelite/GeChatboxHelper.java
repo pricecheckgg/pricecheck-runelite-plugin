@@ -252,6 +252,32 @@ class GeChatboxHelper
 		replaySearch();
 	}
 
+	/** Plugin disable: put the chatbox back exactly as the client expects it.
+	 *  Without this, a hidden input echo and the sentinel string survive into
+	 *  vanilla GE search until the interface is rebuilt. */
+	void shutdown()
+	{
+		clientThread.invoke(() ->
+		{
+			if (!suggestActive)
+			{
+				return;
+			}
+			suggestActive = false;
+			final String cur = client.getVarcStrValue(VARC_INPUT_TEXT);
+			if (cur != null && cur.startsWith(SENTINEL))
+			{
+				client.setVarcStrValue(VARC_INPUT_TEXT, cur.substring(SENTINEL.length()));
+			}
+			final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
+			if (echo != null)
+			{
+				echo.setHidden(false);
+			}
+			replaySearch();
+		});
+	}
+
 	// Back to vanilla: clear the sentinel, unhide the input, rerun the search
 	// so the normal "start typing" panel returns.
 	private void deactivateSuggestions()
