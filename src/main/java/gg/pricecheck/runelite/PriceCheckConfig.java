@@ -75,4 +75,26 @@ public interface PriceCheckConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "gePriceButtons",
+		name = "GE: click-to-fill prices",
+		description = "When setting an offer price, show clickable PriceCheck lines (our live buy/sell for that item, plus your break-even floor when selling a tracked position). One click fills the price; you press Enter.",
+		position = 7
+	)
+	default boolean gePriceButtons()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "geSearchSuggestions",
+		name = "GE: suggest flips in search",
+		description = "While the GE item search is empty, show your tracked positions and the current best flips as clickable results. Start typing and normal search takes over.",
+		position = 8
+	)
+	default boolean geSearchSuggestions()
+	{
+		return true;
+	}
 }

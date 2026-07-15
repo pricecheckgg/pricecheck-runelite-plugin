@@ -83,6 +83,9 @@ public class PriceCheckPlugin extends Plugin
 	// (opt-out via "Contribute market data").
 	private final TelemetryCollector telemetry = new TelemetryCollector();
 
+	// GE chatbox integrations: click-to-fill prices + search suggestions.
+	private GeChatboxHelper geHelper;
+
 	// Liquid capital (coins + platinum tokens) snapshotted from container events
 	// on the client thread; reported to the planner when it changes. The bank is
 	// only readable once opened, so nothing is sent before bankSeen — inventory
@@ -185,6 +188,8 @@ public class PriceCheckPlugin extends Plugin
 			clientToolbar.addNavigation(navButton);
 		}
 
+		geHelper = new GeChatboxHelper(client, clientThread, config, this);
+
 		advisorOverlay = new OfferAdvisorOverlay(this, config);
 		overlayManager.add(advisorOverlay);
 		slotOverlay = new OfferAdvisorSlotOverlay(client, this, config);
@@ -235,6 +240,36 @@ public class PriceCheckPlugin extends Plugin
 		{
 			lastSentCapital = total;
 			capitalDirty = false;
+		}
+	}
+
+	@Subscribe
+	public void onVarClientIntChanged(net.runelite.api.events.VarClientIntChanged event)
+	{
+		final GeChatboxHelper g = geHelper;
+		if (g != null)
+		{
+			g.onVarClientIntChanged(event);
+		}
+	}
+
+	@Subscribe
+	public void onScriptPostFired(net.runelite.api.events.ScriptPostFired event)
+	{
+		final GeChatboxHelper g = geHelper;
+		if (g != null)
+		{
+			g.onScriptPostFired(event);
+		}
+	}
+
+	@Subscribe
+	public void onGrandExchangeSearched(net.runelite.api.events.GrandExchangeSearched event)
+	{
+		final GeChatboxHelper g = geHelper;
+		if (g != null)
+		{
+			g.onGrandExchangeSearched(event);
 		}
 	}
 
@@ -351,6 +386,13 @@ public class PriceCheckPlugin extends Plugin
 		final PriceCheckApiClient.FlipsResult flips = api.getFlips(key, FLIP_LIMIT);
 		final PriceCheckApiClient.TrackedResult tracked = api.getTracked(key);
 		p.update(flips, tracked, config.minEvPerHrK());
+		final GeChatboxHelper g = geHelper;
+		if (g != null)
+		{
+			g.update(
+				flips.state == PriceCheckApiClient.AuthState.OK ? flips.flips : null,
+				tracked != null && tracked.state == PriceCheckApiClient.AuthState.OK ? tracked.tracked : null);
+		}
 	}
 
 	// ── offer advisor ──
