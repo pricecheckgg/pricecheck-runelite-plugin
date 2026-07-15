@@ -278,7 +278,7 @@ class PriceCheckPanel extends PluginPanel
 			logMeta.setText(s.untrackedSells > 0 ? s.untrackedSells + " sold items had no tracked cost" : " ");
 			logSync.setText(hasKey
 				? (s.pendingSync > 0 ? "Backing up… " + s.pendingSync + " fills queued" : "Backed up · premium.pricecheck.gg/portfolio")
-				: "Local only · add a key in Settings for free backup + web view");
+				: "Local only · free key at premium.pricecheck.gg/portfolio → Settings");
 
 			logList.removeAll();
 			if (!s.openLots.isEmpty())
