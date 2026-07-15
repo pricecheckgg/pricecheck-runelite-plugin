@@ -242,6 +242,17 @@ public class PriceCheckPlugin extends Plugin
 		clientThread.invokeLater(() ->
 		{
 			flipLog.setAccount(client.getAccountHash());
+			// With a key, hold the seeded events until the server handoff state
+			// is adopted: a fresh install on a second machine must not treat
+			// offers another machine already recorded as new progress.
+			final String bootKey = config.apiKey();
+			final boolean bootHasKey = bootKey != null && !bootKey.trim().isEmpty();
+			if (bootHasKey && client.getAccountHash() != -1)
+			{
+				flipLog.beginLoginHold();
+				final FlipLogEngine engine = flipLog;
+				poller.execute(() -> engine.adoptRemote(api.getSlots(config.apiKey(), engine.getAccountHash())));
+			}
 			seedOffers();
 			// Feed current slot states into the log too: a plugin enabled
 			// mid-session must capture offers that filled before it existed
@@ -512,14 +523,42 @@ public class PriceCheckPlugin extends Plugin
 	public void onGameStateChanged(net.runelite.api.events.GameStateChanged event)
 	{
 		final net.runelite.api.GameState gs = event.getGameState();
+		final String key = config.apiKey();
+		final boolean hasKey = key != null && !key.trim().isEmpty();
 		if (gs == net.runelite.api.GameState.LOGGING_IN || gs == net.runelite.api.GameState.HOPPING
 			|| gs == net.runelite.api.GameState.CONNECTION_LOST)
 		{
 			lastLoginTick = client.getTickCount();
+			if (flipLog != null && hasKey)
+			{
+				// Hold the coming login burst until the freshest snapshots from
+				// the machine that traded last have been adopted.
+				flipLog.beginLoginHold();
+			}
+		}
+		else if (gs == net.runelite.api.GameState.LOGIN_SCREEN && hasKey)
+		{
+			// Flush immediately at logout so the next machine's handoff fetch
+			// sees this session's final slot state, not a 30s-stale one.
+			poller.execute(this::syncFlipLog);
 		}
 		else if (gs == net.runelite.api.GameState.LOGGED_IN && flipLog != null)
 		{
 			flipLog.setAccount(client.getAccountHash());
+			final FlipLogEngine engine = flipLog;
+			if (hasKey)
+			{
+				poller.execute(() ->
+				{
+					// Adopt fresher server state, then replay the held events.
+					// getSlots failing (offline etc.) still releases the hold.
+					engine.adoptRemote(api.getSlots(config.apiKey(), engine.getAccountHash()));
+				});
+			}
+			else
+			{
+				engine.releaseHold();
+			}
 		}
 	}
 

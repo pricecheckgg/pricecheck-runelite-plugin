@@ -62,6 +62,48 @@ class FlipLogEngine
 		// Wall-clock placement time; 0 = placement never seen (first sight
 		// mid-trade), which can never qualify as a margin check.
 		long placedMs;
+		// Last mutation time: the multi-machine handoff picks whichever copy
+		// of a slot (local file vs server) is fresher.
+		long updatedMs;
+	}
+
+	/** GET /slots response: the freshest state another machine uploaded. */
+	static class RemoteState
+	{
+		List<SlotExport> slots;
+		long slotsUpdatedAt;
+		List<Lot> lots;
+		long lotsUpdatedAt;
+	}
+
+	/** Slot snapshot as it travels to/from the server. */
+	static class SlotExport
+	{
+		int slot;
+		int itemId;
+		int qtySold;
+		int total;
+		int price;
+		long spent;
+		String state;
+		long placedMs;
+		long updatedMs;
+	}
+
+	/** One GE offer event captured as primitives (safe to replay off-thread). */
+	private static class HeldEvent
+	{
+		int slot;
+		int itemId;
+		int qtySold;
+		int total;
+		int price;
+		long spent;
+		GrandExchangeOfferState st;
+		boolean loggedIn;
+		int tick;
+		int lastLoginTick;
+		String name;
 	}
 
 	static class Fill
@@ -122,6 +164,11 @@ class FlipLogEngine
 		// can never import the same trade twice.
 		List<String> fillKeys = new ArrayList<>();
 		long lastBackupMs;
+		// When the local open-lot list last changed (multi-machine adoption
+		// only replaces lots with a server copy that is strictly newer).
+		long lotsMutMs;
+		// Slot snapshots changed since the last successful sync.
+		boolean slotsDirty;
 	}
 
 	/** One row of the in-game GE History tab (totals are pre-tax). */
@@ -169,6 +216,15 @@ class FlipLogEngine
 	private long activeMs;
 	private long lastEventMs;
 
+	// Login hold: while another machine's fresher state is being fetched,
+	// incoming offer events queue here instead of diffing against stale local
+	// snapshots (which would re-report fills the other machine recorded).
+	private boolean holdActive;
+	private long holdStartedMs;
+	private final List<HeldEvent> held = new ArrayList<>();
+	private static final long HOLD_MAX_MS = 6000;
+	private static final int HOLD_MAX_EVENTS = 64;
+
 	FlipLogEngine(Gson gson, File runeliteDir)
 	{
 		this.gson = gson;
@@ -194,6 +250,79 @@ class FlipLogEngine
 		return accountHash;
 	}
 
+	// ── login hold + multi-machine adoption ──
+
+	synchronized void beginLoginHold()
+	{
+		holdActive = true;
+		holdStartedMs = System.currentTimeMillis();
+		held.clear();
+	}
+
+	/** Adopt whatever the server has that is fresher than us, then replay the
+	 *  held events against the adopted snapshots. remote == null (fetch failed,
+	 *  no key) just releases the hold. */
+	synchronized void adoptRemote(RemoteState remote)
+	{
+		if (remote != null && accountHash != -1)
+		{
+			boolean changed = false;
+			if (remote.slots != null)
+			{
+				for (final SlotExport rs : remote.slots)
+				{
+					if (rs == null || rs.slot < 0 || rs.slot >= SLOTS)
+					{
+						continue;
+					}
+					final SlotSnap local = data.slots[rs.slot];
+					if (local == null || rs.updatedMs > local.updatedMs)
+					{
+						final SlotSnap s = new SlotSnap();
+						s.itemId = rs.itemId;
+						s.qtySold = rs.qtySold;
+						s.total = rs.total;
+						s.price = rs.price;
+						s.spent = rs.spent;
+						s.state = rs.state;
+						s.placedMs = rs.placedMs;
+						s.updatedMs = rs.updatedMs;
+						data.slots[rs.slot] = s;
+						changed = true;
+					}
+				}
+			}
+			// Lots follow the same rule: only a strictly-newer server copy wins,
+			// so unsynced local mutations are never thrown away.
+			if (remote.lots != null && remote.lotsUpdatedAt > data.lotsMutMs)
+			{
+				data.openLots = new ArrayList<>(remote.lots);
+				data.lotsMutMs = remote.lotsUpdatedAt;
+				changed = true;
+			}
+			if (changed)
+			{
+				save();
+			}
+		}
+		releaseHold();
+	}
+
+	synchronized void releaseHold()
+	{
+		if (!holdActive)
+		{
+			return;
+		}
+		holdActive = false;
+		final List<HeldEvent> q = new ArrayList<>(held);
+		held.clear();
+		for (final HeldEvent h : q)
+		{
+			process(h.slot, h.itemId, h.qtySold, h.total, h.price, h.spent, h.st, h.loggedIn, h.tick, h.lastLoginTick, h.name);
+		}
+	}
+
 	// ── event intake (client thread) ──
 
 	synchronized void onOffer(int slot, GrandExchangeOffer o, GameState gameState, int tick, int lastLoginTick, String itemName)
@@ -202,14 +331,49 @@ class FlipLogEngine
 		{
 			return;
 		}
-		final GrandExchangeOfferState st = o.getState();
+		if (holdActive)
+		{
+			// Safety valve: a hung fetch must never dam events forever.
+			if (System.currentTimeMillis() - holdStartedMs > HOLD_MAX_MS)
+			{
+				releaseHold();
+			}
+			else
+			{
+				if (held.size() < HOLD_MAX_EVENTS)
+				{
+					final HeldEvent h = new HeldEvent();
+					h.slot = slot;
+					h.itemId = o.getItemId();
+					h.qtySold = o.getQuantitySold();
+					h.total = o.getTotalQuantity();
+					h.price = o.getPrice();
+					h.spent = o.getSpent();
+					h.st = o.getState();
+					h.loggedIn = gameState == GameState.LOGGED_IN;
+					h.tick = tick;
+					h.lastLoginTick = lastLoginTick;
+					h.name = itemName;
+					held.add(h);
+				}
+				return;
+			}
+		}
+		process(slot, o.getItemId(), o.getQuantitySold(), o.getTotalQuantity(), o.getPrice(), o.getSpent(),
+			o.getState(), gameState == GameState.LOGGED_IN, tick, lastLoginTick, itemName);
+	}
+
+	private void process(int slot, int itemId, int qtySold, int totalQty, int price, long spent,
+		GrandExchangeOfferState st, boolean loggedIn, int tick, int lastLoginTick, String itemName)
+	{
 		if (st == GrandExchangeOfferState.EMPTY)
 		{
 			// Real collection only while logged in; the client blanks all slots
 			// during login/hopping and honoring those would wipe good snapshots.
-			if (gameState == GameState.LOGGED_IN && data.slots[slot] != null)
+			if (loggedIn && data.slots[slot] != null)
 			{
 				data.slots[slot] = null;
+				data.slotsDirty = true;
 				save();
 			}
 			return;
@@ -221,23 +385,25 @@ class FlipLogEngine
 		final long now = System.currentTimeMillis();
 
 		// New offer placement: remember when, for margin-check detection.
-		if (o.getQuantitySold() == 0)
+		if (qtySold == 0)
 		{
 			snap = new SlotSnap();
-			snap.itemId = o.getItemId();
+			snap.itemId = itemId;
 			snap.qtySold = 0;
-			snap.total = o.getTotalQuantity();
-			snap.price = o.getPrice();
+			snap.total = totalQty;
+			snap.price = price;
 			snap.spent = 0;
 			snap.state = st.name();
 			snap.placedMs = now;
+			snap.updatedMs = now;
 			data.slots[slot] = snap;
+			data.slotsDirty = true;
 			save();
 			return;
 		}
 
 		// Desync: the slot was changed from another client — resync, no delta.
-		if (snap != null && (snap.itemId != o.getItemId() || snap.price != o.getPrice() || snap.total != o.getTotalQuantity()))
+		if (snap != null && (snap.itemId != itemId || snap.price != price || snap.total != totalQty))
 		{
 			snap = null;
 		}
@@ -246,17 +412,17 @@ class FlipLogEngine
 		// full-quantity BUYING/SELLING that precedes BOUGHT/SOLD: no new fill.
 		final int prevQty = snap == null ? 0 : snap.qtySold;
 		final long prevSpent = snap == null ? 0 : snap.spent;
-		final int dqty = o.getQuantitySold() - prevQty;
-		final long dspent = o.getSpent() - prevSpent;
+		final int dqty = qtySold - prevQty;
+		final long dspent = spent - prevSpent;
 
 		if (snap == null)
 		{
 			// First sight mid-trade (placed on another machine or before install):
 			// treat the whole progress as one aggregate fill.
 			snap = new SlotSnap();
-			snap.itemId = o.getItemId();
-			snap.total = o.getTotalQuantity();
-			snap.price = o.getPrice();
+			snap.itemId = itemId;
+			snap.total = totalQty;
+			snap.price = price;
 			snap.placedMs = 0;   // never margin-check an unseen placement
 			data.slots[slot] = snap;
 		}
@@ -264,8 +430,8 @@ class FlipLogEngine
 		if (dqty > 0 && dspent >= 0)
 		{
 			final Fill f = new Fill();
-			f.id = accountHash + ":" + slot + ":" + now + ":" + o.getQuantitySold();
-			f.itemId = o.getItemId();
+			f.id = accountHash + ":" + slot + ":" + now + ":" + qtySold;
+			f.itemId = itemId;
 			f.buy = isBuy;
 			f.qty = dqty;
 			f.gross = dspent;
@@ -274,16 +440,18 @@ class FlipLogEngine
 			f.agg = tick <= lastLoginTick + LOGIN_BURST_TICKS;
 			// The completing fill usually arrives on the redundant full-quantity
 			// BUYING/SELLING event, so key on completion, not terminal state.
-			f.check = o.getQuantitySold() == o.getTotalQuantity() && o.getTotalQuantity() == 1
+			f.check = qtySold == totalQty && totalQty == 1
 				&& snap.placedMs > 0 && now - snap.placedMs >= 0 && now - snap.placedMs <= MARGIN_CHECK_MS
 				&& !f.agg;
 			f.name = itemName;
 			ingest(f);
 		}
 
-		snap.qtySold = o.getQuantitySold();
-		snap.spent = o.getSpent();
+		snap.qtySold = qtySold;
+		snap.spent = spent;
 		snap.state = st.name();
+		snap.updatedMs = now;
+		data.slotsDirty = true;
 		save();
 	}
 
@@ -339,6 +507,7 @@ class FlipLogEngine
 			{
 				data.openLots.remove(0);
 			}
+			data.lotsMutMs = now;
 			return;
 		}
 
@@ -377,6 +546,7 @@ class FlipLogEngine
 			remaining -= take;
 		}
 		final int matched = f.qty - remaining;
+		data.lotsMutMs = now;
 		if (remaining > 0)
 		{
 			data.untrackedSells += remaining;
@@ -554,6 +724,7 @@ class FlipLogEngine
 		List<Fill> fills;
 		List<Flip> flips;
 		List<Lot> lots;
+		List<SlotExport> slots;
 	}
 
 	synchronized SyncBatch syncBatch()
@@ -576,7 +747,9 @@ class FlipLogEngine
 				flips.add(f);
 			}
 		}
-		if (fills.isEmpty() && flips.isEmpty())
+		// Slot state syncs even with nothing else pending: placements and
+		// collections must reach the server for the next machine's handoff.
+		if (fills.isEmpty() && flips.isEmpty() && !data.slotsDirty)
 		{
 			return null;
 		}
@@ -585,6 +758,26 @@ class FlipLogEngine
 		b.fills = fills;
 		b.flips = flips;
 		b.lots = copyLots(data.openLots);
+		b.slots = new ArrayList<>();
+		for (int i = 0; i < SLOTS; i++)
+		{
+			final SlotSnap s = data.slots[i];
+			if (s == null)
+			{
+				continue;
+			}
+			final SlotExport e = new SlotExport();
+			e.slot = i;
+			e.itemId = s.itemId;
+			e.qtySold = s.qtySold;
+			e.total = s.total;
+			e.price = s.price;
+			e.spent = s.spent;
+			e.state = s.state;
+			e.placedMs = s.placedMs;
+			e.updatedMs = s.updatedMs;
+			b.slots.add(e);
+		}
 		return b;
 	}
 
@@ -621,6 +814,7 @@ class FlipLogEngine
 		{
 			f.synced = true;
 		}
+		data.slotsDirty = false;
 		save();
 	}
 

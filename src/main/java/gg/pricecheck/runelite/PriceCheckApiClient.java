@@ -465,6 +465,25 @@ public class PriceCheckApiClient
 			lots.add(m);
 		}
 		body.put("lots", lots);
+		final List<Map<String, Object>> slots = new java.util.ArrayList<>(batch.slots == null ? 0 : batch.slots.size());
+		if (batch.slots != null)
+		{
+			for (final FlipLogEngine.SlotExport s : batch.slots)
+			{
+				final Map<String, Object> m = new HashMap<>(10);
+				m.put("slot", s.slot);
+				m.put("itemId", s.itemId);
+				m.put("qtySold", s.qtySold);
+				m.put("total", s.total);
+				m.put("price", s.price);
+				m.put("spent", s.spent);
+				m.put("state", s.state);
+				m.put("placedMs", s.placedMs);
+				m.put("updatedMs", s.updatedMs);
+				slots.add(m);
+			}
+		}
+		body.put("slots", slots);
 		final Request req = new Request.Builder()
 			.url(BASE.newBuilder().addPathSegment("fills").build())
 			.header("Authorization", "Bearer " + key.trim())
@@ -478,6 +497,37 @@ public class PriceCheckApiClient
 		{
 			log.debug("PriceCheck fills sync failed", e);
 			return false;
+		}
+	}
+
+	/** The freshest slot snapshots + open lots another machine uploaded for
+	 *  this game account (the multi-machine handoff). Null on any failure. */
+	FlipLogEngine.RemoteState getSlots(String key, long accountHash)
+	{
+		if (key == null || key.trim().isEmpty() || accountHash == -1)
+		{
+			return null;
+		}
+		final HttpUrl url = BASE.newBuilder()
+			.addPathSegment("slots")
+			.addQueryParameter("account", String.valueOf(accountHash))
+			.build();
+		final Request req = new Request.Builder()
+			.url(url)
+			.header("Authorization", "Bearer " + key.trim())
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			if (!res.isSuccessful() || res.body() == null)
+			{
+				return null;
+			}
+			return gson.fromJson(res.body().string(), FlipLogEngine.RemoteState.class);
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck slots fetch failed", e);
+			return null;
 		}
 	}
 
