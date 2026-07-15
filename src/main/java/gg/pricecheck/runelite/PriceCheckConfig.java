@@ -64,4 +64,15 @@ public interface PriceCheckConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "autoCapital",
+		name = "Planner: auto-detect capital",
+		description = "Send your liquid gp total (coins + platinum tokens across bank and inventory) to PriceCheck so the web slot planner fills in your capital automatically. Open your bank once after logging in to refresh it.",
+		position = 6
+	)
+	default boolean autoCapital()
+	{
+		return true;
+	}
 }

@@ -331,6 +331,33 @@ public class PriceCheckApiClient
 		List<TrackedItem> tracked;
 	}
 
+	/** Report the player's liquid capital (coins + platinum tokens, bank +
+	 *  inventory) so the web planner can prefill. Best-effort. */
+	boolean postCapital(String key, long coins, long platTokens)
+	{
+		if (key == null || key.trim().isEmpty())
+		{
+			return false;
+		}
+		final Map<String, Object> body = new HashMap<>(2);
+		body.put("coins", coins);
+		body.put("platTokens", platTokens);
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("capital").build())
+			.header("Authorization", "Bearer " + key.trim())
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			return res.isSuccessful();
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck capital post failed", e);
+			return false;
+		}
+	}
+
 	/** Ship a batch of the player's own GE offer events (see TelemetryCollector).
 	 *  Best-effort: any failure just drops the batch. */
 	boolean postTelemetry(String key, List<Map<String, Object>> events)

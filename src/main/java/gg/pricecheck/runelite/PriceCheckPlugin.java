@@ -83,6 +83,16 @@ public class PriceCheckPlugin extends Plugin
 	// (opt-out via "Contribute market data").
 	private final TelemetryCollector telemetry = new TelemetryCollector();
 
+	// Liquid capital (coins + platinum tokens) snapshotted from container events
+	// on the client thread; reported to the planner when it changes. The bank is
+	// only readable once opened, so nothing is sent before bankSeen — inventory
+	// pocket change alone would overwrite the real number on the server.
+	private static final int COINS_ID = 995;
+	private static final int PLAT_ID = 13204;
+	private volatile long bankCoins, bankPlat, invCoins, invPlat;
+	private volatile boolean bankSeen, capitalDirty;
+	private long lastSentCapital = -1;
+
 	// GE slots, snapshotted on the client thread (offer events) so the background
 	// poller and the overlay render can read them without touching the client.
 	private final AtomicReferenceArray<TrackedOffer> tracked = new AtomicReferenceArray<>(SLOTS);
@@ -182,15 +192,79 @@ public class PriceCheckPlugin extends Plugin
 
 	private void flushTelemetry()
 	{
-		if (!config.contributeData())
+		if (config.contributeData())
+		{
+			final java.util.List<java.util.Map<String, Object>> batch = telemetry.drain();
+			if (!batch.isEmpty())
+			{
+				api.postTelemetry(config.apiKey(), batch);
+			}
+		}
+		flushCapital();
+	}
+
+	private void flushCapital()
+	{
+		if (!config.autoCapital() || !bankSeen || !capitalDirty)
 		{
 			return;
 		}
-		final java.util.List<java.util.Map<String, Object>> batch = telemetry.drain();
-		if (!batch.isEmpty())
+		final long coins = bankCoins + invCoins;
+		final long plat = bankPlat + invPlat;
+		final long total = coins + plat * 1000L;
+		if (total == lastSentCapital)
 		{
-			api.postTelemetry(config.apiKey(), batch);
+			capitalDirty = false;
+			return;
 		}
+		if (api.postCapital(config.apiKey(), coins, plat))
+		{
+			lastSentCapital = total;
+			capitalDirty = false;
+		}
+	}
+
+	@Subscribe
+	public void onItemContainerChanged(net.runelite.api.events.ItemContainerChanged event)
+	{
+		if (!config.autoCapital() || event.getItemContainer() == null)
+		{
+			return;
+		}
+		final int id = event.getContainerId();
+		final boolean bank = id == net.runelite.api.InventoryID.BANK.getId();
+		if (!bank && id != net.runelite.api.InventoryID.INVENTORY.getId())
+		{
+			return;
+		}
+		long coins = 0, plat = 0;
+		for (final net.runelite.api.Item it : event.getItemContainer().getItems())
+		{
+			if (it == null)
+			{
+				continue;
+			}
+			if (it.getId() == COINS_ID)
+			{
+				coins += it.getQuantity();
+			}
+			else if (it.getId() == PLAT_ID)
+			{
+				plat += it.getQuantity();
+			}
+		}
+		if (bank)
+		{
+			bankCoins = coins;
+			bankPlat = plat;
+			bankSeen = true;
+		}
+		else
+		{
+			invCoins = coins;
+			invPlat = plat;
+		}
+		capitalDirty = true;
 	}
 
 	@Override
