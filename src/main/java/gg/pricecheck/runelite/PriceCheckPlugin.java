@@ -83,6 +83,16 @@ public class PriceCheckPlugin extends Plugin
 	// (opt-out via "Contribute market data").
 	private final TelemetryCollector telemetry = new TelemetryCollector();
 
+	@Inject
+	private com.google.gson.Gson gson;
+
+	// The FREE flip log: exact fills -> FIFO flips, local-first, synced when a
+	// key is present. lastLoginTick marks the login burst window so aggregated
+	// offline fills are flagged instead of trusted as instant.
+	private FlipLogEngine flipLog;
+	private ScheduledFuture<?> flipSyncTask;
+	private volatile int lastLoginTick = -10;
+
 	// GE chatbox integrations: click-to-fill prices + search suggestions.
 	private GeChatboxHelper geHelper;
 
@@ -203,10 +213,60 @@ public class PriceCheckPlugin extends Plugin
 			t.setDaemon(true);
 			return t;
 		});
-		clientThread.invokeLater(this::seedOffers);
+		flipLog = new FlipLogEngine(gson, net.runelite.client.RuneLite.RUNELITE_DIR);
+		clientThread.invokeLater(() ->
+		{
+			flipLog.setAccount(client.getAccountHash());
+			seedOffers();
+			// Feed current slot states into the log too: a plugin enabled
+			// mid-session must capture offers that filled before it existed
+			// (the first-sight aggregate path), or their collection would
+			// arrive as an EMPTY the engine has no snapshot for.
+			final GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
+			if (offers != null && client.getAccountHash() != -1)
+			{
+				for (int slot = 0; slot < offers.length && slot < SLOTS; slot++)
+				{
+					final GrandExchangeOffer o = offers[slot];
+					if (o == null || o.getItemId() <= 0)
+					{
+						continue;
+					}
+					String name = null;
+					try
+					{
+						name = itemManager.getItemComposition(o.getItemId()).getName();
+					}
+					catch (RuntimeException ignored)
+					{
+					}
+					flipLog.onOffer(slot, o, client.getGameState(), client.getTickCount(), client.getTickCount(), name);
+				}
+			}
+		});
 		panelTask = poller.scheduleWithFixedDelay(this::refreshPanel, 0, PANEL_REFRESH_SECONDS, TimeUnit.SECONDS);
 		advisorTask = poller.scheduleWithFixedDelay(this::refreshAdvisor, 1, ADVISOR_REFRESH_SECONDS, TimeUnit.SECONDS);
 		telemetryTask = poller.scheduleWithFixedDelay(this::flushTelemetry, 30, 30, TimeUnit.SECONDS);
+		flipSyncTask = poller.scheduleWithFixedDelay(this::syncFlipLog, 20, 30, TimeUnit.SECONDS);
+	}
+
+	private void syncFlipLog()
+	{
+		final FlipLogEngine engine = flipLog;
+		if (engine == null)
+		{
+			return;
+		}
+		final String key = config.apiKey();
+		if (key == null || key.trim().isEmpty())
+		{
+			return;   // local-only until the user adds a key
+		}
+		final FlipLogEngine.SyncBatch batch = engine.syncBatch();
+		if (batch != null && api.postFills(key, batch))
+		{
+			engine.onSyncSuccess(batch);
+		}
 	}
 
 	private void flushTelemetry()
@@ -340,6 +400,12 @@ public class PriceCheckPlugin extends Plugin
 			telemetryTask.cancel(true);
 			telemetryTask = null;
 		}
+		if (flipSyncTask != null)
+		{
+			flipSyncTask.cancel(true);
+			flipSyncTask = null;
+		}
+		flipLog = null;
 		telemetry.clear();
 		if (poller != null)
 		{
@@ -386,6 +452,11 @@ public class PriceCheckPlugin extends Plugin
 		final PriceCheckApiClient.FlipsResult flips = api.getFlips(key, FLIP_LIMIT);
 		final PriceCheckApiClient.TrackedResult tracked = api.getTracked(key);
 		p.update(flips, tracked, config.minEvPerHrK());
+		final FlipLogEngine engine = flipLog;
+		if (engine != null)
+		{
+			p.setFlipLog(engine.summary(), key != null && !key.trim().isEmpty());
+		}
 		final GeChatboxHelper g = geHelper;
 		if (g != null)
 		{
@@ -413,10 +484,51 @@ public class PriceCheckPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onGameStateChanged(net.runelite.api.events.GameStateChanged event)
+	{
+		final net.runelite.api.GameState gs = event.getGameState();
+		if (gs == net.runelite.api.GameState.LOGGING_IN || gs == net.runelite.api.GameState.HOPPING
+			|| gs == net.runelite.api.GameState.CONNECTION_LOST)
+		{
+			lastLoginTick = client.getTickCount();
+		}
+		else if (gs == net.runelite.api.GameState.LOGGED_IN && flipLog != null)
+		{
+			flipLog.setAccount(client.getAccountHash());
+		}
+	}
+
+	@Subscribe
+	public void onAccountHashChanged(net.runelite.api.events.AccountHashChanged event)
+	{
+		if (flipLog != null)
+		{
+			flipLog.setAccount(client.getAccountHash());
+		}
+	}
+
+	@Subscribe
 	public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event)
 	{
 		// Fires on the client thread; snapshot immediately, then recompute off-thread.
 		tracked.set(event.getSlot(), TrackedOffer.of(event.getSlot(), event.getOffer()));
+		if (flipLog != null)
+		{
+			flipLog.setAccount(client.getAccountHash());
+			String name = null;
+			try
+			{
+				if (event.getOffer() != null && event.getOffer().getItemId() > 0)
+				{
+					name = itemManager.getItemComposition(event.getOffer().getItemId()).getName();
+				}
+			}
+			catch (RuntimeException ignored)
+			{
+			}
+			flipLog.onOffer(event.getSlot(), event.getOffer(), client.getGameState(),
+				client.getTickCount(), lastLoginTick, name);
+		}
 		if (config.contributeData())
 		{
 			// Relog/world-hop burst: the client blanks every slot with EMPTY and

@@ -118,13 +118,15 @@ class PriceCheckPanel extends PluginPanel
 
 		final JPanel display = new JPanel(new BorderLayout());
 		final MaterialTabGroup tabGroup = new MaterialTabGroup(display);
-		tabGroup.setLayout(new GridLayout(1, 3, 8, 0));
+		tabGroup.setLayout(new GridLayout(1, 4, 6, 0));
 		tabGroup.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 		final MaterialTab flipsTab = new MaterialTab("Flips", tabGroup, buildFlipsView());
+		final MaterialTab logTab = new MaterialTab("Log", tabGroup, buildLogView());
 		final MaterialTab planTab = new MaterialTab("Plan", tabGroup, buildPlanView());
 		settingsTab = new MaterialTab("Settings", tabGroup, buildSettingsView());
 		settingsTab.setOnSelectEvent(() -> { listener.onFetchAccount(); return true; });
 		tabGroup.addTab(flipsTab);
+		tabGroup.addTab(logTab);
 		tabGroup.addTab(planTab);
 		tabGroup.addTab(settingsTab);
 		tabGroup.select(flipsTab);
@@ -180,6 +182,196 @@ class PriceCheckPanel extends PluginPanel
 		view.add(top, BorderLayout.NORTH);
 		view.add(scroll, BorderLayout.CENTER);
 		return view;
+	}
+
+	// ── Log tab: the FREE flip ledger (works with no key at all) ──
+	private final JLabel logSession = new JLabel(" ");
+	private final JLabel logToday = new JLabel(" ");
+	private final JLabel logWeek = new JLabel(" ");
+	private final JLabel logAll = new JLabel(" ");
+	private final JLabel logMeta = new JLabel(" ");
+	private final JLabel logSync = new JLabel(" ");
+	private final JPanel logList = new JPanel();
+
+	private JPanel buildLogView()
+	{
+		final JPanel head = new JPanel();
+		head.setLayout(new BoxLayout(head, BoxLayout.Y_AXIS));
+		head.setBackground(CARD);
+		head.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+		head.setAlignmentX(Component.LEFT_ALIGNMENT);
+		for (final JLabel l : new JLabel[]{logSession, logToday, logWeek, logAll, logMeta, logSync})
+		{
+			l.setAlignmentX(Component.LEFT_ALIGNMENT);
+			l.setFont(FontManager.getRunescapeSmallFont());
+			head.add(l);
+		}
+		logSession.setForeground(Palette.GOLD);
+		logToday.setForeground(Color.WHITE);
+		logWeek.setForeground(Palette.SUBTLE);
+		logAll.setForeground(Palette.SUBTLE);
+		logMeta.setForeground(Palette.SUBTLE);
+		logSync.setForeground(Palette.SUBTLE);
+		head.setMaximumSize(new Dimension(Integer.MAX_VALUE, head.getPreferredSize().height + 40));
+
+		logList.setLayout(new BoxLayout(logList, BoxLayout.Y_AXIS));
+
+		final JPanel body = new JPanel();
+		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		head.setAlignmentX(Component.LEFT_ALIGNMENT);
+		logList.setAlignmentX(Component.LEFT_ALIGNMENT);
+		body.add(head);
+		body.add(gap(8));
+		body.add(logList);
+
+		final ScrollList wrap = new ScrollList();
+		wrap.add(body, BorderLayout.NORTH);
+		final JScrollPane scroll = new JScrollPane(wrap,
+			ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+		scroll.setBorder(null);
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
+		final JPanel holder = new JPanel(new BorderLayout());
+		holder.add(scroll, BorderLayout.CENTER);
+		return holder;
+	}
+
+	private static String gpSign(long v)
+	{
+		return (v > 0 ? "+" : "") + Fmt.compact(v);
+	}
+
+	private static String dur(long ms)
+	{
+		final long m = ms / 60_000L;
+		if (m < 1)
+		{
+			return "<1m";
+		}
+		if (m < 60)
+		{
+			return m + "m";
+		}
+		final long h = m / 60;
+		if (h < 24)
+		{
+			return h + "h " + (m % 60) + "m";
+		}
+		return (h / 24) + "d " + (h % 24) + "h";
+	}
+
+	void setFlipLog(FlipLogEngine.Summary s, boolean hasKey)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			if (s == null)
+			{
+				return;
+			}
+			logSession.setText(s.sessionGpHr == Long.MIN_VALUE
+				? "Session: " + gpSign(s.sessionProfit)
+				: "Session: " + gpSign(s.sessionProfit) + " · " + gpSign(s.sessionGpHr) + "/hr active");
+			logToday.setText("Today " + gpSign(s.todayProfit) + " · week " + gpSign(s.weekProfit));
+			logToday.setForeground(s.todayProfit >= 0 ? Palette.GREEN : Palette.RED);
+			logWeek.setText("All time " + gpSign(s.allProfit) + " · tax paid " + Fmt.compact(s.allTax));
+			logAll.setText(s.allFlips + " flips" + (s.winRatePct >= 0 ? " · " + s.winRatePct + "% won" : "")
+				+ (s.checks > 0 ? " · " + s.checks + " margin checks" : ""));
+			logMeta.setText(s.untrackedSells > 0 ? s.untrackedSells + " sold items had no tracked cost" : " ");
+			logSync.setText(hasKey
+				? (s.pendingSync > 0 ? "Backing up… " + s.pendingSync + " fills queued" : "Backed up · premium.pricecheck.gg/portfolio")
+				: "Local only · add a key in Settings for free backup + web view");
+
+			logList.removeAll();
+			if (!s.openLots.isEmpty())
+			{
+				logList.add(sectionHeader("Open positions (" + s.openLots.size() + ")"));
+				for (final FlipLogEngine.Lot l : s.openLots)
+				{
+					logList.add(lotRow(l));
+					logList.add(gap(5));
+				}
+				logList.add(gap(4));
+			}
+			logList.add(sectionHeader("Completed flips"));
+			if (s.recent.isEmpty())
+			{
+				logList.add(note("Buy and sell on the GE and flips appear here. No key needed.", Palette.SUBTLE));
+			}
+			for (final FlipLogEngine.Flip f : s.recent)
+			{
+				logList.add(logFlipRow(f));
+				logList.add(gap(5));
+			}
+			logList.add(Box.createVerticalGlue());
+			logList.revalidate();
+			logList.repaint();
+		});
+	}
+
+	private JPanel lotRow(FlipLogEngine.Lot l)
+	{
+		final JPanel rowP = new JPanel(new BorderLayout(6, 0));
+		rowP.setBackground(CARD);
+		rowP.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+		rowP.setAlignmentX(Component.LEFT_ALIGNMENT);
+		final JLabel icon = new JLabel();
+		icon.setPreferredSize(new Dimension(28, 30));
+		icon.setHorizontalAlignment(SwingConstants.CENTER);
+		itemManager.getImage(l.itemId).addTo(icon);
+		final JLabel name = new JLabel("<html><body style='width:126px'><b>"
+			+ escHtml(l.name != null ? l.name : ("#" + l.itemId)) + "</b></body></html>");
+		name.setForeground(Color.WHITE);
+		final JPanel line1 = row();
+		line1.add(name, BorderLayout.CENTER);
+		final JLabel amt = mono(Fmt.full(l.qty) + " @ " + Fmt.compact(l.qty > 0 ? l.cost / l.qty : l.cost), Palette.SUBTLE);
+		final JLabel age = mono(dur(System.currentTimeMillis() - l.openedAt) + " held", Palette.SUBTLE);
+		age.setHorizontalAlignment(SwingConstants.RIGHT);
+		final JPanel line2 = row();
+		line2.add(amt, BorderLayout.CENTER);
+		line2.add(age, BorderLayout.EAST);
+		final JPanel center = new JPanel(new BorderLayout());
+		center.setOpaque(false);
+		center.add(line1, BorderLayout.NORTH);
+		center.add(line2, BorderLayout.SOUTH);
+		rowP.add(icon, BorderLayout.WEST);
+		rowP.add(center, BorderLayout.CENTER);
+		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
+		return rowP;
+	}
+
+	private JPanel logFlipRow(FlipLogEngine.Flip f)
+	{
+		final JPanel rowP = new JPanel(new BorderLayout(6, 0));
+		rowP.setBackground(CARD);
+		rowP.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+		rowP.setAlignmentX(Component.LEFT_ALIGNMENT);
+		final JLabel icon = new JLabel();
+		icon.setPreferredSize(new Dimension(28, 30));
+		icon.setHorizontalAlignment(SwingConstants.CENTER);
+		itemManager.getImage(f.itemId).addTo(icon);
+		final JLabel name = new JLabel("<html><body style='width:110px'><b>"
+			+ escHtml(f.name != null ? f.name : ("#" + f.itemId)) + "</b>"
+			+ (f.check ? " <span style='color:#9a917c'>check</span>" : "") + "</body></html>");
+		name.setForeground(Color.WHITE);
+		final JLabel profit = mono(gpSign(f.profit), f.profit >= 0 ? Palette.GREEN : Palette.RED);
+		profit.setHorizontalAlignment(SwingConstants.RIGHT);
+		final JPanel line1 = row();
+		line1.add(name, BorderLayout.CENTER);
+		line1.add(profit, BorderLayout.EAST);
+		final double roi = f.buyGross > 0 ? 100.0 * f.profit / f.buyGross : 0;
+		final JLabel det = mono(Fmt.full(f.qty) + " × · " + String.format(java.util.Locale.ROOT, "%.1f", roi) + "%", Palette.SUBTLE);
+		final JLabel when = mono(dur(Math.max(0, f.closedAt - f.openedAt)), Palette.SUBTLE);
+		when.setHorizontalAlignment(SwingConstants.RIGHT);
+		final JPanel line2 = row();
+		line2.add(det, BorderLayout.CENTER);
+		line2.add(when, BorderLayout.EAST);
+		final JPanel center = new JPanel(new BorderLayout());
+		center.setOpaque(false);
+		center.add(line1, BorderLayout.NORTH);
+		center.add(line2, BorderLayout.SOUTH);
+		rowP.add(icon, BorderLayout.WEST);
+		rowP.add(center, BorderLayout.CENTER);
+		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
+		return rowP;
 	}
 
 	// ── Plan tab: split your capital across your GE slots ──

@@ -411,6 +411,76 @@ public class PriceCheckApiClient
 		}
 	}
 
+	/** Sync a flip-log batch (fills + flips + open lots) for one game account.
+	 *  Free-tier endpoint: needs only a valid key. Returns true when the server
+	 *  accepted the batch (the caller then marks it synced). */
+	boolean postFills(String key, FlipLogEngine.SyncBatch batch)
+	{
+		if (key == null || key.trim().isEmpty() || batch == null)
+		{
+			return false;
+		}
+		final Map<String, Object> body = new HashMap<>(4);
+		body.put("accountHash", String.valueOf(batch.accountHash));
+		final List<Map<String, Object>> fills = new java.util.ArrayList<>(batch.fills.size());
+		for (final FlipLogEngine.Fill f : batch.fills)
+		{
+			final Map<String, Object> m = new HashMap<>(8);
+			m.put("id", f.id);
+			m.put("itemId", f.itemId);
+			m.put("buy", f.buy);
+			m.put("qty", f.qty);
+			m.put("gross", f.gross);
+			m.put("tax", f.tax);
+			m.put("ts", f.ts);
+			fills.add(m);
+		}
+		body.put("fills", fills);
+		final List<Map<String, Object>> flips = new java.util.ArrayList<>(batch.flips.size());
+		for (final FlipLogEngine.Flip f : batch.flips)
+		{
+			final Map<String, Object> m = new HashMap<>(10);
+			m.put("id", f.id);
+			m.put("itemId", f.itemId);
+			m.put("itemName", f.name);
+			m.put("qty", f.qty);
+			m.put("buyGross", f.buyGross);
+			m.put("sellGross", f.sellGross);
+			m.put("tax", f.tax);
+			m.put("openedAt", f.openedAt);
+			m.put("closedAt", f.closedAt);
+			m.put("marginCheck", f.check);
+			flips.add(m);
+		}
+		body.put("flips", flips);
+		final List<Map<String, Object>> lots = new java.util.ArrayList<>(batch.lots.size());
+		for (final FlipLogEngine.Lot l : batch.lots)
+		{
+			final Map<String, Object> m = new HashMap<>(6);
+			m.put("itemId", l.itemId);
+			m.put("itemName", l.name);
+			m.put("qty", l.qty);
+			m.put("cost", l.cost);
+			m.put("openedAt", l.openedAt);
+			lots.add(m);
+		}
+		body.put("lots", lots);
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("fills").build())
+			.header("Authorization", "Bearer " + key.trim())
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			return res.isSuccessful();
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck fills sync failed", e);
+			return false;
+		}
+	}
+
 	/** Report the player's liquid capital (coins + platinum tokens, bank +
 	 *  inventory) so the web planner can prefill. Best-effort. */
 	boolean postCapital(String key, long coins, long platTokens)
