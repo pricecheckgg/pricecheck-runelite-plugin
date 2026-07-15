@@ -7,9 +7,10 @@ import java.awt.Color;
  * instruction: keep it, or move it by a precise amount, or kill it. Pure logic —
  * no client or network calls — so it's deterministic and unit-testable.
  *
- * Market reference (matches the server): to BUY you place at the current low
- * (FlipData.buy, the price sellers are hitting); to SELL you place at the current
- * high (FlipData.sell, the price buyers are paying). Margins are post-GE-tax.
+ * Market reference (matches the server): to BUY you place at FlipData.buy and to
+ * SELL at FlipData.sell. The server already cuts both 1gp inside the last trades
+ * (overcut the bids, undercut the asks) so an offer at these prices heads the
+ * queue. Margins are post-GE-tax.
  */
 final class OfferAdvisor
 {
