@@ -445,28 +445,26 @@ class PriceCheckPanel extends PluginPanel
 		list.repaint();
 	}
 
-	// ── flip row: icon | name+EV / buy→sell+profit | track toggle ──
+	// ── flip row: icon | name (wraps) / buy→sell+profit / EV | track toggle ──
 	private JPanel flipRow(FlipData f, boolean tracked)
 	{
 		final JPanel rowP = new JPanel(new BorderLayout(6, 0));
 		rowP.setBackground(CARD);
 		rowP.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
 		rowP.setAlignmentX(Component.LEFT_ALIGNMENT);
-		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
 
 		final JLabel icon = new JLabel();
 		icon.setPreferredSize(new Dimension(28, 32));
 		icon.setHorizontalAlignment(SwingConstants.CENTER);
 		itemManager.getImage(f.getGeId()).addTo(icon);
 
-		final JLabel name = new JLabel(f.getName());
-		name.setFont(name.getFont().deriveFont(Font.BOLD));
+		// The name gets the whole first line and wraps instead of truncating —
+		// the fixed body width makes the HTML label report a real wrapped
+		// preferred height, which plain labels in a BorderLayout won't.
+		final JLabel name = new JLabel("<html><body style='width:126px'><b>" + escHtml(f.getName()) + "</b></body></html>");
 		name.setForeground(Color.WHITE);
-		final JLabel ev = mono(Fmt.compact(f.getEvPerHr()) + "/hr", Palette.GOLD);
-		ev.setHorizontalAlignment(SwingConstants.RIGHT);
 		final JPanel line1 = row();
 		line1.add(name, BorderLayout.CENTER);
-		line1.add(ev, BorderLayout.EAST);
 
 		final JLabel bs = mono(Fmt.compact(f.getBuy()) + " → " + Fmt.compact(f.getSell()), Palette.SUBTLE);
 		final JLabel profit = mono("+" + Fmt.compact(f.getProfit()), f.getProfit() >= 0 ? Palette.GREEN : Palette.RED);
@@ -474,6 +472,11 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel line2 = row();
 		line2.add(bs, BorderLayout.CENTER);
 		line2.add(profit, BorderLayout.EAST);
+
+		final JLabel ev = mono(Fmt.compact(f.getEvPerHr()) + "/hr", Palette.GOLD);
+		ev.setHorizontalAlignment(SwingConstants.RIGHT);
+		final JPanel line3 = row();
+		line3.add(ev, BorderLayout.EAST);
 
 		if (f.isConfirmed())
 		{
@@ -486,7 +489,11 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel center = new JPanel(new BorderLayout());
 		center.setOpaque(false);
 		center.add(line1, BorderLayout.NORTH);
-		center.add(line2, BorderLayout.SOUTH);
+		final JPanel lower = new JPanel(new BorderLayout());
+		lower.setOpaque(false);
+		lower.add(line2, BorderLayout.NORTH);
+		lower.add(line3, BorderLayout.SOUTH);
+		center.add(lower, BorderLayout.SOUTH);
 
 		final JLabel trk = new JLabel(tracked ? "✓" : "+", SwingConstants.CENTER);
 		trk.setPreferredSize(new Dimension(18, 34));
@@ -515,7 +522,15 @@ class PriceCheckPanel extends PluginPanel
 		rowP.add(icon, BorderLayout.WEST);
 		rowP.add(center, BorderLayout.CENTER);
 		rowP.add(trk, BorderLayout.EAST);
+		// Height follows the (possibly wrapped) name; without this cap the
+		// BoxLayout parent stretches rows to fill leftover space.
+		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
 		return rowP;
+	}
+
+	private static String escHtml(String s)
+	{
+		return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
 	}
 
 	// ── tracking card ──
