@@ -62,6 +62,8 @@ class PriceCheckPanel extends PluginPanel
 		// capital < 0 = "use my last reported bank total" (server-side fallback)
 		void onBuildPlan(long capital, int slots, int accounts);
 		void onImportHistory();    // import the missed trades found in the GE History tab
+		void onDeleteFlip(String flipId);
+		void onDeleteLot(int itemId, int qty, long cost, long openedAt);
 	}
 
 	private final Listener listener;
@@ -382,7 +384,30 @@ class PriceCheckPanel extends PluginPanel
 		rowP.add(icon, BorderLayout.WEST);
 		rowP.add(center, BorderLayout.CENTER);
 		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
+		final String lotLabel = (l.name != null ? l.name : ("#" + l.itemId)) + " × " + l.qty;
+		attachDeleteMenu(rowP, "Remove position…",
+			"Remove " + lotLabel + " from tracking?\nA later sell of it will show as untracked instead of a flip.",
+			() -> listener.onDeleteLot(l.itemId, l.qty, l.cost, l.openedAt));
 		return rowP;
+	}
+
+	// Right-click delete on log rows: menu, then an explicit confirm. Deletes
+	// propagate to the web portfolio and any other machine on the next sync.
+	private void attachDeleteMenu(JPanel rowP, String menuLabel, String confirmText, Runnable action)
+	{
+		final javax.swing.JPopupMenu menu = new javax.swing.JPopupMenu();
+		final javax.swing.JMenuItem item = new javax.swing.JMenuItem(menuLabel);
+		item.addActionListener(ev ->
+		{
+			final int ok = javax.swing.JOptionPane.showConfirmDialog(rowP, confirmText, "PriceCheck",
+				javax.swing.JOptionPane.OK_CANCEL_OPTION, javax.swing.JOptionPane.WARNING_MESSAGE);
+			if (ok == javax.swing.JOptionPane.OK_OPTION)
+			{
+				action.run();
+			}
+		});
+		menu.add(item);
+		rowP.setComponentPopupMenu(menu);
 	}
 
 	private JPanel logFlipRow(FlipLogEngine.Flip f)
@@ -418,6 +443,10 @@ class PriceCheckPanel extends PluginPanel
 		rowP.add(icon, BorderLayout.WEST);
 		rowP.add(center, BorderLayout.CENTER);
 		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
+		attachDeleteMenu(rowP, "Delete flip…",
+			"Delete this " + (f.name != null ? f.name : ("#" + f.itemId)) + " flip (" + gpSign(f.profit) + ")?\n"
+				+ "It comes out of your log and totals everywhere. Open positions are not restored.",
+			() -> listener.onDeleteFlip(f.id));
 		return rowP;
 	}
 

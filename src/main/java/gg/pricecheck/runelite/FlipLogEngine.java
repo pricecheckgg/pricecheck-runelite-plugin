@@ -1,6 +1,7 @@
 package gg.pricecheck.runelite;
 
 import com.google.gson.Gson;
+import com.google.gson.annotations.SerializedName;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -74,6 +75,9 @@ class FlipLogEngine
 		long slotsUpdatedAt;
 		List<Lot> lots;
 		long lotsUpdatedAt;
+		// Flips deleted on the web or on another machine; applied on adoption so
+		// a delete anywhere is a delete everywhere.
+		List<String> deletions;
 	}
 
 	/** Slot snapshot as it travels to/from the server. */
@@ -123,6 +127,10 @@ class FlipLogEngine
 	static class Lot
 	{
 		int itemId;
+		// The server ships lots as "itemName"; the local file has always said
+		// "name". Without the alternate, every multi-machine adoption nulled the
+		// name and the panel degraded to "#itemId".
+		@SerializedName(value = "name", alternate = {"itemName"})
 		String name;
 		int qty;
 		long cost;
@@ -163,6 +171,11 @@ class FlipLogEngine
 		// live fill and every import records one, so re-opening the history tab
 		// can never import the same trade twice.
 		List<String> fillKeys = new ArrayList<>();
+		// User-deleted flips. deletedFlipIds is the local tombstone set (a sync
+		// or adoption can never resurrect one); pendingDeletes are ids still
+		// awaiting server acknowledgement.
+		List<String> deletedFlipIds = new ArrayList<>();
+		List<String> pendingDeletes = new ArrayList<>();
 		long lastBackupMs;
 		// When the local open-lot list last changed (multi-machine adoption
 		// only replaces lots with a server copy that is strictly newer).
@@ -300,12 +313,168 @@ class FlipLogEngine
 				data.lotsMutMs = remote.lotsUpdatedAt;
 				changed = true;
 			}
+			// Deletes made on the web or another machine reach this one here.
+			if (remote.deletions != null)
+			{
+				for (final String id : remote.deletions)
+				{
+					if (id != null && !data.deletedFlipIds.contains(id) && removeFlip(id, false))
+					{
+						changed = true;
+					}
+				}
+			}
 			if (changed)
 			{
 				save();
 			}
 		}
 		releaseHold();
+	}
+
+	// ── deletion (import mistakes, or the user just wants a trade gone) ──
+
+	/** Delete one flip everywhere: out of the list and totals, tombstoned so no
+	 *  sync or adoption resurrects it, queued for server deletion. The fills
+	 *  behind it stay in fillKeys, so a GE-history import won't re-offer the
+	 *  same trade. Consumed lots are NOT restored (delete, not undo). */
+	synchronized boolean deleteFlip(String id)
+	{
+		if (id == null || !removeFlip(id, true))
+		{
+			return false;
+		}
+		save();
+		return true;
+	}
+
+	private boolean removeFlip(String id, boolean tellServer)
+	{
+		final Iterator<Flip> it = data.flips.iterator();
+		while (it.hasNext())
+		{
+			final Flip f = it.next();
+			if (!id.equals(f.id))
+			{
+				continue;
+			}
+			it.remove();
+			data.allProfit -= f.profit;
+			data.allTax -= f.tax;
+			if (f.check)
+			{
+				data.checks--;
+			}
+			else
+			{
+				data.allFlips--;
+				if (f.profit > 0)
+				{
+					data.allWins--;
+				}
+			}
+			tombstone(data.deletedFlipIds, id);
+			if (tellServer)
+			{
+				tombstone(data.pendingDeletes, id);
+			}
+			return true;
+		}
+		// Not held locally (evicted long ago): still tombstone, so a stale
+		// machine can't push it back after the server forgot it.
+		tombstone(data.deletedFlipIds, id);
+		return false;
+	}
+
+	private static void tombstone(List<String> list, String id)
+	{
+		if (!list.contains(id))
+		{
+			list.add(id);
+			while (list.size() > 500)
+			{
+				list.remove(0);
+			}
+		}
+	}
+
+	/** Remove one open position by exact identity. Sells of that item later
+	 *  become untracked instead of matching a lot the user disowned. */
+	synchronized boolean deleteLot(int itemId, int qty, long cost, long openedAt)
+	{
+		final Iterator<Lot> it = data.openLots.iterator();
+		while (it.hasNext())
+		{
+			final Lot l = it.next();
+			if (l.itemId == itemId && l.qty == qty && l.cost == cost && l.openedAt == openedAt)
+			{
+				it.remove();
+				data.lotsMutMs = System.currentTimeMillis();
+				data.slotsDirty = true;   // force a push so the server copy updates too
+				save();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// ── name healing ──
+	// Names can be missing on old records (a serialization gap in early builds
+	// nulled them on multi-machine adoption). The plugin resolves ids on the
+	// client thread and hands the answers back here.
+
+	synchronized java.util.Set<Integer> idsMissingNames()
+	{
+		final java.util.Set<Integer> out = new java.util.HashSet<>();
+		for (final Lot l : data.openLots)
+		{
+			if (l.name == null || l.name.isEmpty())
+			{
+				out.add(l.itemId);
+			}
+		}
+		for (final Flip f : data.flips)
+		{
+			if (f.name == null || f.name.isEmpty())
+			{
+				out.add(f.itemId);
+			}
+		}
+		return out;
+	}
+
+	synchronized void applyNames(java.util.Map<Integer, String> names)
+	{
+		if (names == null || names.isEmpty())
+		{
+			return;
+		}
+		boolean changed = false;
+		for (final Lot l : data.openLots)
+		{
+			final String n = names.get(l.itemId);
+			if ((l.name == null || l.name.isEmpty()) && n != null)
+			{
+				l.name = n;
+				changed = true;
+			}
+		}
+		for (final Flip f : data.flips)
+		{
+			final String n = names.get(f.itemId);
+			if ((f.name == null || f.name.isEmpty()) && n != null)
+			{
+				f.name = n;
+				changed = true;
+			}
+		}
+		if (changed)
+		{
+			// Healed lots must win the next adoption and reach the server.
+			data.lotsMutMs = System.currentTimeMillis();
+			data.slotsDirty = true;
+			save();
+		}
 	}
 
 	synchronized void releaseHold()
@@ -725,6 +894,7 @@ class FlipLogEngine
 		List<Flip> flips;
 		List<Lot> lots;
 		List<SlotExport> slots;
+		List<String> deletes;
 	}
 
 	synchronized SyncBatch syncBatch()
@@ -749,7 +919,7 @@ class FlipLogEngine
 		}
 		// Slot state syncs even with nothing else pending: placements and
 		// collections must reach the server for the next machine's handoff.
-		if (fills.isEmpty() && flips.isEmpty() && !data.slotsDirty)
+		if (fills.isEmpty() && flips.isEmpty() && !data.slotsDirty && data.pendingDeletes.isEmpty())
 		{
 			return null;
 		}
@@ -757,6 +927,7 @@ class FlipLogEngine
 		b.accountHash = accountHash;
 		b.fills = fills;
 		b.flips = flips;
+		b.deletes = new ArrayList<>(data.pendingDeletes);
 		b.lots = copyLots(data.openLots);
 		b.slots = new ArrayList<>();
 		for (int i = 0; i < SLOTS; i++)
@@ -813,6 +984,10 @@ class FlipLogEngine
 		for (final Flip f : b.flips)
 		{
 			f.synced = true;
+		}
+		if (b.deletes != null)
+		{
+			data.pendingDeletes.removeAll(b.deletes);
 		}
 		data.slotsDirty = false;
 		save();
@@ -881,6 +1056,14 @@ class FlipLogEngine
 			if (d.fillKeys == null)
 			{
 				d.fillKeys = new ArrayList<>();
+			}
+			if (d.deletedFlipIds == null)
+			{
+				d.deletedFlipIds = new ArrayList<>();
+			}
+			if (d.pendingDeletes == null)
+			{
+				d.pendingDeletes = new ArrayList<>();
 			}
 			return d;
 		}

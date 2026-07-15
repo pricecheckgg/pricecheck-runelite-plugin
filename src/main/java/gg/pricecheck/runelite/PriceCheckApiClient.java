@@ -465,6 +465,10 @@ public class PriceCheckApiClient
 			lots.add(m);
 		}
 		body.put("lots", lots);
+		if (batch.deletes != null && !batch.deletes.isEmpty())
+		{
+			body.put("deletes", batch.deletes);
+		}
 		final List<Map<String, Object>> slots = new java.util.ArrayList<>(batch.slots == null ? 0 : batch.slots.size());
 		if (batch.slots != null)
 		{

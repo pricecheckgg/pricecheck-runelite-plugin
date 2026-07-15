@@ -211,6 +211,18 @@ public class PriceCheckPlugin extends Plugin
 					refreshPanel();
 				});
 			}
+
+			@Override
+			public void onDeleteFlip(String flipId)
+			{
+				deleteFlip(flipId);
+			}
+
+			@Override
+			public void onDeleteLot(int itemId, int qty, long cost, long openedAt)
+			{
+				deleteLot(itemId, qty, cost, openedAt);
+			}
 		}, itemManager, configManager, config);
 		navButton = NavigationButton.builder()
 			.tooltip("PriceCheck")
@@ -477,6 +489,73 @@ public class PriceCheckPlugin extends Plugin
 	}
 
 	// ── side panel: the whole best-flips board ──
+	// Resolve any log entries that only carry an item id (old records from
+	// before the adoption serialization fix). Ids resolve on the client thread;
+	// the answers heal the engine, persist, and push on the next sync.
+	private void healItemNames()
+	{
+		final FlipLogEngine engine = flipLog;
+		if (engine == null)
+		{
+			return;
+		}
+		final java.util.Set<Integer> ids = engine.idsMissingNames();
+		if (ids.isEmpty())
+		{
+			return;
+		}
+		clientThread.invoke(() ->
+		{
+			final java.util.Map<Integer, String> names = new java.util.HashMap<>();
+			for (final int id : ids)
+			{
+				try
+				{
+					final String n = itemManager.getItemComposition(id).getName();
+					if (n != null && !n.isEmpty() && !"null".equals(n))
+					{
+						names.put(id, n);
+					}
+				}
+				catch (RuntimeException ignored)
+				{
+				}
+			}
+			if (!names.isEmpty())
+			{
+				poller.execute(() -> engine.applyNames(names));
+			}
+		});
+	}
+
+	/** Panel right-click: delete one flip from the log (and the server). */
+	void deleteFlip(String flipId)
+	{
+		poller.execute(() ->
+		{
+			final FlipLogEngine engine = flipLog;
+			if (engine != null && engine.deleteFlip(flipId))
+			{
+				syncFlipLog();
+				refreshPanel();
+			}
+		});
+	}
+
+	/** Panel right-click: remove one open position from tracking. */
+	void deleteLot(int itemId, int qty, long cost, long openedAt)
+	{
+		poller.execute(() ->
+		{
+			final FlipLogEngine engine = flipLog;
+			if (engine != null && engine.deleteLot(itemId, qty, cost, openedAt))
+			{
+				syncFlipLog();
+				refreshPanel();
+			}
+		});
+	}
+
 	private void refreshPanel()
 	{
 		final PriceCheckPanel p = panel;
@@ -484,6 +563,7 @@ public class PriceCheckPlugin extends Plugin
 		{
 			return;
 		}
+		healItemNames();
 		final String key = config.apiKey();
 		final PriceCheckApiClient.FlipsResult flips = api.getFlips(key, FLIP_LIMIT);
 		final PriceCheckApiClient.TrackedResult tracked = api.getTracked(key);
