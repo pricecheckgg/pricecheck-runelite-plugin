@@ -371,6 +371,11 @@ class PriceCheckPanel extends PluginPanel
 				planStatus.setText("Subscription inactive.");
 				planStatus.setForeground(Palette.RED);
 			}
+			else if (result.state == PriceCheckApiClient.AuthState.PLAN_REQUIRED)
+			{
+				planStatus.setText("The plugin comes with Trader Pro.");
+				planStatus.setForeground(Palette.AMBER);
+			}
 			else if (result.needCapital)
 			{
 				planStatus.setText("Enter your capital, or open your bank once in game.");
@@ -934,6 +939,7 @@ class PriceCheckPanel extends PluginPanel
 		{
 			case INVALID_KEY: title = "Key not recognised"; body = "Regenerate it at premium.pricecheck.gg, then paste it in Settings."; break;
 			case NO_SUBSCRIPTION: title = "Subscription inactive"; body = "Renew at premium.pricecheck.gg to see live flips."; break;
+			case PLAN_REQUIRED: title = "Trader Pro feature"; body = "The RuneLite plugin comes with Trader Pro. Upgrade at premium.pricecheck.gg."; break;
 			case ERROR: title = "Can't reach PriceCheck"; body = "Retrying…"; break;
 			default: title = "Add your plugin key"; body = "Open Settings and paste your key to see live flips."; break;
 		}

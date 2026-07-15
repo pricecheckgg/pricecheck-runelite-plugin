@@ -43,7 +43,25 @@ public class PriceCheckApiClient
 
 	enum AuthState
 	{
-		OK, NO_KEY, INVALID_KEY, NO_SUBSCRIPTION, ERROR
+		OK, NO_KEY, INVALID_KEY, NO_SUBSCRIPTION, PLAN_REQUIRED, ERROR
+	}
+
+	// 403 means either a lapsed subscription or a plan below Trader Pro — the
+	// body's error code tells them apart so the panel can say the right thing.
+	private AuthState forbiddenState(Response res)
+	{
+		try
+		{
+			final String body = res.body() != null ? res.body().string() : "";
+			if (body.contains("plan_required"))
+			{
+				return AuthState.PLAN_REQUIRED;
+			}
+		}
+		catch (IOException | RuntimeException ignored)
+		{
+		}
+		return AuthState.NO_SUBSCRIPTION;
 	}
 
 	static final class FlipsResult
@@ -81,7 +99,7 @@ public class PriceCheckApiClient
 				case 401:
 					return new FlipsResult(AuthState.INVALID_KEY, Collections.emptyList());
 				case 403:
-					return new FlipsResult(AuthState.NO_SUBSCRIPTION, Collections.emptyList());
+					return new FlipsResult(forbiddenState(res), Collections.emptyList());
 				default:
 					break;
 			}
@@ -373,7 +391,7 @@ public class PriceCheckApiClient
 				case 401:
 					return new PlanResult(AuthState.INVALID_KEY, null, false);
 				case 403:
-					return new PlanResult(AuthState.NO_SUBSCRIPTION, null, false);
+					return new PlanResult(forbiddenState(res), null, false);
 				case 400:
 					return new PlanResult(AuthState.OK, null, true);
 				default:
