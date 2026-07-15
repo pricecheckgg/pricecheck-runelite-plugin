@@ -61,6 +61,7 @@ class PriceCheckPanel extends PluginPanel
 		void onFetchAccount();     // fired when the Settings tab is opened / after a key save
 		// capital < 0 = "use my last reported bank total" (server-side fallback)
 		void onBuildPlan(long capital, int slots, int accounts);
+		void onImportHistory();    // import the missed trades found in the GE History tab
 	}
 
 	private final Listener listener;
@@ -192,6 +193,9 @@ class PriceCheckPanel extends PluginPanel
 	private final JLabel logMeta = new JLabel(" ");
 	private final JLabel logSync = new JLabel(" ");
 	private final JPanel logList = new JPanel();
+	private final JPanel importBanner = new JPanel();
+	private final JLabel importLabel = new JLabel(" ");
+	private final JButton importBtn = new JButton("Import");
 
 	private JPanel buildLogView()
 	{
@@ -216,11 +220,34 @@ class PriceCheckPanel extends PluginPanel
 
 		logList.setLayout(new BoxLayout(logList, BoxLayout.Y_AXIS));
 
+		// Recovery banner: shows when the GE History tab reveals trades the log
+		// missed (completed while logged out / plugin off). One click imports.
+		importBanner.setLayout(new BorderLayout(8, 0));
+		importBanner.setBackground(CARD);
+		importBanner.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(new Color(0xd4, 0xaf, 0x37, 90), 1),
+			BorderFactory.createEmptyBorder(8, 10, 8, 8)));
+		importBanner.setAlignmentX(Component.LEFT_ALIGNMENT);
+		importLabel.setForeground(Palette.GOLD);
+		importLabel.setFont(FontManager.getRunescapeSmallFont());
+		importBtn.setFocusPainted(false);
+		importBtn.addActionListener(e ->
+		{
+			importBtn.setEnabled(false);
+			listener.onImportHistory();
+		});
+		importBanner.add(importLabel, BorderLayout.CENTER);
+		importBanner.add(importBtn, BorderLayout.EAST);
+		importBanner.setVisible(false);
+		importBanner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
+
 		final JPanel body = new JPanel();
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 		head.setAlignmentX(Component.LEFT_ALIGNMENT);
 		logList.setAlignmentX(Component.LEFT_ALIGNMENT);
 		body.add(head);
+		body.add(gap(8));
+		body.add(importBanner);
 		body.add(gap(8));
 		body.add(logList);
 
@@ -233,6 +260,26 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel holder = new JPanel(new BorderLayout());
 		holder.add(scroll, BorderLayout.CENTER);
 		return holder;
+	}
+
+	/** n > 0 shows the recovery banner; 0 hides it. Call after an import too. */
+	void setImportOffer(int n)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			if (n > 0)
+			{
+				importLabel.setText("<html><body style='width:150px'>" + n
+					+ (n == 1 ? " trade" : " trades") + " in your GE history " + (n == 1 ? "is" : "are")
+					+ " missing from the log.</body></html>");
+				importBtn.setEnabled(true);
+				importBanner.setVisible(true);
+			}
+			else
+			{
+				importBanner.setVisible(false);
+			}
+		});
 	}
 
 	private static String gpSign(long v)

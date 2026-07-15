@@ -92,6 +92,8 @@ public class PriceCheckPlugin extends Plugin
 	private FlipLogEngine flipLog;
 	private ScheduledFuture<?> flipSyncTask;
 	private volatile int lastLoginTick = -10;
+	// Trades read from the GE History tab awaiting the user's Import click.
+	private volatile java.util.List<FlipLogEngine.HistEntry> pendingHistory;
 
 	// GE chatbox integrations: click-to-fill prices + search suggestions.
 	private GeChatboxHelper geHelper;
@@ -184,6 +186,29 @@ public class PriceCheckPlugin extends Plugin
 					{
 						p.setPlan(r);
 					}
+				});
+			}
+
+			@Override
+			public void onImportHistory()
+			{
+				poller.execute(() ->
+				{
+					final java.util.List<FlipLogEngine.HistEntry> entries = pendingHistory;
+					final FlipLogEngine engine = flipLog;
+					final PriceCheckPanel p = panel;
+					if (entries == null || engine == null)
+					{
+						return;
+					}
+					final int n = engine.importFromHistory(entries, null);
+					pendingHistory = null;
+					if (p != null)
+					{
+						p.setImportOffer(0);
+					}
+					log.debug("imported {} trades from GE history", n);
+					refreshPanel();
 				});
 			}
 		}, itemManager, configManager, config);
@@ -501,10 +526,42 @@ public class PriceCheckPlugin extends Plugin
 	@Subscribe
 	public void onAccountHashChanged(net.runelite.api.events.AccountHashChanged event)
 	{
+		pendingHistory = null;   // never import one account's history into another
 		if (flipLog != null)
 		{
 			flipLog.setAccount(client.getAccountHash());
 		}
+	}
+
+	@Subscribe
+	public void onWidgetLoaded(net.runelite.api.events.WidgetLoaded event)
+	{
+		if (event.getGroupId() != (net.runelite.api.gameval.InterfaceID.GeHistory.LIST >>> 16))
+		{
+			return;
+		}
+		// Defer a tick so the history rows finish building, then diff them
+		// against the log and offer a one-click import for anything missed.
+		clientThread.invokeLater(() ->
+		{
+			final FlipLogEngine engine = flipLog;
+			final PriceCheckPanel p = panel;
+			if (engine == null || engine.getAccountHash() == -1)
+			{
+				return;
+			}
+			final java.util.List<FlipLogEngine.HistEntry> entries = GeHistoryReader.read(client, itemManager);
+			if (entries.isEmpty())
+			{
+				return;
+			}
+			final int missing = engine.previewImport(entries);
+			pendingHistory = missing > 0 ? entries : null;
+			if (p != null)
+			{
+				p.setImportOffer(missing);
+			}
+		});
 	}
 
 	@Subscribe

@@ -117,6 +117,26 @@ class FlipLogEngine
 		int allWins;
 		int checks;
 		long untrackedSells;                            // sold qty with no tracked cost basis
+		// Dedupe keys ("item:side:qty:gross") for the GE-history import: every
+		// live fill and every import records one, so re-opening the history tab
+		// can never import the same trade twice.
+		List<String> fillKeys = new ArrayList<>();
+		long lastBackupMs;
+	}
+
+	/** One row of the in-game GE History tab (totals are pre-tax). */
+	static class HistEntry
+	{
+		int itemId;
+		String name;
+		boolean buy;
+		int qty;
+		long gross;
+
+		String key()
+		{
+			return itemId + ":" + (buy ? "b" : "s") + ":" + qty + ":" + gross;
+		}
 	}
 
 	/** Immutable snapshot for the panel. */
@@ -297,6 +317,13 @@ class FlipLogEngine
 		{
 			data.pendingFills.remove(0);
 		}
+		// Remember the tuple so a GE-history import can tell this trade is
+		// already logged.
+		data.fillKeys.add(f.itemId + ":" + (f.buy ? "b" : "s") + ":" + f.qty + ":" + f.gross);
+		while (data.fillKeys.size() > 800)
+		{
+			data.fillKeys.remove(0);
+		}
 
 		if (f.buy)
 		{
@@ -450,6 +477,75 @@ class FlipLogEngine
 		return s;
 	}
 
+	// ── GE-history recovery ──
+	// The one gap events can't cover: offers completed AND collected while
+	// logged out. The in-game History tab is the ground truth; these two calls
+	// diff it against the log. Matching is by count per (item, side, qty,
+	// gross) tuple, and ambiguity UNDER-imports: a trade is only imported when
+	// the history shows more occurrences than the log knows about, so opening
+	// the tab twice, or importing a trade the events already caught, can never
+	// double-count.
+
+	synchronized int previewImport(List<HistEntry> entries)
+	{
+		return diffHistory(entries).size();
+	}
+
+	synchronized int importFromHistory(List<HistEntry> entries, String itemNameFallback)
+	{
+		final List<HistEntry> missing = diffHistory(entries);
+		final long now = System.currentTimeMillis();
+		int i = 0;
+		for (final HistEntry h : missing)
+		{
+			final Fill f = new Fill();
+			f.id = "hist:" + accountHash + ":" + now + ":" + (i++);
+			f.itemId = h.itemId;
+			f.buy = h.buy;
+			f.qty = h.qty;
+			f.gross = h.gross;
+			f.tax = h.buy ? 0 : fillTax(h.gross, h.qty);
+			f.ts = now;
+			f.agg = true;      // real coins, unknown timing: stays out of session stats
+			f.check = false;
+			f.name = h.name != null ? h.name : itemNameFallback;
+			ingest(f);         // records its key, so re-imports self-suppress
+		}
+		if (!missing.isEmpty())
+		{
+			save();
+		}
+		return missing.size();
+	}
+
+	private List<HistEntry> diffHistory(List<HistEntry> entries)
+	{
+		final java.util.Map<String, Integer> known = new java.util.HashMap<>();
+		for (final String k : data.fillKeys)
+		{
+			known.merge(k, 1, Integer::sum);
+		}
+		final List<HistEntry> missing = new ArrayList<>();
+		for (final HistEntry h : entries)
+		{
+			if (h == null || h.itemId <= 0 || h.qty <= 0 || h.gross <= 0)
+			{
+				continue;
+			}
+			final String k = h.key();
+			final Integer have = known.get(k);
+			if (have != null && have > 0)
+			{
+				known.put(k, have - 1);   // already logged: consume one occurrence
+			}
+			else
+			{
+				missing.add(h);
+			}
+		}
+		return missing;
+	}
+
 	// ── sync drain (poller thread) ──
 
 	static class SyncBatch
@@ -537,37 +633,11 @@ class FlipLogEngine
 
 	private Data load()
 	{
-		try
+		Data d = read(fileFor(accountHash));
+		if (d == null)
 		{
-			final File f = fileFor(accountHash);
-			if (f.exists())
-			{
-				final Data d = gson.fromJson(new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8), Data.class);
-				if (d != null)
-				{
-					if (d.slots == null || d.slots.length != SLOTS)
-					{
-						d.slots = new SlotSnap[SLOTS];
-					}
-					if (d.openLots == null)
-					{
-						d.openLots = new ArrayList<>();
-					}
-					if (d.flips == null)
-					{
-						d.flips = new ArrayList<>();
-					}
-					if (d.pendingFills == null)
-					{
-						d.pendingFills = new ArrayList<>();
-					}
-					return d;
-				}
-			}
-		}
-		catch (IOException | RuntimeException e)
-		{
-			log.warn("flip log load failed; starting fresh (old file kept as .bad)", e);
+			// Main file unreadable: quarantine it and fall back to the daily
+			// backup before ever starting fresh.
 			try
 			{
 				Files.move(fileFor(accountHash).toPath(), new File(dir, "flips-" + accountHash + ".bad.json").toPath(),
@@ -576,8 +646,60 @@ class FlipLogEngine
 			catch (IOException ignored)
 			{
 			}
+			d = read(backupFor(accountHash));
+			if (d != null)
+			{
+				log.warn("flip log restored from daily backup");
+			}
 		}
-		return new Data();
+		return d != null ? d : new Data();
+	}
+
+	private Data read(File f)
+	{
+		try
+		{
+			if (!f.exists())
+			{
+				return null;
+			}
+			final Data d = gson.fromJson(new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8), Data.class);
+			if (d == null)
+			{
+				return null;
+			}
+			if (d.slots == null || d.slots.length != SLOTS)
+			{
+				d.slots = new SlotSnap[SLOTS];
+			}
+			if (d.openLots == null)
+			{
+				d.openLots = new ArrayList<>();
+			}
+			if (d.flips == null)
+			{
+				d.flips = new ArrayList<>();
+			}
+			if (d.pendingFills == null)
+			{
+				d.pendingFills = new ArrayList<>();
+			}
+			if (d.fillKeys == null)
+			{
+				d.fillKeys = new ArrayList<>();
+			}
+			return d;
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.warn("flip log read failed: {}", f.getName(), e);
+			return null;
+		}
+	}
+
+	private File backupFor(long hash)
+	{
+		return new File(dir, "flips-" + hash + ".bak.json");
 	}
 
 	private void save()
@@ -588,9 +710,18 @@ class FlipLogEngine
 			{
 				return;
 			}
+			final byte[] json = gson.toJson(data).getBytes(StandardCharsets.UTF_8);
 			final Path tmp = new File(dir, "flips-" + accountHash + ".tmp").toPath();
-			Files.write(tmp, gson.toJson(data).getBytes(StandardCharsets.UTF_8));
+			Files.write(tmp, json);
 			Files.move(tmp, fileFor(accountHash).toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			// Rolling daily backup: a logic bug that corrupts state can only
+			// cost a day, not the ledger.
+			final long now = System.currentTimeMillis();
+			if (now - data.lastBackupMs > 86_400_000L)
+			{
+				data.lastBackupMs = now;
+				Files.write(backupFor(accountHash).toPath(), json);
+			}
 		}
 		catch (IOException | RuntimeException e)
 		{
