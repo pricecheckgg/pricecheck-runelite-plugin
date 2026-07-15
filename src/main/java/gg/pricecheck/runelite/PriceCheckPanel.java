@@ -326,8 +326,8 @@ class PriceCheckPanel extends PluginPanel
 				+ (s.checks > 0 ? " · " + s.checks + " margin checks" : ""));
 			logMeta.setText(s.untrackedSells > 0 ? s.untrackedSells + " sold items had no tracked cost" : " ");
 			logSync.setText(hasKey
-				? (s.pendingSync > 0 ? "Backing up… " + s.pendingSync + " fills queued" : "Backed up · premium.pricecheck.gg/portfolio")
-				: "Local only · free key at premium.pricecheck.gg/portfolio → Settings");
+				? (s.pendingSync > 0 ? "Backing up… " + s.pendingSync + " fills queued" : "Backed up · flipping.pricecheck.gg/portfolio")
+				: "Local only · turn on Sync flip log in settings for backup + web portfolio");
 
 			logList.removeAll();
 			if (!s.openLots.isEmpty())

@@ -11,13 +11,15 @@ import net.runelite.api.GrandExchangeOfferState;
 /**
  * Collects the player's OWN Grand Exchange offer lifecycle events (placed,
  * partial fill, completed, cancelled) for batched reporting to PriceCheck.
- * These fills are ground truth the public price aggregates can't see — how
- * long offers at a given price actually take to fill — and they sharpen the
- * measured fill model behind everyone's board.
+ * These fills carry something our live price feed can't observe on its own:
+ * how long offers at a given price actually take to fill. Submissions are
+ * stored server-side toward a future measured fill-time model; they do not
+ * currently alter any shared statistic.
  *
- * Opt-out via the "Contribute market data" config toggle. Only offer state is
- * queued: item, price, quantities, GE slot. Never the RSN, skills, wealth, or
- * anything else about the account.
+ * Strictly opt-in via the "Contribute market data" config toggle (off by
+ * default, with a data warning on enable). Only offer state is queued: item,
+ * price, quantities, GE slot. Never the RSN, skills, wealth, or anything else
+ * about the account.
  *
  * Thread-safe: offer() is called from the client thread (offer-changed events),
  * drain() from the background poller.

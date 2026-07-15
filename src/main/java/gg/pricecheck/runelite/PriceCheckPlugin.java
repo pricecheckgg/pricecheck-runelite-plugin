@@ -257,9 +257,7 @@ public class PriceCheckPlugin extends Plugin
 			// With a key, hold the seeded events until the server handoff state
 			// is adopted: a fresh install on a second machine must not treat
 			// offers another machine already recorded as new progress.
-			final String bootKey = config.apiKey();
-			final boolean bootHasKey = bootKey != null && !bootKey.trim().isEmpty();
-			if (bootHasKey && client.getAccountHash() != -1)
+			if (syncEnabled() && client.getAccountHash() != -1)
 			{
 				flipLog.beginLoginHold();
 				final FlipLogEngine engine = flipLog;
@@ -298,20 +296,24 @@ public class PriceCheckPlugin extends Plugin
 		flipSyncTask = poller.scheduleWithFixedDelay(this::syncFlipLog, 20, 30, TimeUnit.SECONDS);
 	}
 
+	// The flip log only talks to the server with a key present AND the sync
+	// toggle on (Hub rule: third-party submission is opt-in). Off = fully
+	// local: no push, no handoff fetch.
+	private boolean syncEnabled()
+	{
+		final String key = config.apiKey();
+		return key != null && !key.trim().isEmpty() && config.syncFlipLog();
+	}
+
 	private void syncFlipLog()
 	{
 		final FlipLogEngine engine = flipLog;
-		if (engine == null)
+		if (engine == null || !syncEnabled())
 		{
 			return;
 		}
-		final String key = config.apiKey();
-		if (key == null || key.trim().isEmpty())
-		{
-			return;   // local-only until the user adds a key
-		}
 		final FlipLogEngine.SyncBatch batch = engine.syncBatch();
-		if (batch != null && api.postFills(key, batch))
+		if (batch != null && api.postFills(config.apiKey(), batch))
 		{
 			engine.onSyncSuccess(batch);
 		}
@@ -571,7 +573,7 @@ public class PriceCheckPlugin extends Plugin
 		final FlipLogEngine engine = flipLog;
 		if (engine != null)
 		{
-			p.setFlipLog(engine.summary(), key != null && !key.trim().isEmpty());
+			p.setFlipLog(engine.summary(), syncEnabled());
 		}
 		final GeChatboxHelper g = geHelper;
 		if (g != null)
@@ -603,20 +605,19 @@ public class PriceCheckPlugin extends Plugin
 	public void onGameStateChanged(net.runelite.api.events.GameStateChanged event)
 	{
 		final net.runelite.api.GameState gs = event.getGameState();
-		final String key = config.apiKey();
-		final boolean hasKey = key != null && !key.trim().isEmpty();
+		final boolean syncs = syncEnabled();
 		if (gs == net.runelite.api.GameState.LOGGING_IN || gs == net.runelite.api.GameState.HOPPING
 			|| gs == net.runelite.api.GameState.CONNECTION_LOST)
 		{
 			lastLoginTick = client.getTickCount();
-			if (flipLog != null && hasKey)
+			if (flipLog != null && syncs)
 			{
 				// Hold the coming login burst until the freshest snapshots from
 				// the machine that traded last have been adopted.
 				flipLog.beginLoginHold();
 			}
 		}
-		else if (gs == net.runelite.api.GameState.LOGIN_SCREEN && hasKey)
+		else if (gs == net.runelite.api.GameState.LOGIN_SCREEN && syncs)
 		{
 			// Flush immediately at logout so the next machine's handoff fetch
 			// sees this session's final slot state, not a 30s-stale one.
@@ -626,7 +627,7 @@ public class PriceCheckPlugin extends Plugin
 		{
 			flipLog.setAccount(client.getAccountHash());
 			final FlipLogEngine engine = flipLog;
-			if (hasKey)
+			if (syncs)
 			{
 				poller.execute(() ->
 				{

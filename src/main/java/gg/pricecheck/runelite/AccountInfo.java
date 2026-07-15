@@ -10,6 +10,6 @@ public class AccountInfo
 	private boolean premium;
 	private String plan;         // "premium"
 	private String status;       // "active"
-	private String keyPrefix;    // e.g. "pck_btIb8moI…" — safe to show
+	private String keyPrefix;    // e.g. "pck_AbCd0000…" — display-only, never the full key
 	private int trackedCount;
 }
