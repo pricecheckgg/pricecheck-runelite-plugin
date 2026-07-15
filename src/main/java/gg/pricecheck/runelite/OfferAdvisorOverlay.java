@@ -3,21 +3,22 @@ package gg.pricecheck.runelite;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.util.List;
+import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
 /**
- * The live advisor. For each of your active GE offers it draws one status line
- * plus the exact instruction (raise/drop by X, or the margin died) computed by
- * {@link OfferAdvisor}. Draggable; hides itself when you have no offers.
+ * The live advisor, floating fallback for when the GE grid isn't open. For each
+ * active offer it draws the item + the exact instruction from {@link OfferAdvisor}.
+ * Draggable; hides itself when you have no offers or the grid is up (the per-slot
+ * overlay takes over there).
  */
 class OfferAdvisorOverlay extends OverlayPanel
 {
-	private static final Color GOLD = new Color(0xe6, 0xc6, 0x67);
-
 	private final PriceCheckPlugin plugin;
 	private final PriceCheckConfig config;
 
@@ -26,13 +27,20 @@ class OfferAdvisorOverlay extends OverlayPanel
 		this.plugin = plugin;
 		this.config = config;
 		setPosition(OverlayPosition.TOP_LEFT);
+		setLayer(OverlayLayer.ABOVE_WIDGETS);
 		panelComponent.setPreferredSize(new Dimension(252, 0));
+		panelComponent.setBackgroundColor(Palette.INK);
+		panelComponent.setGap(new Point(0, 2));
 	}
 
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
 		if (!config.showAdvisor())
+		{
+			return null;
+		}
+		if (plugin.isGrandExchangeOpen())
 		{
 			return null;
 		}
@@ -44,17 +52,23 @@ class OfferAdvisorOverlay extends OverlayPanel
 
 		panelComponent.getChildren().clear();
 		panelComponent.getChildren().add(TitleComponent.builder()
-			.text("PriceCheck offers")
-			.color(GOLD)
+			.text("PriceCheck")
+			.color(Palette.GOLD)
 			.build());
 
+		boolean first = true;
 		for (OfferAdvice a : advice)
 		{
+			if (!first)
+			{
+				panelComponent.getChildren().add(LineComponent.builder().left("").build());  // group separator
+			}
+			first = false;
 			panelComponent.getChildren().add(LineComponent.builder()
 				.left(a.getItemName())
 				.right(a.getSide())
 				.leftColor(Color.WHITE)
-				.rightColor(a.getColor())
+				.rightColor(Palette.SUBTLE_CANVAS)   // side is identity, not state
 				.build());
 			panelComponent.getChildren().add(LineComponent.builder()
 				.left(a.getMessage())

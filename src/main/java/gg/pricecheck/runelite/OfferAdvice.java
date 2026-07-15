@@ -14,8 +14,9 @@ class OfferAdvice
 
 	int slot;
 	String itemName;
-	String side;      // "BUY", "SELL" or ""
+	String side;       // "BUY", "SELL" or ""
 	Kind kind;
-	String message;   // the exact instruction — no filler
+	String message;    // the exact instruction — no filler (floating panel)
+	String shortText;  // compact form for the on-slot status chip, e.g. "RAISE +12.9k"
 	Color color;
 }

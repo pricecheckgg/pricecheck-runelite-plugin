@@ -29,7 +29,7 @@ final class OfferAdvisor
 		if (offer.isDone())
 		{
 			final String nm = live != null ? live.getName() : "Item " + offer.getItemId();
-			return new OfferAdvice(slot, nm, "", OfferAdvice.Kind.COLLECT, "Filled - collect", GREY);
+			return new OfferAdvice(slot, nm, "", OfferAdvice.Kind.COLLECT, "Filled - collect", "COLLECT", GREY);
 		}
 		if (!offer.isActive())
 		{
@@ -39,7 +39,7 @@ final class OfferAdvisor
 		final String side = offer.isBuying() ? "BUY" : "SELL";
 		if (live == null)
 		{
-			return new OfferAdvice(slot, "Item " + offer.getItemId(), side, OfferAdvice.Kind.NO_DATA, "No live data yet", GREY);
+			return new OfferAdvice(slot, "Item " + offer.getItemId(), side, OfferAdvice.Kind.NO_DATA, "No live data yet", "", GREY);
 		}
 
 		final String name = live.getName();
@@ -51,7 +51,7 @@ final class OfferAdvisor
 		// we'd tell a seller to "drop to 0" and give the item away.
 		if (marketBuy <= 0 || marketSell <= 0)
 		{
-			return new OfferAdvice(slot, name, side, OfferAdvice.Kind.NO_DATA, "No live price yet", GREY);
+			return new OfferAdvice(slot, name, side, OfferAdvice.Kind.NO_DATA, "No live price yet", "", GREY);
 		}
 		final long marketMargin = live.getProfit(); // net(marketBuy, marketSell), post-tax
 
@@ -61,40 +61,52 @@ final class OfferAdvisor
 			if (marketMargin <= 0)
 			{
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
-					"Margin gone (" + signed(marketMargin) + " at market) - cancel", RED);
+					"Margin gone (" + signed(marketMargin) + " at market) - cancel", "MARGIN DEAD", RED);
 			}
 			final long yourMargin = GeTax.net(yourPrice, marketSell);
 			if (yourMargin <= 0)
 			{
 				// Bid so high it loses even sold at the market high — always report red.
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
-					"Bid too high - " + signed(yourMargin) + " if it fills, lower it", RED);
+					"Bid too high - " + signed(yourMargin) + " if it fills, lower it", "BID TOO HIGH", RED);
 			}
-			if (live.isFallingKnife())
+			// An offer that has already transacted is demonstrably filling — don't
+			// nag it over small ticks. getQuantitySold covers bought units too.
+			final boolean filling = offer.getSoldQty() > 0;
+			if (!filling && live.isFallingKnife())
 			{
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.FALLING,
-					"Price falling " + pct(Math.abs(live.getTrendPct())) + " - margin closing, watch it", AMBER);
+					"Price falling " + pct(Math.abs(live.getTrendPct())) + " - margin closing, watch it",
+					"FALLING " + pct(Math.abs(live.getTrendPct())), AMBER);
 			}
-			// Your bid must sit at or above the current low or sellers won't hit it.
-			if (yourPrice < marketBuy)
+			// Your bid must sit at (near) the current low or sellers won't hit it.
+			// Ignore sub-1% noise, and don't nag an offer that's already buying.
+			final long buyTol = Math.max(marketBuy / 100, 1);
+			if (!filling && yourPrice < marketBuy - buyTol)
 			{
 				final long delta = marketBuy - yourPrice;
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.RAISE_BUY,
-					"Raise buy to " + full(marketBuy) + " (+" + gp(delta) + ") - margin " + signed(marketMargin), AMBER);
+					"Raise buy to " + full(marketBuy) + " (+" + gp(delta) + ") - margin " + signed(marketMargin),
+					"RAISE +" + gp(delta), AMBER);
 			}
 			return new OfferAdvice(slot, name, side, OfferAdvice.Kind.ON_TRACK,
-				"On track - filling, " + signed(yourMargin) + " if sold at market", GREEN);
+				"On track - " + signed(yourMargin) + " if sold at market", "ON TRACK", GREEN);
 		}
 
-		// SELLING: your ask fills only when it is at or below the current high.
-		if (yourPrice > marketSell)
+		// SELLING: it fills at/under the current high. Only flag a drop when the ask
+		// is meaningfully (>1%) above market AND nothing has sold yet — an offer that
+		// is already selling is filling fine even a touch above the momentary high.
+		final boolean sellFilling = offer.getSoldQty() > 0;
+		final long sellTol = Math.max(marketSell / 100, 1);
+		if (!sellFilling && yourPrice > marketSell + sellTol)
 		{
 			final long delta = yourPrice - marketSell;
 			return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DROP_SELL,
-				"Won't fill - drop to " + full(marketSell) + " (-" + gp(delta) + ")", AMBER);
+				"Above market by " + gp(delta) + " - drop to " + full(marketSell) + " to fill",
+				"DROP -" + gp(delta), AMBER);
 		}
 		return new OfferAdvice(slot, name, side, OfferAdvice.Kind.ON_TRACK,
-			"On track - at/under market, filling", GREEN);
+			"On track - at/near market, filling", "ON TRACK", GREEN);
 	}
 
 	private static String signed(long n)
