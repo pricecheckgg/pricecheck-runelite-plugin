@@ -53,4 +53,15 @@ public interface PriceCheckConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "contributeData",
+		name = "Contribute market data",
+		description = "Report your own GE offer fills to PriceCheck to sharpen fill-time and margin accuracy for everyone. Only offer details (item, price, quantity) are sent — never your RSN or anything about your account.",
+		position = 5
+	)
+	default boolean contributeData()
+	{
+		return true;
+	}
 }

@@ -12,8 +12,10 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.HttpUrl;
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
@@ -106,6 +108,83 @@ public class PriceCheckApiClient
 		List<FlipData> flips;
 	}
 
+	/** Server-side search over ALL tradeable items (not just the ranked flips). */
+	FlipsResult searchItems(String key, String query)
+	{
+		if (key == null || key.trim().isEmpty())
+		{
+			return new FlipsResult(AuthState.NO_KEY, Collections.emptyList());
+		}
+		if (query == null || query.trim().length() < 2)
+		{
+			return new FlipsResult(AuthState.OK, Collections.emptyList());
+		}
+		final HttpUrl url = BASE.newBuilder()
+			.addPathSegment("search")
+			.addQueryParameter("q", query.trim())
+			.build();
+		final Request req = new Request.Builder()
+			.url(url)
+			.header("Authorization", "Bearer " + key.trim())
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			if (res.code() == 401)
+			{
+				return new FlipsResult(AuthState.INVALID_KEY, Collections.emptyList());
+			}
+			if (res.code() == 403)
+			{
+				return new FlipsResult(AuthState.NO_SUBSCRIPTION, Collections.emptyList());
+			}
+			if (!res.isSuccessful() || res.body() == null)
+			{
+				return new FlipsResult(AuthState.ERROR, Collections.emptyList());
+			}
+			final SearchResponse parsed = gson.fromJson(res.body().string(), SearchResponse.class);
+			final List<FlipData> results = parsed != null && parsed.results != null
+				? parsed.results : Collections.emptyList();
+			return new FlipsResult(AuthState.OK, results);
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck search failed", e);
+			return new FlipsResult(AuthState.ERROR, Collections.emptyList());
+		}
+	}
+
+	private static final class SearchResponse
+	{
+		long scannedAt;
+		List<FlipData> results;
+	}
+
+	/** Account identity for the Settings tab. Returns null on any failure. */
+	AccountInfo getAccount(String key)
+	{
+		if (key == null || key.trim().isEmpty())
+		{
+			return null;
+		}
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("me").build())
+			.header("Authorization", "Bearer " + key.trim())
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			if (!res.isSuccessful() || res.body() == null)
+			{
+				return null;
+			}
+			return gson.fromJson(res.body().string(), AccountInfo.class);
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck account fetch failed", e);
+			return null;
+		}
+	}
+
 	/** Live data for a set of item ids (the items in your active GE offers). */
 	Map<Integer, FlipData> getItems(String key, Collection<Integer> ids)
 	{
@@ -152,5 +231,129 @@ public class PriceCheckApiClient
 	{
 		long scannedAt;
 		List<FlipData> items;
+	}
+
+	// ── Tracked positions (shared account store with the website dashboard) ──
+
+	static final class TrackedResult
+	{
+		final AuthState state;
+		final List<TrackedItem> tracked;
+
+		TrackedResult(AuthState state, List<TrackedItem> tracked)
+		{
+			this.state = state;
+			this.tracked = tracked;
+		}
+	}
+
+	private static final MediaType JSON = MediaType.get("application/json");
+
+	private TrackedResult readTracked(Request req)
+	{
+		try (Response res = http.newCall(req).execute())
+		{
+			switch (res.code())
+			{
+				case 401:
+					return new TrackedResult(AuthState.INVALID_KEY, Collections.emptyList());
+				case 403:
+					return new TrackedResult(AuthState.NO_SUBSCRIPTION, Collections.emptyList());
+				default:
+					break;
+			}
+			if (!res.isSuccessful() || res.body() == null)
+			{
+				return new TrackedResult(AuthState.ERROR, Collections.emptyList());
+			}
+			final TrackedResponse parsed = gson.fromJson(res.body().string(), TrackedResponse.class);
+			final List<TrackedItem> list = parsed != null && parsed.tracked != null
+				? parsed.tracked : Collections.emptyList();
+			return new TrackedResult(AuthState.OK, list);
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck tracked call failed", e);
+			return new TrackedResult(AuthState.ERROR, Collections.emptyList());
+		}
+	}
+
+	TrackedResult getTracked(String key)
+	{
+		if (key == null || key.trim().isEmpty())
+		{
+			return new TrackedResult(AuthState.NO_KEY, Collections.emptyList());
+		}
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("tracked").build())
+			.header("Authorization", "Bearer " + key.trim())
+			.build();
+		return readTracked(req);
+	}
+
+	/** Start tracking an item at the given cost basis. Returns the updated list. */
+	TrackedResult addTracked(String key, int geId, long entryBuy, String name, long entryMargin)
+	{
+		if (key == null || key.trim().isEmpty())
+		{
+			return new TrackedResult(AuthState.NO_KEY, Collections.emptyList());
+		}
+		final Map<String, Object> body = new HashMap<>();
+		body.put("geId", geId);
+		body.put("entryBuy", entryBuy);
+		if (name != null) body.put("name", name);
+		body.put("entryMargin", entryMargin);
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("tracked").build())
+			.header("Authorization", "Bearer " + key.trim())
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+		return readTracked(req);
+	}
+
+	TrackedResult removeTracked(String key, int geId)
+	{
+		if (key == null || key.trim().isEmpty())
+		{
+			return new TrackedResult(AuthState.NO_KEY, Collections.emptyList());
+		}
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("tracked").addPathSegment(String.valueOf(geId)).build())
+			.header("Authorization", "Bearer " + key.trim())
+			.delete()
+			.build();
+		return readTracked(req);
+	}
+
+	private static final class TrackedResponse
+	{
+		long scannedAt;
+		List<TrackedItem> tracked;
+	}
+
+	/** Ship a batch of the player's own GE offer events (see TelemetryCollector).
+	 *  Best-effort: any failure just drops the batch. */
+	boolean postTelemetry(String key, List<Map<String, Object>> events)
+	{
+		if (key == null || key.trim().isEmpty() || events == null || events.isEmpty())
+		{
+			return false;
+		}
+		final Map<String, Object> body = new HashMap<>(1);
+		body.put("events", events);
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("telemetry").build())
+			.header("Authorization", "Bearer " + key.trim())
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			return res.isSuccessful();
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck telemetry post failed", e);
+			return false;
+		}
 	}
 }
