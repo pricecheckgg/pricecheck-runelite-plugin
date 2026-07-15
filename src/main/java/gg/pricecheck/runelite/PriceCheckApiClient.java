@@ -29,7 +29,7 @@ import okhttp3.Response;
 public class PriceCheckApiClient
 {
 	// Hardcoded on purpose: this is our endpoint, not something the user sets.
-	private static final HttpUrl BASE = HttpUrl.get("https://premium.pricecheck.gg/api/plugin");
+	private static final HttpUrl BASE = HttpUrl.get("https://flipping.pricecheck.gg/api/plugin");
 
 	private final OkHttpClient http;
 	private final Gson gson;

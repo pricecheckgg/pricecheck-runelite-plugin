@@ -833,14 +833,14 @@ class PriceCheckPanel extends PluginPanel
 		v.add(saveKeyBtn);
 		v.add(gap(4));
 
-		final JLabel link = new JLabel("Get a key · premium.pricecheck.gg");
+		final JLabel link = new JLabel("Get a key · flipping.pricecheck.gg");
 		link.setForeground(Palette.SUBTLE);
 		link.setFont(FontManager.getRunescapeSmallFont());
 		link.setAlignmentX(Component.LEFT_ALIGNMENT);
 		link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		link.addMouseListener(new MouseAdapter()
 		{
-			public void mousePressed(MouseEvent e) { LinkBrowser.browse("https://premium.pricecheck.gg"); }
+			public void mousePressed(MouseEvent e) { LinkBrowser.browse("https://flipping.pricecheck.gg"); }
 			public void mouseEntered(MouseEvent e) { link.setForeground(Palette.GOLD); }
 			public void mouseExited(MouseEvent e) { link.setForeground(Palette.SUBTLE); }
 		});
@@ -1205,9 +1205,9 @@ class PriceCheckPanel extends PluginPanel
 		String title, body;
 		switch (authState)
 		{
-			case INVALID_KEY: title = "Key not recognised"; body = "Regenerate it at premium.pricecheck.gg, then paste it in Settings."; break;
-			case NO_SUBSCRIPTION: title = "Subscription inactive"; body = "Renew at premium.pricecheck.gg to see live flips."; break;
-			case PLAN_REQUIRED: title = "Trader Pro feature"; body = "The RuneLite plugin comes with Trader Pro. Upgrade at premium.pricecheck.gg."; break;
+			case INVALID_KEY: title = "Key not recognised"; body = "Regenerate it at flipping.pricecheck.gg, then paste it in Settings."; break;
+			case NO_SUBSCRIPTION: title = "Subscription inactive"; body = "Renew at flipping.pricecheck.gg to see live flips."; break;
+			case PLAN_REQUIRED: title = "Trader Pro feature"; body = "The RuneLite plugin comes with Trader Pro. Upgrade at flipping.pricecheck.gg."; break;
 			case ERROR: title = "Can't reach PriceCheck"; body = "Retrying…"; break;
 			default: title = "Add your plugin key"; body = "Open Settings and paste your key to see live flips."; break;
 		}
