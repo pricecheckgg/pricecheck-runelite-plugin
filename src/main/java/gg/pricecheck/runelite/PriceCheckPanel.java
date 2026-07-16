@@ -873,7 +873,18 @@ class PriceCheckPanel extends PluginPanel
 			{
 				return;
 			}
-			if (syncToggle.isSelected())
+			// Capture the intent from the EVENT, not from isSelected() later: a
+			// modal dialog opened mid-click can see the checkbox model revert
+			// underneath it (Swing re-entrancy), which would make the OK write
+			// the wrong value. The dialog is also deferred out of the click
+			// transaction for the same reason.
+			final boolean want = e.getStateChange() == java.awt.event.ItemEvent.SELECTED;
+			if (!want)
+			{
+				configManager.setConfiguration(PriceCheckConfig.GROUP, "syncFlipLog", false);
+				return;
+			}
+			SwingUtilities.invokeLater(() ->
 			{
 				final int ok = javax.swing.JOptionPane.showConfirmDialog(syncToggle,
 					"<html><body style='width:300px'>Enabling this submits your Grand Exchange trades (item, price, quantity, "
@@ -881,15 +892,14 @@ class PriceCheckPanel extends PluginPanel
 						+ "(never your RSN), and your IP address to PriceCheck's servers, which are not controlled or verified "
 						+ "by the RuneLite Developers.</body></html>",
 					"Sync flip log", javax.swing.JOptionPane.OK_CANCEL_OPTION, javax.swing.JOptionPane.WARNING_MESSAGE);
-				if (ok != javax.swing.JOptionPane.OK_OPTION)
+				settingsMuted = true;
+				syncToggle.setSelected(ok == javax.swing.JOptionPane.OK_OPTION);
+				settingsMuted = false;
+				if (ok == javax.swing.JOptionPane.OK_OPTION)
 				{
-					settingsMuted = true;
-					syncToggle.setSelected(false);
-					settingsMuted = false;
-					return;
+					configManager.setConfiguration(PriceCheckConfig.GROUP, "syncFlipLog", true);
 				}
-			}
-			configManager.setConfiguration(PriceCheckConfig.GROUP, "syncFlipLog", syncToggle.isSelected());
+			});
 		});
 		v.add(syncToggle);
 		v.add(gap(6));
