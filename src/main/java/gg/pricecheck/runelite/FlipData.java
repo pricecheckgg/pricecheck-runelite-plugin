@@ -24,4 +24,22 @@ public class FlipData
 	private double trendPct;        // mid vs 1h-avg, % (negative = falling)
 	private Long limit;             // null = no published buy limit for this item
 	private long vol1h;
+	private String risk;            // null = clean board row; else why it missed one quality bar
+	                                // ("age" | "qty" | "ev" | "profit")
+
+	String riskLabel()
+	{
+		if (risk == null)
+		{
+			return null;
+		}
+		switch (risk)
+		{
+			case "age": return "stale prints";
+			case "qty": return "slow fills";
+			case "ev": return "low EV";
+			case "profit": return "small margin";
+			default: return risk;
+		}
+	}
 }

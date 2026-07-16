@@ -1,6 +1,5 @@
 package gg.pricecheck.runelite;
 
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -12,13 +11,16 @@ import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
 /**
- * The live advisor, floating fallback for when the GE grid isn't open. For each
- * active offer it draws the item + the exact instruction from {@link OfferAdvisor}.
- * Draggable; hides itself when you have no offers or the grid is up (the per-slot
- * overlay takes over there).
+ * The live advisor, floating fallback for when the GE grid isn't open. Only
+ * offers that NEED something get a line (one line each: item left, instruction
+ * right); quiet on-track offers collapse into a single dim summary, and when
+ * nothing needs attention the whole box stays hidden. Draggable; the per-slot
+ * overlay takes over while the grid is up.
  */
 class OfferAdvisorOverlay extends OverlayPanel
 {
+	private static final int MAX_NAME = 20;
+
 	private final PriceCheckPlugin plugin;
 	private final PriceCheckConfig config;
 
@@ -28,7 +30,7 @@ class OfferAdvisorOverlay extends OverlayPanel
 		this.config = config;
 		setPosition(OverlayPosition.TOP_LEFT);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
-		panelComponent.setPreferredSize(new Dimension(252, 0));
+		panelComponent.setPreferredSize(new Dimension(216, 0));
 		panelComponent.setBackgroundColor(Palette.INK);
 		panelComponent.setGap(new Point(0, 2));
 	}
@@ -50,31 +52,56 @@ class OfferAdvisorOverlay extends OverlayPanel
 			return null;
 		}
 
+		int quiet = 0;
+		int shown = 0;
 		panelComponent.getChildren().clear();
 		panelComponent.getChildren().add(TitleComponent.builder()
 			.text("PriceCheck")
 			.color(Palette.GOLD)
 			.build());
 
-		boolean first = true;
 		for (OfferAdvice a : advice)
 		{
-			if (!first)
+			if (a.getKind() == OfferAdvice.Kind.NO_DATA)
 			{
-				panelComponent.getChildren().add(LineComponent.builder().left("").build());  // group separator
+				continue;
 			}
-			first = false;
+			if (a.getKind() == OfferAdvice.Kind.ON_TRACK)
+			{
+				quiet++;
+				continue;
+			}
+			shown++;
 			panelComponent.getChildren().add(LineComponent.builder()
-				.left(a.getItemName())
-				.right(a.getSide())
-				.leftColor(Color.WHITE)
-				.rightColor(Palette.SUBTLE_CANVAS)   // side is identity, not state
+				.left(shortName(a.getItemName()))
+				.right(a.getShortText())
+				.leftColor(Palette.SUBTLE_CANVAS)
+				.rightColor(a.getColor())
 				.build());
+		}
+
+		// All quiet: no box at all. The advisor earns screen space only when
+		// an offer actually needs a decision.
+		if (shown == 0)
+		{
+			return null;
+		}
+		if (quiet > 0)
+		{
 			panelComponent.getChildren().add(LineComponent.builder()
-				.left(a.getMessage())
-				.leftColor(a.getColor())
+				.left(quiet + " on track")
+				.leftColor(Palette.SUBTLE_CANVAS)
 				.build());
 		}
 		return super.render(graphics);
+	}
+
+	private static String shortName(String s)
+	{
+		if (s == null)
+		{
+			return "";
+		}
+		return s.length() <= MAX_NAME ? s : s.substring(0, MAX_NAME - 1) + "…";
 	}
 }

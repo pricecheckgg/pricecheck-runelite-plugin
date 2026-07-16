@@ -17,12 +17,15 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * Paints each active offer's advice directly onto its Grand Exchange slot: a
- * status-coloured frame plus a bar across the bottom with the exact instruction
- * ("RAISE +12.9k", "MARGIN DEAD", "ON TRACK"). Attention hierarchy: DEAD greys the
- * whole slot, action states (RAISE/DROP/FALLING) get a bright frame + a direction
- * triangle, ON_TRACK is deliberately quiet so a wall of slots pops only where you
- * need to act. Slot geometry: widgets 465:7 .. 465:14, live only while 465:0 is up.
+ * Paints each active offer's advice onto its Grand Exchange slot without
+ * covering the slot's own content: a status-coloured frame, plus a compact
+ * chip tucked into the TOP-RIGHT corner (over the empty caption corner, never
+ * the progress bar or the price) for offers that need action. Attention
+ * hierarchy: DEAD greys the whole slot, action states (RAISE/DROP/FALLING)
+ * get a bright frame + a direction triangle in the chip, COLLECT gets a small
+ * quiet chip, ON_TRACK is a dim frame only — a wall of slots pops exactly
+ * where you need to act and shows the game everywhere else. Slot geometry:
+ * widgets 465:7 .. 465:14, live only while 465:0 is up.
  */
 class OfferAdvisorSlotOverlay extends Overlay
 {
@@ -30,7 +33,7 @@ class OfferAdvisorSlotOverlay extends Overlay
 	private static final int GE_WINDOW_CHILD = 0;
 	private static final int FIRST_SLOT_CHILD = 7;
 	private static final int SLOTS = 8;
-	private static final int BAR_H = 15;
+	private static final int CHIP_H = 13;
 
 	private static final Stroke FRAME = new BasicStroke(2f);
 	private static final Stroke HALO = new BasicStroke(4f);
@@ -126,40 +129,46 @@ class OfferAdvisorSlotOverlay extends Overlay
 		g.setColor(new Color(0, 0, 0, 140));
 		g.drawRoundRect(b.x + 1, b.y + 1, b.width - 3, b.height - 3, 8, 8);
 		g.setStroke(FRAME);
-		g.setColor(new Color(col.getRed(), col.getGreen(), col.getBlue(), quiet ? 120 : 230));
+		g.setColor(new Color(col.getRed(), col.getGreen(), col.getBlue(), quiet ? 110 : 230));
 		g.drawRoundRect(b.x + 1, b.y + 1, b.width - 3, b.height - 3, 8, 8);
 
-		// Status bar: rounded-bottom, square top to meet the frame flush.
-		final int barX = b.x + 2;
-		final int barY = b.y + b.height - BAR_H - 2;
-		final int barW = b.width - 4;
-		g.setColor(Palette.INK);
-		g.fillRoundRect(barX, barY, barW, BAR_H, 6, 6);
-		g.fillRect(barX, barY, barW, 6);
-		g.setColor(col);
-		g.fillRect(barX, barY, barW, 2);   // signature coloured top edge
+		// On track needs nothing more than the dim frame: the slot's own
+		// progress bar, price and item stay fully visible.
+		if (onTrack)
+		{
+			return;
+		}
 
-		// Direction triangle for the actionable states (drawn, not font glyphs).
+		// Compact chip in the top-right corner. The caption strip's corners are
+		// empty, so this covers dead space instead of the progress bar the old
+		// full-width bottom bar sat on.
 		final boolean up = kind == OfferAdvice.Kind.RAISE_BUY;
 		final boolean down = kind == OfferAdvice.Kind.DROP_SELL || kind == OfferAdvice.Kind.FALLING;
-		final int triW = (up || down) ? 11 : 0;   // 7px glyph + 4px gap
+		final int triW = (up || down) ? 10 : 0;
 
 		String text = label;
-		final int maxTextW = barW - 4 - triW;
+		final int maxTextW = b.width - 24 - triW;
 		if (fm.stringWidth(text) > maxTextW)
 		{
 			text = fitToWidth(fm, text, maxTextW);
 		}
-		final int totalW = triW + fm.stringWidth(text);
-		int cx = barX + Math.max(1, (barW - totalW) / 2);
-		final int midY = barY + 2 + (BAR_H - 2) / 2;
+		final int chipW = triW + fm.stringWidth(text) + 10;
+		final int chipX = b.x + b.width - chipW - 4;
+		final int chipY = b.y + 3;
 
+		g.setColor(new Color(Palette.INK.getRed(), Palette.INK.getGreen(), Palette.INK.getBlue(), 235));
+		g.fillRoundRect(chipX, chipY, chipW, CHIP_H, 6, 6);
+		g.setColor(new Color(col.getRed(), col.getGreen(), col.getBlue(), quiet ? 140 : 220));
+		g.drawRoundRect(chipX, chipY, chipW, CHIP_H, 6, 6);
+
+		int cx = chipX + 5;
+		final int midY = chipY + CHIP_H / 2;
 		if (up || down)
 		{
 			drawTriangle(g, cx, midY, up, col);
 			cx += triW;
 		}
-		final int ty = barY + 2 + ((BAR_H - 2 - (fm.getAscent() + fm.getDescent())) / 2) + fm.getAscent();
+		final int ty = chipY + ((CHIP_H - (fm.getAscent() + fm.getDescent())) / 2) + fm.getAscent();
 		g.setColor(new Color(0, 0, 0, 205));
 		g.drawString(text, cx + 1, ty + 1);
 		g.setColor(col);

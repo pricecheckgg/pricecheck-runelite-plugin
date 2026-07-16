@@ -94,6 +94,7 @@ class PriceCheckPanel extends PluginPanel
 	private final JLabel keyDot = new JLabel("●");
 	private final JPasswordField keyField = new JPasswordField();
 	private final JButton saveKeyBtn = new JButton("Save key");
+	private final JCheckBox syncToggle = new JCheckBox("Sync flip log");
 	private final JCheckBox advisorToggle = new JCheckBox("Offer advisor overlay");
 	private final JSpinner minEvSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 10000, 50));
 	private boolean settingsMuted = false;
@@ -218,6 +219,13 @@ class PriceCheckPanel extends PluginPanel
 		logAll.setForeground(Palette.SUBTLE);
 		logMeta.setForeground(Palette.SUBTLE);
 		logSync.setForeground(Palette.SUBTLE);
+		// The "Local only" hint points at Settings, so clicking it goes there.
+		logSync.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		logSync.setToolTipText("Open Settings");
+		logSync.addMouseListener(new MouseAdapter()
+		{
+			public void mousePressed(MouseEvent e) { if (settingsTab != null) { settingsTab.select(); } }
+		});
 		head.setMaximumSize(new Dimension(Integer.MAX_VALUE, head.getPreferredSize().height + 40));
 
 		logList.setLayout(new BoxLayout(logList, BoxLayout.Y_AXIS));
@@ -849,6 +857,42 @@ class PriceCheckPanel extends PluginPanel
 
 		// Options section
 		v.add(sectionHeader("Options"));
+		// The sync toggle lives HERE, where the Log tab's "Local only" hint sends
+		// people, not just in the RuneLite config panel. Enabling shows the same
+		// data-submission disclosure the config panel warns with; declining
+		// reverts the box.
+		syncToggle.setOpaque(false);
+		syncToggle.setForeground(Color.WHITE);
+		syncToggle.setFocusPainted(false);
+		syncToggle.setAlignmentX(Component.LEFT_ALIGNMENT);
+		syncToggle.setToolTipText("Back up your flip log to your PriceCheck account and see it at flipping.pricecheck.gg/portfolio");
+		syncToggle.setSelected(config.syncFlipLog());
+		syncToggle.addItemListener(e ->
+		{
+			if (settingsMuted)
+			{
+				return;
+			}
+			if (syncToggle.isSelected())
+			{
+				final int ok = javax.swing.JOptionPane.showConfirmDialog(syncToggle,
+					"<html><body style='width:300px'>Enabling this submits your Grand Exchange trades (item, price, quantity, "
+						+ "tax, profit, timestamps), open positions, offer-slot snapshots, an anonymous per-account identifier "
+						+ "(never your RSN), and your IP address to PriceCheck's servers, which are not controlled or verified "
+						+ "by the RuneLite Developers.</body></html>",
+					"Sync flip log", javax.swing.JOptionPane.OK_CANCEL_OPTION, javax.swing.JOptionPane.WARNING_MESSAGE);
+				if (ok != javax.swing.JOptionPane.OK_OPTION)
+				{
+					settingsMuted = true;
+					syncToggle.setSelected(false);
+					settingsMuted = false;
+					return;
+				}
+			}
+			configManager.setConfiguration(PriceCheckConfig.GROUP, "syncFlipLog", syncToggle.isSelected());
+		});
+		v.add(syncToggle);
+		v.add(gap(6));
 		advisorToggle.setOpaque(false);
 		advisorToggle.setForeground(Color.WHITE);
 		advisorToggle.setFocusPainted(false);
@@ -951,6 +995,7 @@ class PriceCheckPanel extends PluginPanel
 		SwingUtilities.invokeLater(() ->
 		{
 			settingsMuted = true;
+			if (syncToggle.isSelected() != config.syncFlipLog()) { syncToggle.setSelected(config.syncFlipLog()); }
 			if (advisorToggle.isSelected() != config.showAdvisor()) { advisorToggle.setSelected(config.showAdvisor()); }
 			if (!minEvSpinner.getValue().equals(config.minEvPerHrK())) { minEvSpinner.setValue(config.minEvPerHrK()); }
 			settingsMuted = false;
@@ -1069,7 +1114,21 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel line3 = row();
 		line3.add(ev, BorderLayout.EAST);
 
-		if (f.isConfirmed())
+		if (f.riskLabel() != null)
+		{
+			// Risk-tier row: volume-confirmed margin that missed one quality bar.
+			// The amber mark carries WHY so the row explains itself on hover.
+			final JLabel dot = new JLabel("! ");
+			dot.setForeground(Palette.AMBER);
+			dot.setFont(dot.getFont().deriveFont(Font.BOLD));
+			dot.setToolTipText("Higher risk: " + f.riskLabel() + ". Margin is volume-confirmed but this missed one board quality bar.");
+			line1.add(dot, BorderLayout.WEST);
+			final JLabel why = new JLabel(f.riskLabel());
+			why.setForeground(Palette.AMBER);
+			why.setFont(FontManager.getRunescapeSmallFont());
+			line3.add(why, BorderLayout.WEST);
+		}
+		else if (f.isConfirmed())
 		{
 			final JLabel dot = new JLabel("✓ ");
 			dot.setForeground(Palette.GREEN);
