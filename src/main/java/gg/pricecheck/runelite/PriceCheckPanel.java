@@ -127,8 +127,15 @@ class PriceCheckPanel extends PluginPanel
 		final MaterialTab flipsTab = new MaterialTab("Flips", tabGroup, buildFlipsView());
 		final MaterialTab logTab = new MaterialTab("Log", tabGroup, buildLogView());
 		final MaterialTab planTab = new MaterialTab("Plan", tabGroup, buildPlanView());
-		settingsTab = new MaterialTab("Settings", tabGroup, buildSettingsView());
+		settingsTab = new MaterialTab("Setup", tabGroup, buildSettingsView());
 		settingsTab.setOnSelectEvent(() -> { listener.onFetchAccount(); return true; });
+		// Equal grid cells clip long labels ("Settings" read "Set..."), and the
+		// default left-hung labels looked ragged; short names, centred, one size.
+		for (final MaterialTab t : new MaterialTab[]{ flipsTab, logTab, planTab, settingsTab })
+		{
+			t.setHorizontalAlignment(SwingConstants.CENTER);
+			t.setFont(t.getFont().deriveFont(Font.BOLD, 12f));
+		}
 		tabGroup.addTab(flipsTab);
 		tabGroup.addTab(logTab);
 		tabGroup.addTab(planTab);
@@ -335,7 +342,7 @@ class PriceCheckPanel extends PluginPanel
 			logMeta.setText(s.untrackedSells > 0 ? s.untrackedSells + " sold items had no tracked cost" : " ");
 			logSync.setText(hasKey
 				? (s.pendingSync > 0 ? "Backing up… " + s.pendingSync + " fills queued" : "Backed up · flipping.pricecheck.gg/portfolio")
-				: "Local only · turn on Sync flip log in settings for backup + web portfolio");
+				: "Local only · turn on Sync flip log in Setup for backup + web portfolio");
 
 			logList.removeAll();
 			if (!s.openLots.isEmpty())

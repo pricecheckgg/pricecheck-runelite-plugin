@@ -237,7 +237,7 @@ public class PriceCheckPlugin extends Plugin
 
 		geHelper = new GeChatboxHelper(client, clientThread, config, this);
 
-		advisorOverlay = new OfferAdvisorOverlay(this, config);
+		advisorOverlay = new OfferAdvisorOverlay(client, this, config);
 		overlayManager.add(advisorOverlay);
 		slotOverlay = new OfferAdvisorSlotOverlay(client, this, config);
 		overlayManager.add(slotOverlay);

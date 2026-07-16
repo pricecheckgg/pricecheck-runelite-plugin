@@ -4,6 +4,8 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.util.List;
+import net.runelite.api.Client;
+import net.runelite.api.KeyCode;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -21,11 +23,13 @@ class OfferAdvisorOverlay extends OverlayPanel
 {
 	private static final int MAX_NAME = 20;
 
+	private final Client client;
 	private final PriceCheckPlugin plugin;
 	private final PriceCheckConfig config;
 
-	OfferAdvisorOverlay(PriceCheckPlugin plugin, PriceCheckConfig config)
+	OfferAdvisorOverlay(Client client, PriceCheckPlugin plugin, PriceCheckConfig config)
 	{
+		this.client = client;
 		this.plugin = plugin;
 		this.config = config;
 		setPosition(OverlayPosition.TOP_LEFT);
@@ -39,6 +43,11 @@ class OfferAdvisorOverlay extends OverlayPanel
 	public Dimension render(Graphics2D graphics)
 	{
 		if (!config.showAdvisor())
+		{
+			return null;
+		}
+		// Hold Shift to peek at the game under any PriceCheck overlay.
+		if (client.isKeyPressed(KeyCode.KC_SHIFT))
 		{
 			return null;
 		}

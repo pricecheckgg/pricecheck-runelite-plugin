@@ -10,6 +10,7 @@ import java.awt.RenderingHints;
 import java.awt.Stroke;
 import java.util.List;
 import net.runelite.api.Client;
+import net.runelite.api.KeyCode;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
@@ -54,6 +55,11 @@ class OfferAdvisorSlotOverlay extends Overlay
 	public Dimension render(Graphics2D g)
 	{
 		if (!config.showAdvisor())
+		{
+			return null;
+		}
+		// Hold Shift to peek at the untouched slots (price captions included).
+		if (client.isKeyPressed(KeyCode.KC_SHIFT))
 		{
 			return null;
 		}
