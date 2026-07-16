@@ -13,11 +13,10 @@ import net.runelite.client.ui.overlay.components.LineComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
 /**
- * The live advisor, floating fallback for when the GE grid isn't open. Only
- * offers that NEED something get a line (one line each: item left, instruction
- * right); quiet on-track offers collapse into a single dim summary, and when
- * nothing needs attention the whole box stays hidden. Draggable; the per-slot
- * overlay takes over while the grid is up.
+ * The live advisor, floating fallback for when the GE grid isn't open. One
+ * compact line per offer: item left, live status + margin right ("OK +26.2k",
+ * "RAISE +23.8k"), so the margins stay readable at a glance. Hold Shift to
+ * hide it. Draggable; the per-slot overlay takes over while the grid is up.
  */
 class OfferAdvisorOverlay extends OverlayPanel
 {
@@ -61,7 +60,6 @@ class OfferAdvisorOverlay extends OverlayPanel
 			return null;
 		}
 
-		int quiet = 0;
 		int shown = 0;
 		panelComponent.getChildren().clear();
 		panelComponent.getChildren().add(TitleComponent.builder()
@@ -75,11 +73,6 @@ class OfferAdvisorOverlay extends OverlayPanel
 			{
 				continue;
 			}
-			if (a.getKind() == OfferAdvice.Kind.ON_TRACK)
-			{
-				quiet++;
-				continue;
-			}
 			shown++;
 			panelComponent.getChildren().add(LineComponent.builder()
 				.left(shortName(a.getItemName()))
@@ -88,19 +81,9 @@ class OfferAdvisorOverlay extends OverlayPanel
 				.rightColor(a.getColor())
 				.build());
 		}
-
-		// All quiet: no box at all. The advisor earns screen space only when
-		// an offer actually needs a decision.
 		if (shown == 0)
 		{
 			return null;
-		}
-		if (quiet > 0)
-		{
-			panelComponent.getChildren().add(LineComponent.builder()
-				.left(quiet + " on track")
-				.leftColor(Palette.SUBTLE_CANVAS)
-				.build());
 		}
 		return super.render(graphics);
 	}
