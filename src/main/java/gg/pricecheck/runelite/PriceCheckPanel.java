@@ -1160,7 +1160,7 @@ class PriceCheckPanel extends PluginPanel
 		trk.setForeground(tracked ? Palette.GREEN : Palette.SUBTLE);
 		trk.setFont(trk.getFont().deriveFont(Font.BOLD, 15f));
 		trk.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		trk.setToolTipText(tracked ? "Tracking — click to stop" : "Track this position");
+		trk.setToolTipText(tracked ? "Tracking, click to stop" : "Track this position");
 		final boolean[] fired = { false };
 		trk.addMouseListener(new MouseAdapter()
 		{

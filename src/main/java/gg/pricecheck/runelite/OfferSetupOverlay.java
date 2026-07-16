@@ -19,10 +19,12 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
  * The "type THIS" overlay. On the Grand Exchange Set-up-offer screen it reads the
- * item you're pricing and the live market, then paints the exact price to type in
- * the Price-per-item field: the current low for a buy, the current high for a sell.
- * Renders as an opaque floating card anchored to the field, flipping above it when
- * there's no room below.
+ * item you're pricing and the live market, then shows the exact price to type in
+ * the Price-per-item field. Renders as ONE compact chip straddling the top edge
+ * of the field's ring, so the only thing it can cover is the static
+ * "Price per item:" caption, never the item description or the presets. The
+ * ring colour carries the state: gold = here's the price, red = what you typed
+ * will not fill, amber = it fills but you're giving margin away.
  */
 class OfferSetupOverlay extends Overlay
 {
@@ -115,138 +117,124 @@ class OfferSetupOverlay extends Overlay
 
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-		// Halo + gold ring around the field you type into (same recipe as the slots).
-		g.setStroke(HALO_STROKE);
-		g.setColor(new Color(0, 0, 0, 120));
-		g.drawRoundRect(b.x - 2, b.y - 2, b.width + 3, b.height + 3, 8, 8);
-		g.setStroke(RING);
-		g.setColor(Palette.GOLD);
-		g.drawRoundRect(b.x - 2, b.y - 2, b.width + 3, b.height + 3, 8, 8);
-
 		if (live == null)
 		{
-			drawCard(g, b, new Line[]{ line(seg("PriceCheck: loading…", small(g), Palette.SUBTLE_CANVAS)) });
+			drawRing(g, b, Palette.GOLD);
+			drawChip(g, b, Palette.GOLD, line(seg("PriceCheck…", small(g), Palette.SUBTLE_CANVAS)));
 			return null;
 		}
 
 		final long target = sell ? live.getSell() : live.getBuy();
 		if (target <= 0)
 		{
-			drawCard(g, b, new Line[]{ line(seg("PriceCheck: no live price", small(g), Palette.SUBTLE_CANVAS)) });
+			drawRing(g, b, Palette.GOLD);
+			drawChip(g, b, Palette.GOLD, line(seg("no live price", small(g), Palette.SUBTLE_CANVAS)));
 			return null;
 		}
 
-		// Main line: the number is the payload — bold + gold, "Type " quiet before it.
-		final Line main = line(
-			seg("Type ", reg(g), Palette.SUBTLE_CANVAS),
-			seg(Fmt.full(target), bold(g), Palette.GOLD));
-		// Sub line: what it is, then WHY (the margin) in green.
-		final Line sub = line(
-			seg((sell ? "market sell · " : "market buy · "), small(g), Palette.SUBTLE_CANVAS),
-			seg("+" + Fmt.compact(live.getProfit()) + " margin", small(g), Palette.GREEN));
-
-		// Warn line only when what's typed is meaningfully off market.
-		Line warn = null;
+		// One line: the number is the payload. The suffix is either the margin
+		// (all good) or the correction (typed price is off market), and the ring
+		// colour repeats the state so it reads without the text.
+		Color state = Palette.GOLD;
+		Seg tail = seg("  +" + Fmt.compact(live.getProfit()), small(g), Palette.GREEN);
 		final long tol = Math.max(target / 100, 1);
 		if (entered > 0 && Math.abs(entered - target) > tol)
 		{
 			final long d = Math.abs(entered - target);
-			final String msg;
-			final Color col;
 			if (sell)
 			{
-				msg = entered > target ? "won't fill — drop " + Fmt.compact(d) : "under market by " + Fmt.compact(d);
-				col = entered > target ? Palette.RED : Palette.AMBER;
+				if (entered > target)
+				{
+					state = Palette.RED;
+					tail = seg("  drop " + Fmt.compact(d) + " to fill", small(g), Palette.RED);
+				}
+				else
+				{
+					state = Palette.AMBER;
+					tail = seg("  under market by " + Fmt.compact(d), small(g), Palette.AMBER);
+				}
 			}
 			else
 			{
-				msg = entered < target ? "won't fill — raise " + Fmt.compact(d) : "overpaying by " + Fmt.compact(d);
-				col = entered < target ? Palette.RED : Palette.AMBER;   // overpay = amber (fills, just worse)
+				if (entered < target)
+				{
+					state = Palette.RED;
+					tail = seg("  raise " + Fmt.compact(d) + " to fill", small(g), Palette.RED);
+				}
+				else
+				{
+					state = Palette.AMBER;   // overpay fills, just worse
+					tail = seg("  overpaying by " + Fmt.compact(d), small(g), Palette.AMBER);
+				}
 			}
-			warn = line(seg(msg, small(g), col));
-			warn.rule = true;
 		}
 
-		drawCard(g, b, warn == null ? new Line[]{ main, sub } : new Line[]{ main, sub, warn });
+		drawRing(g, b, state);
+		drawChip(g, b, state, line(
+			seg("Type ", small(g), Palette.SUBTLE_CANVAS),
+			seg(Fmt.full(target), bold(g), Palette.GOLD),
+			tail));
 		return null;
 	}
 
-	// ── card layout ──
-	private void drawCard(Graphics2D g, Rectangle field, Line[] lines)
+	// Halo + state-coloured ring around the field you type into.
+	private void drawRing(Graphics2D g, Rectangle b, Color col)
 	{
-		int w = 0, h = PAD * 2;
-		for (final Line ln : lines)
-		{
-			w = Math.max(w, ln.width());
-			h += ln.height();
-			if (ln.rule)
-			{
-				h += 4;
-			}
-		}
-		w += PAD * 2;
+		g.setStroke(HALO_STROKE);
+		g.setColor(new Color(0, 0, 0, 120));
+		g.drawRoundRect(b.x - 2, b.y - 2, b.width + 3, b.height + 3, 8, 8);
+		g.setStroke(RING);
+		g.setColor(col);
+		g.drawRoundRect(b.x - 2, b.y - 2, b.width + 3, b.height + 3, 8, 8);
+	}
 
-		// Sit ABOVE the field by default so we never cover the quantity/price preset
-		// buttons or the total below it; only cover the redundant "Price per item:"
-		// label. Flip below if there isn't room above.
-		final int tail = 7;
-		int x = field.x;
+	// ── chip layout: one line, straddling the ring's top edge ──
+	private void drawChip(Graphics2D g, Rectangle field, Color border, Line ln)
+	{
+		final int w = ln.width() + PAD * 2;
+		final int h = ln.height() + 4;
+
+		// Centre on the field, clamp to the canvas; straddle the TOP edge of the
+		// ring so the chip covers the caption row above the field, never the
+		// item description or the preset buttons.
+		int x = field.x + (field.width - w) / 2;
 		final int cw = client.getCanvasWidth();
-		if (cw > 0 && x + w > cw)
+		if (cw > 0 && x + w > cw - 2)
 		{
-			x = Math.max(2, cw - w - 2);
+			x = cw - w - 2;
 		}
-		boolean above = true;
-		int y = field.y - h - tail - 2;
+		if (x < 2)
+		{
+			x = 2;
+		}
+		int y = field.y - h + 4;
 		if (y < 2)
 		{
-			above = false;
-			y = field.y + field.height + tail + 2;
+			y = field.y + field.height - 4;   // no room above: straddle the bottom edge
 		}
 
-		// Speech bubble: rounded card + a tail pointing at the field (one seamless
-		// outline so no border line cuts across the tail).
-		final int tailCx = Math.min(Math.max(field.x + field.width / 2, x + 12), x + w - 12);
-		final java.awt.geom.Area shape = new java.awt.geom.Area(
-			new java.awt.geom.RoundRectangle2D.Float(x, y, w, h, 9, 9));
-		final java.awt.Polygon tri = above
-			? new java.awt.Polygon(new int[]{ tailCx - tail, tailCx + tail, tailCx }, new int[]{ y + h - 1, y + h - 1, y + h + tail }, 3)
-			: new java.awt.Polygon(new int[]{ tailCx - tail, tailCx + tail, tailCx }, new int[]{ y + 1, y + 1, y - tail }, 3);
-		shape.add(new java.awt.geom.Area(tri));
-
-		g.translate(2, 2);
+		g.translate(1, 1);
 		g.setColor(new Color(0, 0, 0, 90));
-		g.fill(shape);
-		g.translate(-2, -2);
+		g.fillRoundRect(x, y, w, h, 8, 8);
+		g.translate(-1, -1);
 		g.setColor(Palette.INK);
-		g.fill(shape);
+		g.fillRoundRect(x, y, w, h, 8, 8);
 		g.setStroke(new BasicStroke(1f));
-		g.setColor(new Color(Palette.GOLD.getRed(), Palette.GOLD.getGreen(), Palette.GOLD.getBlue(), 190));
-		g.draw(shape);
+		g.setColor(new Color(border.getRed(), border.getGreen(), border.getBlue(), 200));
+		g.drawRoundRect(x, y, w, h, 8, 8);
 
-		int ty = y + PAD;
-		for (final Line ln : lines)
+		int tx = x + PAD;
+		final int ascent = ln.ascent();
+		final int ty = y + (h - ln.height()) / 2;
+		for (final Seg s : ln.segs)
 		{
-			if (ln.rule)
-			{
-				g.setColor(new Color(255, 255, 255, 26));
-				g.fillRect(x + PAD, ty + 1, w - PAD * 2, 1);
-				ty += 4;
-			}
-			int tx = x + PAD;
-			final int ascent = ln.ascent();
-			for (final Seg s : ln.segs)
-			{
-				g.setFont(s.font);
-				final FontMetrics fm = g.getFontMetrics();
-				// shadow
-				g.setColor(new Color(0, 0, 0, 190));
-				g.drawString(s.text, tx + 1, ty + ascent + 1);
-				g.setColor(s.color);
-				g.drawString(s.text, tx, ty + ascent);
-				tx += fm.stringWidth(s.text);
-			}
-			ty += ln.height();
+			g.setFont(s.font);
+			final FontMetrics fm = g.getFontMetrics();
+			g.setColor(new Color(0, 0, 0, 190));
+			g.drawString(s.text, tx + 1, ty + ascent + 1);
+			g.setColor(s.color);
+			g.drawString(s.text, tx, ty + ascent);
+			tx += fm.stringWidth(s.text);
 		}
 	}
 
@@ -259,7 +247,7 @@ class OfferSetupOverlay extends Overlay
 
 	private final class Line
 	{
-		final Seg[] segs; boolean rule;
+		final Seg[] segs;
 		Line(Seg[] s) { segs = s; }
 		int width()
 		{
@@ -285,7 +273,6 @@ class OfferSetupOverlay extends Overlay
 	private FontMetrics fm(Font f) { return g2.getFontMetrics(f); }
 	private Seg seg(String t, Font f, Color c) { return new Seg(t, f, c); }
 	private Line line(Seg... s) { return new Line(s); }
-	private Font reg(Graphics2D g) { g2 = g; return FontManager.getRunescapeFont(); }
 	private Font bold(Graphics2D g) { g2 = g; return FontManager.getRunescapeBoldFont(); }
 	private Font small(Graphics2D g) { g2 = g; return FontManager.getRunescapeSmallFont(); }
 
