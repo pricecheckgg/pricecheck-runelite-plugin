@@ -1001,7 +1001,11 @@ class PriceCheckPanel extends PluginPanel
 			}
 			acctName.setText(acct.getUsername() != null ? acct.getUsername() : "PriceCheck member");
 			acctPlan.setText(" " + (acct.getPlan() != null ? acct.getPlan().toUpperCase(Locale.ROOT) : "PREMIUM") + " ");
-			acctSub.setText(acct.getTrackedCount() + (acct.getTrackedCount() == 1 ? " position tracked" : " positions tracked"));
+			// This is the tracked-margins WATCHLIST (the + on flip rows), not your
+			// live GE offers; the old "positions tracked" wording read like offers.
+			final int n = acct.getTrackedCount();
+			acctSub.setText("Watching " + n + (n == 1 ? " item" : " items"));
+			acctSub.setToolTipText("Items on your tracked-margins watchlist (the + button on flip rows). Live GE offers show on the Flips tab and the in-game overlays.");
 			if (acct.getKeyPrefix() != null) { keyPrefixLabel.setText(acct.getKeyPrefix()); }
 		});
 	}
