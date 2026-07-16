@@ -1,7 +1,6 @@
-// PriceCheck RuneLite plugin — a THIN CLIENT. It ships no margin logic and no
-// data: it sends the user's plugin key to premium.pricecheck.gg/api/plugin and
-// draws what comes back. There are NO secrets in this repo (the key is entered
-// by the user at runtime), so the whole source is safe to publish to the Hub.
+// PriceCheck RuneLite plugin. The flip log runs fully locally; every paid
+// surface is a thin client over flipping.pricecheck.gg/api/plugin (the key is
+// entered by the user at runtime, so no secrets live in this repo).
 plugins {
     id 'java'
     id 'com.github.johnrengelman.shadow' version '7.1.2'
