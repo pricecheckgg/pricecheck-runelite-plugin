@@ -90,7 +90,7 @@ final class OfferAdvisor
 					"RAISE +" + gp(delta), AMBER);
 			}
 			return new OfferAdvice(slot, name, side, OfferAdvice.Kind.ON_TRACK,
-				"On track - " + signed(yourMargin) + " if sold at market", "ON TRACK", GREEN);
+				"On track - " + signed(yourMargin) + " if sold at market", "OK " + signed(yourMargin), GREEN);
 		}
 
 		// SELLING: it fills at/under the current high. Only flag a drop when the ask
@@ -106,7 +106,7 @@ final class OfferAdvisor
 				"DROP -" + gp(delta), AMBER);
 		}
 		return new OfferAdvice(slot, name, side, OfferAdvice.Kind.ON_TRACK,
-			"On track - at/near market, filling", "ON TRACK", GREEN);
+			"On track - at/near market, filling (" + signed(marketMargin) + " live margin)", "OK " + signed(marketMargin), GREEN);
 	}
 
 	private static String signed(long n)
