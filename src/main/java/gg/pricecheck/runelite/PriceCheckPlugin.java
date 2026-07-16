@@ -58,6 +58,9 @@ public class PriceCheckPlugin extends Plugin
 	private ConfigManager configManager;
 
 	@Inject
+	private net.runelite.client.input.MouseManager mouseManager;
+
+	@Inject
 	private net.runelite.client.game.ItemManager itemManager;
 
 	@Inject
@@ -73,6 +76,20 @@ public class PriceCheckPlugin extends Plugin
 	private PriceCheckPanel panel;
 	private NavigationButton navButton;
 	private OfferAdvisorOverlay advisorOverlay;
+	// Shift-click on the advisor's [-]/[+] button collapses/expands it.
+	private final net.runelite.client.input.MouseAdapter advisorMouse = new net.runelite.client.input.MouseAdapter()
+	{
+		@Override
+		public java.awt.event.MouseEvent mousePressed(java.awt.event.MouseEvent e)
+		{
+			if (advisorOverlay != null
+				&& advisorOverlay.handleClick(e.getPoint(), client.isKeyPressed(net.runelite.api.KeyCode.KC_SHIFT)))
+			{
+				e.consume();
+			}
+			return e;
+		}
+	};
 	private OfferAdvisorSlotOverlay slotOverlay;
 	private OfferSetupOverlay setupOverlay;
 	private ScheduledFuture<?> panelTask;
@@ -237,8 +254,9 @@ public class PriceCheckPlugin extends Plugin
 
 		geHelper = new GeChatboxHelper(client, clientThread, config, this);
 
-		advisorOverlay = new OfferAdvisorOverlay(client, this, config);
+		advisorOverlay = new OfferAdvisorOverlay(client, this, config, configManager);
 		overlayManager.add(advisorOverlay);
+		mouseManager.registerMouseListener(advisorMouse);
 		slotOverlay = new OfferAdvisorSlotOverlay(client, this, config);
 		overlayManager.add(slotOverlay);
 		setupOverlay = new OfferSetupOverlay(client, this, config);
@@ -476,6 +494,7 @@ public class PriceCheckPlugin extends Plugin
 		if (advisorOverlay != null)
 		{
 			overlayManager.remove(advisorOverlay);
+			mouseManager.unregisterMouseListener(advisorMouse);
 			advisorOverlay = null;
 		}
 		if (slotOverlay != null)
