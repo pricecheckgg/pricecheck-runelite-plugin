@@ -12,4 +12,6 @@ public class AccountInfo
 	private String status;       // "active"
 	private String keyPrefix;    // e.g. "pck_AbCd0000…" — display-only, never the full key
 	private int trackedCount;
+	private Long expiresAt;      // license end, epoch ms; null = no expiry
+	private String source;       // how it is paid: "stripe" renews, anything else just runs out
 }

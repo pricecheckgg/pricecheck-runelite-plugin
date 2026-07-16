@@ -1000,12 +1000,32 @@ class PriceCheckPanel extends PluginPanel
 				return;   // keep the last good card on a blip
 			}
 			acctName.setText(acct.getUsername() != null ? acct.getUsername() : "PriceCheck member");
-			acctPlan.setText(" " + (acct.getPlan() != null ? acct.getPlan().toUpperCase(Locale.ROOT) : "PREMIUM") + " ");
-			// This is the tracked-margins WATCHLIST (the + on flip rows), not your
-			// live GE offers; the old "positions tracked" wording read like offers.
+			final String plan = acct.getPlan() == null ? "" : acct.getPlan();
+			final String pill = !acct.isPremium() ? "FREE"
+				: ("pro".equals(plan) || "premium".equals(plan)) ? "TRADER PRO" : "TRADER";
+			acctPlan.setText(" " + pill + " ");
+			// License line: what the plan is doing and when it runs out. "Renews"
+			// for a live subscription, "left" for comped/prepaid time, no date talk
+			// for a lifetime grant. The watchlist count rides along at the end.
+			String lic;
+			if (!acct.isPremium())
+			{
+				lic = "Free plan";
+			}
+			else if (acct.getExpiresAt() == null || acct.getExpiresAt() <= 0)
+			{
+				lic = "Lifetime license";
+			}
+			else
+			{
+				final long days = Math.max(0, (acct.getExpiresAt() - System.currentTimeMillis() + 86_399_999L) / 86_400_000L);
+				final boolean renews = "stripe".equals(acct.getSource());
+				lic = days <= 0 ? "License expired"
+					: (renews ? "Renews in " : "") + days + (renews ? (days == 1 ? " day" : " days") : (days == 1 ? " day left" : " days left"));
+			}
 			final int n = acct.getTrackedCount();
-			acctSub.setText("Watching " + n + (n == 1 ? " item" : " items"));
-			acctSub.setToolTipText("Items on your tracked-margins watchlist (the + button on flip rows). Live GE offers show on the Flips tab and the in-game overlays.");
+			acctSub.setText(lic + " · watching " + n + (n == 1 ? " item" : " items"));
+			acctSub.setToolTipText("Watching = your tracked-margins watchlist (the + button on flip rows); live GE offers show on the Flips tab and the in-game overlays.");
 			if (acct.getKeyPrefix() != null) { keyPrefixLabel.setText(acct.getKeyPrefix()); }
 		});
 	}
