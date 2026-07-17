@@ -6,7 +6,10 @@ import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.RenderingHints;
 import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -20,6 +23,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
@@ -145,6 +149,12 @@ class PriceCheckPanel extends PluginPanel
 		add(display, BorderLayout.CENTER);
 	}
 
+	/** Dev preview only: the Log header panel, for headless rendering. */
+	JPanel logHeaderForPreview()
+	{
+		return logHeader;
+	}
+
 	// ── Flips tab ──
 	private JPanel buildFlipsView()
 	{
@@ -195,10 +205,10 @@ class PriceCheckPanel extends PluginPanel
 	}
 
 	// ── Log tab: the FREE flip ledger (works with no key at all) ──
-	// Header: a session hero, a Today/Week/All-time cell strip, one meta
-	// line, and a sync status row with a coloured dot.
-	private static final Color CELL = new Color(24, 24, 24);
-	private static final Color CELL_LINE = new Color(48, 48, 48);
+	// Header: a session hero, a borderless Today/Week/All-time column strip
+	// between hairline dividers, one meta line, and a painted status dot
+	// (the RuneScape font has no dot glyph, so it is drawn, not typed).
+	private static final Color HAIRLINE = new Color(48, 48, 48);
 	private final JLabel heroTitle = new JLabel("SESSION");
 	private final JLabel heroValue = new JLabel(" ");
 	private final JLabel heroSub = new JLabel(" ");
@@ -206,81 +216,152 @@ class PriceCheckPanel extends PluginPanel
 	private final JLabel cellWeek = new JLabel(" ");
 	private final JLabel cellAll = new JLabel(" ");
 	private final JLabel logMeta = new JLabel(" ");
-	private final JLabel logSyncDot = new JLabel("\u25CF");
+	private final Dot logSyncDot = new Dot();
 	private final JLabel logSync = new JLabel(" ");
 	private final JPanel logList = new JPanel();
+	private JPanel logHeader;
 	private volatile boolean syncOpensWeb;
 
-	private JPanel statCell(String caption, JLabel value)
+	private static final class Dot extends JComponent
 	{
-		final JPanel cell = new JPanel();
-		cell.setLayout(new BoxLayout(cell, BoxLayout.Y_AXIS));
-		cell.setBackground(CELL);
-		cell.setBorder(BorderFactory.createCompoundBorder(
-			BorderFactory.createLineBorder(CELL_LINE, 1),
-			BorderFactory.createEmptyBorder(5, 6, 5, 6)));
+		private Color color = Palette.SUBTLE;
+
+		Dot()
+		{
+			setPreferredSize(new Dimension(9, 14));
+			setMinimumSize(getPreferredSize());
+			setMaximumSize(getPreferredSize());
+		}
+
+		void setColor(Color c)
+		{
+			color = c;
+			repaint();
+		}
+
+		@Override
+		protected void paintComponent(Graphics g)
+		{
+			final Graphics2D g2 = (Graphics2D) g;
+			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			g2.setColor(color);
+			g2.fillOval(0, (getHeight() - 7) / 2, 7, 7);
+		}
+	}
+
+	/** Signed gp at three significant figures: +873k, +3.99m, -12.4m, +1.02b. */
+	private static void setStat(JLabel cell, long v)
+	{
+		cell.setText(statGp(v));
+		cell.setForeground(v > 0 ? Palette.GREEN : (v < 0 ? Palette.RED : Palette.SUBTLE));
+	}
+
+	private static String statGp(long v)
+	{
+		final long a = Math.abs(v);
+		final String sign = v > 0 ? "+" : (v < 0 ? "-" : "");
+		if (a >= 1_000_000_000L) return sign + sig3(a / 1e9) + "b";
+		if (a >= 1_000_000L) return sign + sig3(a / 1e6) + "m";
+		if (a >= 1_000L) return sign + sig3(a / 1e3) + "k";
+		return sign + a;
+	}
+
+	private static String sig3(double x)
+	{
+		String s = x >= 100 ? String.format(java.util.Locale.ROOT, "%.0f", x)
+			: (x >= 10 ? String.format(java.util.Locale.ROOT, "%.1f", x)
+			: String.format(java.util.Locale.ROOT, "%.2f", x));
+		if (s.contains("."))
+		{
+			s = s.replaceAll("0+$", "").replaceAll("\\.$", "");
+		}
+		return s;
+	}
+
+	private JPanel statCol(String caption, JLabel value)
+	{
+		final JPanel col = new JPanel();
+		col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
+		col.setBackground(CARD);
 		final JLabel cap = new JLabel(caption);
-		cap.setFont(FontManager.getRunescapeSmallFont().deriveFont(10f));
+		cap.setFont(FontManager.getRunescapeSmallFont());
 		cap.setForeground(Palette.SUBTLE);
-		cap.setAlignmentX(Component.CENTER_ALIGNMENT);
+		cap.setAlignmentX(Component.LEFT_ALIGNMENT);
 		value.setFont(FontManager.getRunescapeBoldFont());
-		value.setAlignmentX(Component.CENTER_ALIGNMENT);
-		cell.add(cap);
-		cell.add(Box.createVerticalStrut(2));
-		cell.add(value);
-		return cell;
+		value.setAlignmentX(Component.LEFT_ALIGNMENT);
+		col.add(cap);
+		col.add(Box.createVerticalStrut(3));
+		col.add(value);
+		return col;
+	}
+
+	private Component hairline()
+	{
+		final JPanel line = new JPanel();
+		line.setBackground(HAIRLINE);
+		line.setPreferredSize(new Dimension(1, 1));
+		line.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+		line.setAlignmentX(Component.LEFT_ALIGNMENT);
+		return line;
 	}
 
 	private JPanel buildLogView()
 	{
 		final JPanel head = new JPanel();
+		logHeader = head;
 		head.setLayout(new BoxLayout(head, BoxLayout.Y_AXIS));
 		head.setBackground(CARD);
-		head.setBorder(BorderFactory.createEmptyBorder(12, 12, 10, 12));
+		head.setBorder(BorderFactory.createEmptyBorder(12, 12, 11, 12));
 		head.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		// Hero: the session owns the header.
-		heroTitle.setFont(FontManager.getRunescapeSmallFont().deriveFont(10f));
+		heroTitle.setFont(FontManager.getRunescapeSmallFont());
 		heroTitle.setForeground(Palette.SUBTLE);
-		heroValue.setFont(FontManager.getRunescapeBoldFont().deriveFont(20f));
-		heroValue.setForeground(Palette.GOLD);
+		heroValue.setFont(FontManager.getRunescapeBoldFont().deriveFont(22f));
+		heroValue.setForeground(Palette.SUBTLE);
 		heroSub.setFont(FontManager.getRunescapeSmallFont());
 		heroSub.setForeground(Palette.SUBTLE);
 		for (final JLabel l : new JLabel[]{heroTitle, heroValue, heroSub})
 		{
 			l.setAlignmentX(Component.LEFT_ALIGNMENT);
-			head.add(l);
 		}
-		head.add(gap(10));
+		head.add(heroTitle);
+		head.add(Box.createVerticalStrut(3));
+		head.add(heroValue);
+		head.add(Box.createVerticalStrut(3));
+		head.add(heroSub);
+		head.add(Box.createVerticalStrut(10));
+		head.add(hairline());
+		head.add(Box.createVerticalStrut(9));
 
-		final JPanel cells = new JPanel(new GridLayout(1, 3, 6, 0));
-		cells.setBackground(CARD);
-		cells.setAlignmentX(Component.LEFT_ALIGNMENT);
-		cells.add(statCell("TODAY", cellToday));
-		cells.add(statCell("WEEK", cellWeek));
-		cells.add(statCell("ALL TIME", cellAll));
-		cells.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
-		head.add(cells);
-		head.add(gap(8));
+		final JPanel cols = new JPanel(new GridLayout(1, 3, 8, 0));
+		cols.setBackground(CARD);
+		cols.setAlignmentX(Component.LEFT_ALIGNMENT);
+		cols.add(statCol("TODAY", cellToday));
+		cols.add(statCol("WEEK", cellWeek));
+		cols.add(statCol("ALL TIME", cellAll));
+		cols.setMaximumSize(new Dimension(Integer.MAX_VALUE, cols.getPreferredSize().height));
+		head.add(cols);
+		head.add(Box.createVerticalStrut(9));
+		head.add(hairline());
+		head.add(Box.createVerticalStrut(9));
 
 		logMeta.setFont(FontManager.getRunescapeSmallFont());
 		logMeta.setForeground(Palette.SUBTLE);
 		logMeta.setAlignmentX(Component.LEFT_ALIGNMENT);
 		head.add(logMeta);
-		head.add(gap(6));
+		head.add(Box.createVerticalStrut(7));
 
-		// Sync status: coloured dot + one short line. Opens the web
-		// portfolio once backed up, Settings while local-only.
+		// Sync status: painted dot + one short line. Opens the web portfolio
+		// once backed up, Settings while local-only.
 		final JPanel sync = new JPanel(new BorderLayout(6, 0));
 		sync.setBackground(CARD);
 		sync.setAlignmentX(Component.LEFT_ALIGNMENT);
-		logSyncDot.setFont(FontManager.getRunescapeSmallFont());
-		logSyncDot.setForeground(Palette.SUBTLE);
 		logSync.setFont(FontManager.getRunescapeSmallFont());
 		logSync.setForeground(Palette.SUBTLE);
 		sync.add(logSyncDot, BorderLayout.WEST);
 		sync.add(logSync, BorderLayout.CENTER);
-		sync.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
+		sync.setMaximumSize(new Dimension(Integer.MAX_VALUE, 16));
 		sync.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		sync.addMouseListener(new MouseAdapter()
 		{
@@ -352,16 +433,14 @@ class PriceCheckPanel extends PluginPanel
 			{
 				return;
 			}
-			final boolean active = s.sessionGpHr != Long.MIN_VALUE;
-			heroValue.setText(gpSign(s.sessionProfit));
-			heroValue.setForeground(s.sessionProfit > 0 ? Palette.GREEN : (s.sessionProfit < 0 ? Palette.RED : Palette.GOLD));
-			heroSub.setText(active ? gpSign(s.sessionGpHr) + "/hr while flipping" : "gp/hr shows after a few active minutes");
-			cellToday.setText(gpSign(s.todayProfit));
-			cellToday.setForeground(s.todayProfit >= 0 ? Palette.GREEN : Palette.RED);
-			cellWeek.setText(gpSign(s.weekProfit));
-			cellWeek.setForeground(s.weekProfit >= 0 ? Palette.GREEN : Palette.RED);
-			cellAll.setText(gpSign(s.allProfit));
-			cellAll.setForeground(s.allProfit >= 0 ? Palette.GREEN : Palette.RED);
+			heroValue.setText(s.sessionProfit == 0 ? "0 gp" : statGp(s.sessionProfit));
+			heroValue.setForeground(s.sessionProfit > 0 ? Palette.GREEN : (s.sessionProfit < 0 ? Palette.RED : Palette.SUBTLE));
+			heroSub.setText(s.sessionGpHr != Long.MIN_VALUE
+				? statGp(s.sessionGpHr) + "/hr while flipping"
+				: (s.sessionProfit == 0 ? "no flips yet this session" : "gp/hr shows after a few active minutes"));
+			setStat(cellToday, s.todayProfit);
+			setStat(cellWeek, s.weekProfit);
+			setStat(cellAll, s.allProfit);
 			cellAll.setToolTipText("Tax paid: " + Fmt.compact(s.allTax) + " gp");
 			logMeta.setText(s.allFlips + " flips"
 				+ (s.winRatePct >= 0 ? " · " + s.winRatePct + "% won" : "")
@@ -370,10 +449,10 @@ class PriceCheckPanel extends PluginPanel
 				? s.untrackedSells + " sold items had no tracked buy, so they count at zero cost"
 				: null);
 			syncOpensWeb = hasKey && s.pendingSync == 0;
-			logSyncDot.setForeground(hasKey ? (s.pendingSync > 0 ? Palette.AMBER : Palette.GREEN) : Palette.SUBTLE);
+			logSyncDot.setColor(hasKey ? (s.pendingSync > 0 ? Palette.AMBER : Palette.GREEN) : Palette.SUBTLE);
 			logSync.setText(hasKey
 				? (s.pendingSync > 0 ? "Backing up " + s.pendingSync + " fills…" : "Backed up · open web portfolio")
-				: "Local only · turn on Sync flip log in Setup");
+				: "Local only · back up in Setup");
 
 			logList.removeAll();
 			if (!s.openLots.isEmpty())
@@ -559,7 +638,7 @@ class PriceCheckPanel extends PluginPanel
 		controls.add(acctRow);
 		controls.add(gap(8));
 
-		// Restore the last-used shape.
+		// Restore the last-used shape. Best-effort: any failure keeps defaults.
 		try
 		{
 			final String s = configManager.getConfiguration(PriceCheckConfig.GROUP, "planSlots");
@@ -567,7 +646,7 @@ class PriceCheckPanel extends PluginPanel
 			final String a = configManager.getConfiguration(PriceCheckConfig.GROUP, "planAccounts");
 			if (a != null) { planAccts.setValue(Math.min(Math.max(Integer.parseInt(a), 1), 100)); }
 		}
-		catch (NumberFormatException ignored)
+		catch (Exception ignored)
 		{
 		}
 
