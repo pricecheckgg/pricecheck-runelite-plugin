@@ -23,6 +23,7 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -64,7 +65,7 @@ class PriceCheckPanel extends PluginPanel
 		void onSearch(String query);
 		void onFetchAccount();     // fired when the Settings tab is opened / after a key save
 		// capital < 0 = "use my last reported bank total" (server-side fallback)
-		void onBuildPlan(long capital, int slots, int accounts);
+		void onBuildPlan(long capital, int slots, int accounts, int hours);
 		void onDeleteFlip(String flipId);
 		void onDeleteLot(int itemId, int qty, long cost, long openedAt);
 	}
@@ -82,6 +83,8 @@ class PriceCheckPanel extends PluginPanel
 	private final javax.swing.JTextField planCapital = new javax.swing.JTextField();
 	private final JSpinner planSlots = new JSpinner(new SpinnerNumberModel(8, 1, 8, 1));
 	private final JSpinner planAccts = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+	private final JComboBox<String> planHours = new JComboBox<>(new String[]{"1 hour", "4 hours", "Overnight"});
+	private static final int[] PLAN_HOURS_VALUES = {1, 4, 8};
 	private final JButton planBuild = new JButton("Build plan");
 	private final JLabel planStatus = new JLabel(" ");
 	private final JPanel planList = new JPanel();
@@ -658,6 +661,22 @@ class PriceCheckPanel extends PluginPanel
 		acctRow.add(acctLbl, BorderLayout.WEST);
 		acctRow.add(acctWrap, BorderLayout.EAST);
 		controls.add(acctRow);
+		controls.add(gap(6));
+
+		final JPanel hoursRow = row();
+		hoursRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
+		final JLabel hoursLbl = new JLabel("Session");
+		hoursLbl.setForeground(Palette.SUBTLE);
+		planHours.setToolTipText("How long you are flipping for. Short sessions favour fast movers; overnight admits patient big tickets and fits more buy-limit windows.");
+		planHours.setPreferredSize(new Dimension(96, 24));
+		planHours.setMaximumSize(new Dimension(96, 24));
+		planHours.setSelectedIndex(1);
+		final JPanel hoursWrap = new JPanel(new BorderLayout());
+		hoursWrap.setOpaque(false);
+		hoursWrap.add(planHours, BorderLayout.EAST);
+		hoursRow.add(hoursLbl, BorderLayout.WEST);
+		hoursRow.add(hoursWrap, BorderLayout.EAST);
+		controls.add(hoursRow);
 		controls.add(gap(8));
 
 		// Restore the last-used shape. Best-effort: any failure keeps defaults.
@@ -667,6 +686,15 @@ class PriceCheckPanel extends PluginPanel
 			if (s != null) { planSlots.setValue(Math.min(Math.max(Integer.parseInt(s), 1), 8)); }
 			final String a = configManager.getConfiguration(PriceCheckConfig.GROUP, "planAccounts");
 			if (a != null) { planAccts.setValue(Math.min(Math.max(Integer.parseInt(a), 1), 100)); }
+			final String h = configManager.getConfiguration(PriceCheckConfig.GROUP, "planHours");
+			if (h != null)
+			{
+				final int hv = Integer.parseInt(h);
+				for (int i = 0; i < PLAN_HOURS_VALUES.length; i++)
+				{
+					if (PLAN_HOURS_VALUES[i] == hv) { planHours.setSelectedIndex(i); }
+				}
+			}
 		}
 		catch (Exception ignored)
 		{
@@ -729,13 +757,15 @@ class PriceCheckPanel extends PluginPanel
 		}
 		final int slots = (Integer) planSlots.getValue();
 		final int accounts = (Integer) planAccts.getValue();
+		final int hours = PLAN_HOURS_VALUES[Math.max(0, planHours.getSelectedIndex())];
 		configManager.setConfiguration(PriceCheckConfig.GROUP, "planSlots", String.valueOf(slots));
 		configManager.setConfiguration(PriceCheckConfig.GROUP, "planAccounts", String.valueOf(accounts));
+		configManager.setConfiguration(PriceCheckConfig.GROUP, "planHours", String.valueOf(hours));
 		planBuild.setEnabled(false);
 		planBuild.setText("Building…");
 		planStatus.setText(" ");
 		planStatus.setForeground(Palette.SUBTLE);
-		listener.onBuildPlan(capital, slots, accounts);
+		listener.onBuildPlan(capital, slots, accounts, hours);
 	}
 
 	/** Live bank+inventory total from the capital tracker. Prefills the capital
@@ -828,9 +858,22 @@ class PriceCheckPanel extends PluginPanel
 		card.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		final JPanel l1 = row();
-		final JLabel exp = mono(Fmt.compact(d.getTotals().getEstPerHr()) + "/hr expected", Palette.GOLD);
+		final boolean hasRange = d.getTotals().getEstSession() != 0 || d.getTotals().getHigh() != 0;
+		final JLabel exp = mono(hasRange
+			? Fmt.compact(d.getTotals().getEstSession()) + " expected this session"
+			: Fmt.compact(d.getTotals().getEstPerHr()) + "/hr expected", Palette.GOLD);
 		l1.add(exp, BorderLayout.WEST);
 		card.add(l1);
+
+		if (hasRange)
+		{
+			final JPanel lr = row();
+			final JLabel range = mono(Fmt.compact(d.getTotals().getLow()) + " to " + Fmt.compact(d.getTotals().getHigh())
+				+ (d.getTotals().getWorstCase() > 0 ? " · worst case -" + Fmt.compact(d.getTotals().getWorstCase()) : ""), Palette.SUBTLE);
+			range.setToolTipText("Range from the measured odds: a slow tape lands near the low, a clean sweep near the high. Worst case assumes every big ticket bails and every flow item eats its daily wobble.");
+			lr.add(range, BorderLayout.WEST);
+			card.add(lr);
+		}
 
 		final JPanel l2 = row();
 		final JLabel dep = mono("deployed " + Fmt.compact(d.getTotals().getOutlay())
@@ -870,7 +913,16 @@ class PriceCheckPanel extends PluginPanel
 		icon.setHorizontalAlignment(SwingConstants.CENTER);
 		itemManager.getImage(r.getGeId()).addTo(icon);
 
-		final JLabel name = new JLabel("<html><body style='width:126px'><b>" + escHtml(r.getName()) + "</b></body></html>");
+		String tag = "";
+		if ("big".equals(r.getLane()))
+		{
+			tag = r.isBand() ? " <span style='color:#e6c667'>BIG · BAND</span>" : " <span style='color:#e6c667'>BIG</span>";
+		}
+		else if ("dip".equals(r.getLane()))
+		{
+			tag = " <span style='color:#e6b34a'>DIP</span>";
+		}
+		final JLabel name = new JLabel("<html><body style='width:126px'><b>" + escHtml(r.getName()) + "</b>" + tag + "</body></html>");
 		name.setForeground(Color.WHITE);
 		final JPanel line1 = row();
 		line1.add(name, BorderLayout.CENTER);
@@ -885,11 +937,37 @@ class PriceCheckPanel extends PluginPanel
 		line2.add(qty, BorderLayout.CENTER);
 
 		final JLabel outlay = mono(Fmt.compact(r.getOutlay()) + " in", Palette.SUBTLE);
-		final JLabel ev = mono(Fmt.compact(r.getEstPerHr()) + "/hr", Palette.GOLD);
+		final JLabel ev = mono(r.getEstSession() != 0
+			? "+" + Fmt.compact(r.getEstSession()) : Fmt.compact(r.getEstPerHr()) + "/hr", Palette.GOLD);
+		ev.setToolTipText(r.getEstSession() != 0 ? "Expected over your session (" + Fmt.compact(r.getEstPerHr()) + "/hr)" : null);
 		ev.setHorizontalAlignment(SwingConstants.RIGHT);
 		final JPanel line3 = row();
 		line3.add(outlay, BorderLayout.CENTER);
 		line3.add(ev, BorderLayout.EAST);
+
+		// Receipt: the evidence behind the line. Old servers send no lane, so
+		// this row simply doesn't appear.
+		JPanel receiptLine = null;
+		if (r.getLane() != null)
+		{
+			String receipt;
+			if ("big".equals(r.getLane()))
+			{
+				receipt = Math.round(r.getOdds() * 100) + "% fill · ~" + r.getHoldHrs() + "h hold"
+					+ (r.isBand() ? " · rest these exact prices" : "");
+			}
+			else if ("dip".equals(r.getLane()))
+			{
+				receipt = "target " + Fmt.compact(r.getTarget()) + " · half odds, opportunistic";
+			}
+			else
+			{
+				receipt = Math.round(r.getOdds() * 100) + "% fill · ~" + r.getTtfMin() + "m to first fill";
+			}
+			final JLabel rec = mono(receipt, Palette.SUBTLE);
+			receiptLine = row();
+			receiptLine.add(rec, BorderLayout.CENTER);
+		}
 
 		final JPanel center = new JPanel(new BorderLayout());
 		center.setOpaque(false);
@@ -897,6 +975,10 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel lower = new JPanel(new BorderLayout());
 		lower.setOpaque(false);
 		lower.add(line2, BorderLayout.NORTH);
+		if (receiptLine != null)
+		{
+			lower.add(receiptLine, BorderLayout.CENTER);
+		}
 		lower.add(line3, BorderLayout.SOUTH);
 		center.add(lower, BorderLayout.SOUTH);
 

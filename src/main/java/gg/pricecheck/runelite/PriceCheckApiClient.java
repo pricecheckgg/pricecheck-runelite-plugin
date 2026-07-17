@@ -366,7 +366,7 @@ public class PriceCheckApiClient
 	}
 
 	/** Build a plan. capital < 0 means "use my last reported bank total". */
-	PlanResult getPlan(String key, long capital, int slots, int accounts)
+	PlanResult getPlan(String key, long capital, int slots, int accounts, int hours)
 	{
 		if (key == null || key.trim().isEmpty())
 		{
@@ -375,7 +375,8 @@ public class PriceCheckApiClient
 		final HttpUrl.Builder url = BASE.newBuilder()
 			.addPathSegment("plan")
 			.addQueryParameter("slots", String.valueOf(slots))
-			.addQueryParameter("accounts", String.valueOf(accounts));
+			.addQueryParameter("accounts", String.valueOf(accounts))
+			.addQueryParameter("hours", String.valueOf(hours));
 		if (capital >= 0)
 		{
 			url.addQueryParameter("capital", String.valueOf(capital));

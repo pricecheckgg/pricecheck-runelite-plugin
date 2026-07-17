@@ -36,7 +36,7 @@ public final class HeaderPreview
 			public void onUntrack(int geId) { }
 			public void onSearch(String query) { }
 			public void onFetchAccount() { }
-			public void onBuildPlan(long capital, int slots, int accounts) { }
+			public void onBuildPlan(long capital, int slots, int accounts, int hours) { }
 			public void onDeleteFlip(String flipId) { }
 			public void onDeleteLot(int itemId, int qty, long cost, long openedAt) { }
 		};

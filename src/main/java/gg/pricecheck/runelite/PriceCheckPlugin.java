@@ -190,11 +190,11 @@ public class PriceCheckPlugin extends Plugin
 			}
 
 			@Override
-			public void onBuildPlan(long capital, int slots, int accounts)
+			public void onBuildPlan(long capital, int slots, int accounts, int hours)
 			{
 				poller.execute(() ->
 				{
-					final PriceCheckApiClient.PlanResult r = api.getPlan(config.apiKey(), capital, slots, accounts);
+					final PriceCheckApiClient.PlanResult r = api.getPlan(config.apiKey(), capital, slots, accounts, hours);
 					final PriceCheckPanel p = panel;
 					if (p != null)
 					{
