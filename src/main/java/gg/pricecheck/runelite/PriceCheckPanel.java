@@ -396,6 +396,11 @@ class PriceCheckPanel extends PluginPanel
 
 		head.setMaximumSize(new Dimension(Integer.MAX_VALUE, head.getPreferredSize().height));
 
+		// The list stacks vertically. (This line was lost in the header rework,
+		// leaving the default FlowLayout: one 42px row, everything else clipped
+		// out of view. That is where the completed flips "went".)
+		logList.setLayout(new BoxLayout(logList, BoxLayout.Y_AXIS));
+
 		final JPanel body = new JPanel();
 		logBody = body;
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
