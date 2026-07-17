@@ -83,8 +83,23 @@ public final class HeaderPreview
 			s.checks = 155;
 			s.pendingSync = 37;
 		}
-		s.openLots = Collections.emptyList();
-		s.recent = Collections.emptyList();
+		final java.util.List<FlipLogEngine.Lot> lots = new java.util.ArrayList<>();
+		final FlipLogEngine.Lot lot = new FlipLogEngine.Lot();
+		lot.itemId = 11732; lot.name = "Armadyl chainskirt"; lot.qty = 1; lot.cost = 26_720_000L; lot.openedAt = System.currentTimeMillis() - 73 * 60_000L;
+		lots.add(lot);
+		s.openLots = "fresh".equals(variant) ? Collections.emptyList() : lots;
+		final java.util.List<FlipLogEngine.Flip> flips = new java.util.ArrayList<>();
+		final String[] nm = {"Bloodbark legs", "Heavy ballista", "Dragon claws", "Zulrah's scales", "Twisted bow"};
+		final long[] pf = {9_528, 19_806, 142_500, -3_240, 512_000};
+		for (int i = 0; i < nm.length; i++) {
+			final FlipLogEngine.Flip f = new FlipLogEngine.Flip();
+			f.itemId = 100 + i; f.name = nm[i]; f.qty = 1 + i; f.profit = pf[i];
+			f.closedAt = System.currentTimeMillis() - (i + 1) * 900_000L;
+			f.openedAt = f.closedAt - 1_200_000L;
+			f.check = i == 3;
+			flips.add(f);
+		}
+		s.recent = "fresh".equals(variant) ? Collections.emptyList() : flips;
 
 		holder[0].setFlipLog(s, !"fresh".equals(variant));
 		EventQueue.invokeAndWait(() -> { });
@@ -94,13 +109,18 @@ public final class HeaderPreview
 			// Paint the header in isolation at the true side-panel inner width
 			// (RuneLite panel ~226px). The whole scrollpane can't lay out
 			// headless without a shown window, but the header can.
-			final javax.swing.JComponent head = holder[0].logHeaderForPreview();
+			final javax.swing.JComponent head = holder[0].logBodyForPreview();
 			final int w = 226;
+			invalidateAll(head);
+			head.setSize(w, 2000);
+			layoutTree(head);
+			// Override each nested BoxLayout container's stale preferred height
+			// with the real extent of its children (headless caches don't clear).
+			fixHeights(head, w);
 			invalidateAll(head);
 			final int h = head.getPreferredSize().height;
 			head.setSize(w, h);
-			layoutAll(head);
-			dump(head, 0);
+			layoutTree(head);
 			final BufferedImage img = new BufferedImage(w * 2, h * 2, BufferedImage.TYPE_INT_RGB);
 			final Graphics2D g = img.createGraphics();
 			g.scale(2, 2);
@@ -120,19 +140,6 @@ public final class HeaderPreview
 		System.out.println("wrote " + out);
 	}
 
-	private static void dump(Component c, int d)
-	{
-		if (c instanceof javax.swing.JLabel)
-		{
-			final javax.swing.JLabel l = (javax.swing.JLabel) c;
-			System.err.println("LABEL w=" + c.getWidth() + " pref=" + c.getPreferredSize().width
-				+ " max=" + c.getMaximumSize().width + " text=[" + l.getText() + "]");
-		}
-		if (c instanceof Container)
-		{
-			for (final Component k : ((Container) c).getComponents()) { dump(k, d + 1); }
-		}
-	}
 
 	private static void layoutAll(Component c)
 	{
@@ -154,6 +161,26 @@ public final class HeaderPreview
 			}
 		}
 		c.invalidate();
+	}
+
+	private static int fixHeights(Component c, int w)
+	{
+		final boolean vbox = c instanceof Container
+			&& ((Container) c).getLayout() instanceof javax.swing.BoxLayout;
+		if (!vbox)
+		{
+			return c.getPreferredSize().height;   // BorderLayout rows, labels: trust their own pref
+		}
+		int sum = 0;
+		for (final Component k : ((Container) c).getComponents())
+		{
+			sum += fixHeights(k, w);
+		}
+		final java.awt.Insets in = ((javax.swing.JComponent) c).getInsets();
+		final int total = sum + in.top + in.bottom;
+		c.setPreferredSize(new java.awt.Dimension(w, total));
+		c.setSize(w, total);
+		return total;
 	}
 
 	private static void layoutTree(Component c)

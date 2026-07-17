@@ -155,6 +155,18 @@ class PriceCheckPanel extends PluginPanel
 		return logHeader;
 	}
 
+	/** Dev preview only: the whole Log view (header + list). */
+	JPanel logViewForPreview()
+	{
+		return logView;
+	}
+
+	/** Dev preview only: the scrollable content (header + list), full height. */
+	JPanel logBodyForPreview()
+	{
+		return logBody;
+	}
+
 	// ── Flips tab ──
 	private JPanel buildFlipsView()
 	{
@@ -220,6 +232,8 @@ class PriceCheckPanel extends PluginPanel
 	private final JLabel logSync = new JLabel(" ");
 	private final JPanel logList = new JPanel();
 	private JPanel logHeader;
+	private JPanel logView;
+	private JPanel logBody;
 	private volatile boolean syncOpensWeb;
 
 	private static final class Dot extends JComponent
@@ -290,7 +304,7 @@ class PriceCheckPanel extends PluginPanel
 		value.setFont(FontManager.getRunescapeBoldFont());
 		value.setAlignmentX(Component.LEFT_ALIGNMENT);
 		col.add(cap);
-		col.add(Box.createVerticalStrut(3));
+		col.add(Box.createVerticalStrut(2));
 		col.add(value);
 		return col;
 	}
@@ -311,13 +325,14 @@ class PriceCheckPanel extends PluginPanel
 		logHeader = head;
 		head.setLayout(new BoxLayout(head, BoxLayout.Y_AXIS));
 		head.setBackground(CARD);
-		head.setBorder(BorderFactory.createEmptyBorder(12, 12, 11, 12));
+		head.setBorder(BorderFactory.createEmptyBorder(9, 12, 8, 12));
 		head.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		// Hero: the session owns the header.
+		// Hero: the session owns the header. Kept compact so the completed-flip
+		// list below stays visible without scrolling on a short panel.
 		heroTitle.setFont(FontManager.getRunescapeSmallFont());
 		heroTitle.setForeground(Palette.SUBTLE);
-		heroValue.setFont(FontManager.getRunescapeBoldFont().deriveFont(22f));
+		heroValue.setFont(FontManager.getRunescapeBoldFont().deriveFont(20f));
 		heroValue.setForeground(Palette.SUBTLE);
 		heroSub.setFont(FontManager.getRunescapeSmallFont());
 		heroSub.setForeground(Palette.SUBTLE);
@@ -326,13 +341,13 @@ class PriceCheckPanel extends PluginPanel
 			l.setAlignmentX(Component.LEFT_ALIGNMENT);
 		}
 		head.add(heroTitle);
-		head.add(Box.createVerticalStrut(3));
+		head.add(Box.createVerticalStrut(1));
 		head.add(heroValue);
-		head.add(Box.createVerticalStrut(3));
+		head.add(Box.createVerticalStrut(2));
 		head.add(heroSub);
-		head.add(Box.createVerticalStrut(10));
+		head.add(Box.createVerticalStrut(8));
 		head.add(hairline());
-		head.add(Box.createVerticalStrut(9));
+		head.add(Box.createVerticalStrut(7));
 
 		final JPanel cols = new JPanel(new GridLayout(1, 3, 8, 0));
 		cols.setBackground(CARD);
@@ -342,15 +357,15 @@ class PriceCheckPanel extends PluginPanel
 		cols.add(statCol("ALL TIME", cellAll));
 		cols.setMaximumSize(new Dimension(Integer.MAX_VALUE, cols.getPreferredSize().height));
 		head.add(cols);
-		head.add(Box.createVerticalStrut(9));
+		head.add(Box.createVerticalStrut(7));
 		head.add(hairline());
-		head.add(Box.createVerticalStrut(9));
+		head.add(Box.createVerticalStrut(6));
 
 		logMeta.setFont(FontManager.getRunescapeSmallFont());
 		logMeta.setForeground(Palette.SUBTLE);
 		logMeta.setAlignmentX(Component.LEFT_ALIGNMENT);
 		head.add(logMeta);
-		head.add(Box.createVerticalStrut(7));
+		head.add(Box.createVerticalStrut(5));
 
 		// Sync status: painted dot + one short line. Opens the web portfolio
 		// once backed up, Settings while local-only.
@@ -379,14 +394,15 @@ class PriceCheckPanel extends PluginPanel
 		});
 		head.add(sync);
 
-		head.setMaximumSize(new Dimension(Integer.MAX_VALUE, head.getPreferredSize().height + 80));
+		head.setMaximumSize(new Dimension(Integer.MAX_VALUE, head.getPreferredSize().height));
 
 		final JPanel body = new JPanel();
+		logBody = body;
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 		head.setAlignmentX(Component.LEFT_ALIGNMENT);
 		logList.setAlignmentX(Component.LEFT_ALIGNMENT);
 		body.add(head);
-		body.add(gap(8));
+		body.add(gap(6));
 		body.add(logList);
 
 		final ScrollList wrap = new ScrollList();
@@ -397,6 +413,7 @@ class PriceCheckPanel extends PluginPanel
 		scroll.getVerticalScrollBar().setUnitIncrement(16);
 		final JPanel holder = new JPanel(new BorderLayout());
 		holder.add(scroll, BorderLayout.CENTER);
+		logView = holder;
 		return holder;
 	}
 
@@ -490,7 +507,7 @@ class PriceCheckPanel extends PluginPanel
 		final JLabel icon = new JLabel();
 		icon.setPreferredSize(new Dimension(28, 30));
 		icon.setHorizontalAlignment(SwingConstants.CENTER);
-		itemManager.getImage(l.itemId).addTo(icon);
+		if (itemManager != null) { itemManager.getImage(l.itemId).addTo(icon); }
 		final JLabel name = new JLabel("<html><body style='width:126px'><b>"
 			+ escHtml(l.name != null ? l.name : ("#" + l.itemId)) + "</b></body></html>");
 		name.setForeground(Color.WHITE);
@@ -544,7 +561,7 @@ class PriceCheckPanel extends PluginPanel
 		final JLabel icon = new JLabel();
 		icon.setPreferredSize(new Dimension(28, 30));
 		icon.setHorizontalAlignment(SwingConstants.CENTER);
-		itemManager.getImage(f.itemId).addTo(icon);
+		if (itemManager != null) { itemManager.getImage(f.itemId).addTo(icon); }
 		final JLabel name = new JLabel("<html><body style='width:110px'><b>"
 			+ escHtml(f.name != null ? f.name : ("#" + f.itemId)) + "</b>"
 			+ (f.check ? " <span style='color:#9a917c'>check</span>" : "") + "</body></html>");
@@ -680,6 +697,7 @@ class PriceCheckPanel extends PluginPanel
 		scroll.getVerticalScrollBar().setUnitIncrement(16);
 		final JPanel holder = new JPanel(new BorderLayout());
 		holder.add(scroll, BorderLayout.CENTER);
+		logView = holder;
 		return holder;
 	}
 
