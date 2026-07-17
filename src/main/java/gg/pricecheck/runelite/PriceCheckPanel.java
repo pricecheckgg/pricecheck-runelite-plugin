@@ -61,7 +61,6 @@ class PriceCheckPanel extends PluginPanel
 		void onFetchAccount();     // fired when the Settings tab is opened / after a key save
 		// capital < 0 = "use my last reported bank total" (server-side fallback)
 		void onBuildPlan(long capital, int slots, int accounts);
-		void onImportHistory();    // import the missed trades found in the GE History tab
 		void onDeleteFlip(String flipId);
 		void onDeleteLot(int itemId, int qty, long cost, long openedAt);
 	}
@@ -196,75 +195,116 @@ class PriceCheckPanel extends PluginPanel
 	}
 
 	// ── Log tab: the FREE flip ledger (works with no key at all) ──
-	private final JLabel logSession = new JLabel(" ");
-	private final JLabel logToday = new JLabel(" ");
-	private final JLabel logWeek = new JLabel(" ");
-	private final JLabel logAll = new JLabel(" ");
+	// Header: a session hero, a Today/Week/All-time cell strip, one meta
+	// line, and a sync status row with a coloured dot.
+	private static final Color CELL = new Color(24, 24, 24);
+	private static final Color CELL_LINE = new Color(48, 48, 48);
+	private final JLabel heroTitle = new JLabel("SESSION");
+	private final JLabel heroValue = new JLabel(" ");
+	private final JLabel heroSub = new JLabel(" ");
+	private final JLabel cellToday = new JLabel(" ");
+	private final JLabel cellWeek = new JLabel(" ");
+	private final JLabel cellAll = new JLabel(" ");
 	private final JLabel logMeta = new JLabel(" ");
+	private final JLabel logSyncDot = new JLabel("\u25CF");
 	private final JLabel logSync = new JLabel(" ");
 	private final JPanel logList = new JPanel();
-	private final JPanel importBanner = new JPanel();
-	private final JLabel importLabel = new JLabel(" ");
-	private final JButton importBtn = new JButton("Import");
+	private volatile boolean syncOpensWeb;
+
+	private JPanel statCell(String caption, JLabel value)
+	{
+		final JPanel cell = new JPanel();
+		cell.setLayout(new BoxLayout(cell, BoxLayout.Y_AXIS));
+		cell.setBackground(CELL);
+		cell.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(CELL_LINE, 1),
+			BorderFactory.createEmptyBorder(5, 6, 5, 6)));
+		final JLabel cap = new JLabel(caption);
+		cap.setFont(FontManager.getRunescapeSmallFont().deriveFont(10f));
+		cap.setForeground(Palette.SUBTLE);
+		cap.setAlignmentX(Component.CENTER_ALIGNMENT);
+		value.setFont(FontManager.getRunescapeBoldFont());
+		value.setAlignmentX(Component.CENTER_ALIGNMENT);
+		cell.add(cap);
+		cell.add(Box.createVerticalStrut(2));
+		cell.add(value);
+		return cell;
+	}
 
 	private JPanel buildLogView()
 	{
 		final JPanel head = new JPanel();
 		head.setLayout(new BoxLayout(head, BoxLayout.Y_AXIS));
 		head.setBackground(CARD);
-		head.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
+		head.setBorder(BorderFactory.createEmptyBorder(12, 12, 10, 12));
 		head.setAlignmentX(Component.LEFT_ALIGNMENT);
-		for (final JLabel l : new JLabel[]{logSession, logToday, logWeek, logAll, logMeta, logSync})
+
+		// Hero: the session owns the header.
+		heroTitle.setFont(FontManager.getRunescapeSmallFont().deriveFont(10f));
+		heroTitle.setForeground(Palette.SUBTLE);
+		heroValue.setFont(FontManager.getRunescapeBoldFont().deriveFont(20f));
+		heroValue.setForeground(Palette.GOLD);
+		heroSub.setFont(FontManager.getRunescapeSmallFont());
+		heroSub.setForeground(Palette.SUBTLE);
+		for (final JLabel l : new JLabel[]{heroTitle, heroValue, heroSub})
 		{
 			l.setAlignmentX(Component.LEFT_ALIGNMENT);
-			l.setFont(FontManager.getRunescapeSmallFont());
 			head.add(l);
 		}
-		logSession.setForeground(Palette.GOLD);
-		logToday.setForeground(Color.WHITE);
-		logWeek.setForeground(Palette.SUBTLE);
-		logAll.setForeground(Palette.SUBTLE);
+		head.add(gap(10));
+
+		final JPanel cells = new JPanel(new GridLayout(1, 3, 6, 0));
+		cells.setBackground(CARD);
+		cells.setAlignmentX(Component.LEFT_ALIGNMENT);
+		cells.add(statCell("TODAY", cellToday));
+		cells.add(statCell("WEEK", cellWeek));
+		cells.add(statCell("ALL TIME", cellAll));
+		cells.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+		head.add(cells);
+		head.add(gap(8));
+
+		logMeta.setFont(FontManager.getRunescapeSmallFont());
 		logMeta.setForeground(Palette.SUBTLE);
+		logMeta.setAlignmentX(Component.LEFT_ALIGNMENT);
+		head.add(logMeta);
+		head.add(gap(6));
+
+		// Sync status: coloured dot + one short line. Opens the web
+		// portfolio once backed up, Settings while local-only.
+		final JPanel sync = new JPanel(new BorderLayout(6, 0));
+		sync.setBackground(CARD);
+		sync.setAlignmentX(Component.LEFT_ALIGNMENT);
+		logSyncDot.setFont(FontManager.getRunescapeSmallFont());
+		logSyncDot.setForeground(Palette.SUBTLE);
+		logSync.setFont(FontManager.getRunescapeSmallFont());
 		logSync.setForeground(Palette.SUBTLE);
-		// The "Local only" hint points at Settings, so clicking it goes there.
-		logSync.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		logSync.setToolTipText("Open Settings");
-		logSync.addMouseListener(new MouseAdapter()
+		sync.add(logSyncDot, BorderLayout.WEST);
+		sync.add(logSync, BorderLayout.CENTER);
+		sync.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
+		sync.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		sync.addMouseListener(new MouseAdapter()
 		{
-			public void mousePressed(MouseEvent e) { if (settingsTab != null) { settingsTab.select(); } }
+			public void mousePressed(MouseEvent e)
+			{
+				if (syncOpensWeb)
+				{
+					LinkBrowser.browse("https://flipping.pricecheck.gg/portfolio");
+				}
+				else if (settingsTab != null)
+				{
+					settingsTab.select();
+				}
+			}
 		});
-		head.setMaximumSize(new Dimension(Integer.MAX_VALUE, head.getPreferredSize().height + 40));
+		head.add(sync);
 
-		logList.setLayout(new BoxLayout(logList, BoxLayout.Y_AXIS));
-
-		// Recovery banner: shows when the GE History tab reveals trades the log
-		// missed (completed while logged out / plugin off). One click imports.
-		importBanner.setLayout(new BorderLayout(8, 0));
-		importBanner.setBackground(CARD);
-		importBanner.setBorder(BorderFactory.createCompoundBorder(
-			BorderFactory.createLineBorder(new Color(0xd4, 0xaf, 0x37, 90), 1),
-			BorderFactory.createEmptyBorder(8, 10, 8, 8)));
-		importBanner.setAlignmentX(Component.LEFT_ALIGNMENT);
-		importLabel.setForeground(Palette.GOLD);
-		importLabel.setFont(FontManager.getRunescapeSmallFont());
-		importBtn.setFocusPainted(false);
-		importBtn.addActionListener(e ->
-		{
-			importBtn.setEnabled(false);
-			listener.onImportHistory();
-		});
-		importBanner.add(importLabel, BorderLayout.CENTER);
-		importBanner.add(importBtn, BorderLayout.EAST);
-		importBanner.setVisible(false);
-		importBanner.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
+		head.setMaximumSize(new Dimension(Integer.MAX_VALUE, head.getPreferredSize().height + 80));
 
 		final JPanel body = new JPanel();
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 		head.setAlignmentX(Component.LEFT_ALIGNMENT);
 		logList.setAlignmentX(Component.LEFT_ALIGNMENT);
 		body.add(head);
-		body.add(gap(8));
-		body.add(importBanner);
 		body.add(gap(8));
 		body.add(logList);
 
@@ -279,25 +319,6 @@ class PriceCheckPanel extends PluginPanel
 		return holder;
 	}
 
-	/** n > 0 shows the recovery banner; 0 hides it. Call after an import too. */
-	void setImportOffer(int n)
-	{
-		SwingUtilities.invokeLater(() ->
-		{
-			if (n > 0)
-			{
-				importLabel.setText("<html><body style='width:150px'>" + n
-					+ (n == 1 ? " trade" : " trades") + " in your GE history " + (n == 1 ? "is" : "are")
-					+ " missing from the log.</body></html>");
-				importBtn.setEnabled(true);
-				importBanner.setVisible(true);
-			}
-			else
-			{
-				importBanner.setVisible(false);
-			}
-		});
-	}
 
 	private static String gpSign(long v)
 	{
@@ -331,18 +352,28 @@ class PriceCheckPanel extends PluginPanel
 			{
 				return;
 			}
-			logSession.setText(s.sessionGpHr == Long.MIN_VALUE
-				? "Session: " + gpSign(s.sessionProfit)
-				: "Session: " + gpSign(s.sessionProfit) + " · " + gpSign(s.sessionGpHr) + "/hr active");
-			logToday.setText("Today " + gpSign(s.todayProfit) + " · week " + gpSign(s.weekProfit));
-			logToday.setForeground(s.todayProfit >= 0 ? Palette.GREEN : Palette.RED);
-			logWeek.setText("All time " + gpSign(s.allProfit) + " · tax paid " + Fmt.compact(s.allTax));
-			logAll.setText(s.allFlips + " flips" + (s.winRatePct >= 0 ? " · " + s.winRatePct + "% won" : "")
-				+ (s.checks > 0 ? " · " + s.checks + " margin checks" : ""));
-			logMeta.setText(s.untrackedSells > 0 ? s.untrackedSells + " sold items had no tracked cost" : " ");
+			final boolean active = s.sessionGpHr != Long.MIN_VALUE;
+			heroValue.setText(gpSign(s.sessionProfit));
+			heroValue.setForeground(s.sessionProfit > 0 ? Palette.GREEN : (s.sessionProfit < 0 ? Palette.RED : Palette.GOLD));
+			heroSub.setText(active ? gpSign(s.sessionGpHr) + "/hr while flipping" : "gp/hr shows after a few active minutes");
+			cellToday.setText(gpSign(s.todayProfit));
+			cellToday.setForeground(s.todayProfit >= 0 ? Palette.GREEN : Palette.RED);
+			cellWeek.setText(gpSign(s.weekProfit));
+			cellWeek.setForeground(s.weekProfit >= 0 ? Palette.GREEN : Palette.RED);
+			cellAll.setText(gpSign(s.allProfit));
+			cellAll.setForeground(s.allProfit >= 0 ? Palette.GREEN : Palette.RED);
+			cellAll.setToolTipText("Tax paid: " + Fmt.compact(s.allTax) + " gp");
+			logMeta.setText(s.allFlips + " flips"
+				+ (s.winRatePct >= 0 ? " · " + s.winRatePct + "% won" : "")
+				+ (s.checks > 0 ? " · " + s.checks + " checks" : ""));
+			logMeta.setToolTipText(s.untrackedSells > 0
+				? s.untrackedSells + " sold items had no tracked buy, so they count at zero cost"
+				: null);
+			syncOpensWeb = hasKey && s.pendingSync == 0;
+			logSyncDot.setForeground(hasKey ? (s.pendingSync > 0 ? Palette.AMBER : Palette.GREEN) : Palette.SUBTLE);
 			logSync.setText(hasKey
-				? (s.pendingSync > 0 ? "Backing up… " + s.pendingSync + " fills queued" : "Backed up · flipping.pricecheck.gg/portfolio")
-				: "Local only · turn on Sync flip log in Setup for backup + web portfolio");
+				? (s.pendingSync > 0 ? "Backing up " + s.pendingSync + " fills…" : "Backed up · open web portfolio")
+				: "Local only · turn on Sync flip log in Setup");
 
 			logList.removeAll();
 			if (!s.openLots.isEmpty())

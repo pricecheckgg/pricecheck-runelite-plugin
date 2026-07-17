@@ -184,21 +184,6 @@ class FlipLogEngine
 		boolean slotsDirty;
 	}
 
-	/** One row of the in-game GE History tab (totals are pre-tax). */
-	static class HistEntry
-	{
-		int itemId;
-		String name;
-		boolean buy;
-		int qty;
-		long gross;
-
-		String key()
-		{
-			return itemId + ":" + (buy ? "b" : "s") + ":" + qty + ":" + gross;
-		}
-	}
-
 	/** Immutable snapshot for the panel. */
 	static class Summary
 	{
@@ -817,74 +802,6 @@ class FlipLogEngine
 	}
 
 	// ── GE-history recovery ──
-	// The one gap events can't cover: offers completed AND collected while
-	// logged out. The in-game History tab is the ground truth; these two calls
-	// diff it against the log. Matching is by count per (item, side, qty,
-	// gross) tuple, and ambiguity UNDER-imports: a trade is only imported when
-	// the history shows more occurrences than the log knows about, so opening
-	// the tab twice, or importing a trade the events already caught, can never
-	// double-count.
-
-	synchronized int previewImport(List<HistEntry> entries)
-	{
-		return diffHistory(entries).size();
-	}
-
-	synchronized int importFromHistory(List<HistEntry> entries, String itemNameFallback)
-	{
-		final List<HistEntry> missing = diffHistory(entries);
-		final long now = System.currentTimeMillis();
-		int i = 0;
-		for (final HistEntry h : missing)
-		{
-			final Fill f = new Fill();
-			f.id = "hist:" + accountHash + ":" + now + ":" + (i++);
-			f.itemId = h.itemId;
-			f.buy = h.buy;
-			f.qty = h.qty;
-			f.gross = h.gross;
-			f.tax = h.buy ? 0 : fillTax(h.gross, h.qty);
-			f.ts = now;
-			f.agg = true;      // real coins, unknown timing: stays out of session stats
-			f.check = false;
-			f.name = h.name != null ? h.name : itemNameFallback;
-			ingest(f);         // records its key, so re-imports self-suppress
-		}
-		if (!missing.isEmpty())
-		{
-			save();
-		}
-		return missing.size();
-	}
-
-	private List<HistEntry> diffHistory(List<HistEntry> entries)
-	{
-		final java.util.Map<String, Integer> known = new java.util.HashMap<>();
-		for (final String k : data.fillKeys)
-		{
-			known.merge(k, 1, Integer::sum);
-		}
-		final List<HistEntry> missing = new ArrayList<>();
-		for (final HistEntry h : entries)
-		{
-			if (h == null || h.itemId <= 0 || h.qty <= 0 || h.gross <= 0)
-			{
-				continue;
-			}
-			final String k = h.key();
-			final Integer have = known.get(k);
-			if (have != null && have > 0)
-			{
-				known.put(k, have - 1);   // already logged: consume one occurrence
-			}
-			else
-			{
-				missing.add(h);
-			}
-		}
-		return missing;
-	}
-
 	// ── sync drain (poller thread) ──
 
 	static class SyncBatch
