@@ -13,10 +13,10 @@ import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 
 /**
- * Dev-only: renders the Log tab headlessly to a PNG so header design can be
- * iterated without launching the client. Never shipped (test source set).
- *
- *   ./gradlew --init-script preview.init.gradle previewHeader -Pout=/tmp/h.png
+ * Dev-only: renders the Log tab headlessly to a PNG so panel design can be
+ * iterated without launching the client. Run main() from an IDE on the test
+ * classpath with args [outputPath, variant]; variants are active, loss,
+ * fresh. Never shipped (test source set).
  */
 public final class HeaderPreview
 {
@@ -141,15 +141,6 @@ public final class HeaderPreview
 	}
 
 
-	private static void layoutAll(Component c)
-	{
-		// BoxLayout caches child size requirements at build time (text was
-		// blank then); invalidate drops that cache so doLayout recomputes
-		// from the now-populated labels. Without a shown window nothing
-		// else triggers it.
-		invalidateAll(c);
-		layoutTree(c);
-	}
 
 	private static void invalidateAll(Component c)
 	{

@@ -203,7 +203,6 @@ public class PriceCheckPlugin extends Plugin
 				});
 			}
 
-
 			@Override
 			public void onDeleteFlip(String flipId)
 			{
@@ -652,7 +651,6 @@ public class PriceCheckPlugin extends Plugin
 			flipLog.setAccount(client.getAccountHash());
 		}
 	}
-
 
 	@Subscribe
 	public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event)

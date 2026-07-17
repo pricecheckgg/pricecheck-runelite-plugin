@@ -801,7 +801,6 @@ class FlipLogEngine
 		return s;
 	}
 
-	// ── GE-history recovery ──
 	// ── sync drain (poller thread) ──
 
 	static class SyncBatch

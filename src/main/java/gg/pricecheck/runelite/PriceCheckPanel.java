@@ -158,12 +158,6 @@ class PriceCheckPanel extends PluginPanel
 		return logHeader;
 	}
 
-	/** Dev preview only: the whole Log view (header + list). */
-	JPanel logViewForPreview()
-	{
-		return logView;
-	}
-
 	/** Dev preview only: the scrollable content (header + list), full height. */
 	JPanel logBodyForPreview()
 	{
@@ -235,7 +229,6 @@ class PriceCheckPanel extends PluginPanel
 	private final JLabel logSync = new JLabel(" ");
 	private final JPanel logList = new JPanel();
 	private JPanel logHeader;
-	private JPanel logView;
 	private JPanel logBody;
 	private volatile boolean syncOpensWeb;
 
@@ -277,8 +270,8 @@ class PriceCheckPanel extends PluginPanel
 	{
 		final long a = Math.abs(v);
 		final String sign = v > 0 ? "+" : (v < 0 ? "-" : "");
-		if (a >= 1_000_000_000L) return sign + sig3(a / 1e9) + "b";
-		if (a >= 1_000_000L) return sign + sig3(a / 1e6) + "m";
+		if (a >= 999_500_000L) return sign + sig3(a / 1e9) + "b";
+		if (a >= 999_500L) return sign + sig3(a / 1e6) + "m";
 		if (a >= 1_000L) return sign + sig3(a / 1e3) + "k";
 		return sign + a;
 	}
@@ -421,10 +414,8 @@ class PriceCheckPanel extends PluginPanel
 		scroll.getVerticalScrollBar().setUnitIncrement(16);
 		final JPanel holder = new JPanel(new BorderLayout());
 		holder.add(scroll, BorderLayout.CENTER);
-		logView = holder;
 		return holder;
 	}
-
 
 	private static String gpSign(long v)
 	{
@@ -730,7 +721,6 @@ class PriceCheckPanel extends PluginPanel
 		scroll.getVerticalScrollBar().setUnitIncrement(16);
 		final JPanel holder = new JPanel(new BorderLayout());
 		holder.add(scroll, BorderLayout.CENTER);
-		logView = holder;
 		return holder;
 	}
 
@@ -953,7 +943,8 @@ class PriceCheckPanel extends PluginPanel
 			String receipt;
 			if ("big".equals(r.getLane()))
 			{
-				receipt = Math.round(r.getOdds() * 100) + "% fill · ~" + r.getHoldHrs() + "h hold"
+				receipt = Math.round(r.getOdds() * 100) + "% fill · ~"
+					+ String.format(java.util.Locale.ROOT, "%.1f", r.getHoldHrs()) + "h hold"
 					+ (r.isBand() ? " · rest these exact prices" : "");
 			}
 			else if ("dip".equals(r.getLane()))
