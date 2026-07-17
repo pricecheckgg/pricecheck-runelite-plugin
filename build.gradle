@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'gg.pricecheck'
-version = '0.1.0'
+version = '0.2.0'
 
 repositories {
     exclusiveContent {
@@ -56,6 +56,13 @@ tasks.named('jar') {
 // always starts the latest build — no manual copy step to forget.
 tasks.register('sideload', Copy) {
     dependsOn 'shadowJar'
+    // Clear stale pricecheck jars first: a version bump changes the filename,
+    // so without this the old jar lingers and RuneLite loads the wrong one.
+    doFirst {
+        delete fileTree("${System.properties['user.home']}/.runelite/sideloaded-plugins") {
+            include 'pricecheck-*.jar'
+        }
+    }
     from tasks.named('shadowJar').flatMap { it.archiveFile }
     into "${System.properties['user.home']}/.runelite/sideloaded-plugins"
 }

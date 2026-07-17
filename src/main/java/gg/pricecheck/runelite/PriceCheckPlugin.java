@@ -37,6 +37,11 @@ import net.runelite.client.util.ImageUtil;
 )
 public class PriceCheckPlugin extends Plugin
 {
+	// Displayed version. Source of truth for what the panel shows: the Hub
+	// rebuilds with its own build.gradle, so a gradle-only version never
+	// reaches users. Keep build.gradle's version in sync for the dev jar name.
+	public static final String VERSION = "0.2.0";
+
 	private static final int SLOTS = 8;
 	private static final int PANEL_REFRESH_SECONDS = 6;
 	private static final int ADVISOR_REFRESH_SECONDS = 3;

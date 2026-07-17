@@ -158,6 +158,59 @@ class PriceCheckPanel extends PluginPanel
 		return logHeader;
 	}
 
+	/** Dev preview only: the Setup tab's Discord card, for headless rendering. */
+	JPanel discordCardForPreview()
+	{
+		return discordCard();
+	}
+
+	// Community card in the Setup tab: one quiet row, not a banner. Two short
+	// subtitle lines instead of one wide one (Swing's HTML width wrapping is
+	// unreliable in game-panel labels, so the copy is split explicitly). Click
+	// anywhere opens the invite.
+	private JPanel discordCard()
+	{
+		final JPanel disc = new JPanel(new BorderLayout(8, 0));
+		disc.setBackground(CARD);
+		disc.setBorder(BorderFactory.createEmptyBorder(9, 10, 9, 10));
+		disc.setAlignmentX(Component.LEFT_ALIGNMENT);
+		disc.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
+
+		final JLabel dTitle = new JLabel("Join the PriceCheck Discord");
+		dTitle.setForeground(new Color(0x93, 0xa1, 0xff));
+		dTitle.setFont(dTitle.getFont().deriveFont(Font.BOLD, 12f));
+		dTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		final JLabel dSub1 = new JLabel("Flip chat and price checks");
+		final JLabel dSub2 = new JLabel("Giveaways and community help");
+		for (final JLabel l : new JLabel[]{dSub1, dSub2})
+		{
+			l.setForeground(Palette.SUBTLE);
+			l.setFont(FontManager.getRunescapeSmallFont());
+			l.setAlignmentX(Component.LEFT_ALIGNMENT);
+		}
+
+		final JPanel dText = new JPanel();
+		dText.setLayout(new BoxLayout(dText, BoxLayout.Y_AXIS));
+		dText.setOpaque(false);
+		dText.add(dTitle);
+		dText.add(Box.createVerticalStrut(2));
+		dText.add(dSub1);
+		dText.add(dSub2);
+		disc.add(dText, BorderLayout.CENTER);
+
+		disc.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		disc.setToolTipText("discord.gg/pricecheck");
+		disc.addMouseListener(new MouseAdapter()
+		{
+			public void mousePressed(MouseEvent e)
+			{
+				LinkBrowser.browse("https://discord.gg/pricecheck");
+			}
+		});
+		return disc;
+	}
+
 	/** Dev preview only: the scrollable content (header + list), full height. */
 	JPanel logBodyForPreview()
 	{
@@ -1152,39 +1205,10 @@ class PriceCheckPanel extends PluginPanel
 		evRow.add(spinWrap, BorderLayout.EAST);
 		v.add(evRow);
 
-		// Community card: one quiet row, not a banner. Click opens the invite.
-		final JPanel disc = new JPanel(new BorderLayout(8, 0));
-		disc.setBackground(CARD);
-		disc.setBorder(BorderFactory.createEmptyBorder(9, 10, 9, 10));
-		disc.setAlignmentX(Component.LEFT_ALIGNMENT);
-		disc.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
-		final JLabel dTitle = new JLabel("Join the PriceCheck Discord");
-		dTitle.setForeground(new Color(0x93, 0xa1, 0xff));
-		dTitle.setFont(dTitle.getFont().deriveFont(Font.BOLD, 12f));
-		dTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
-		final JLabel dSub = new JLabel("Flip chat, price checks, giveaways, support");
-		dSub.setForeground(Palette.SUBTLE);
-		dSub.setFont(FontManager.getRunescapeSmallFont());
-		dSub.setAlignmentX(Component.LEFT_ALIGNMENT);
-		final JPanel dText = new JPanel();
-		dText.setLayout(new BoxLayout(dText, BoxLayout.Y_AXIS));
-		dText.setOpaque(false);
-		dText.add(dTitle);
-		dText.add(dSub);
-		disc.add(dText, BorderLayout.CENTER);
-		disc.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		disc.setToolTipText("discord.gg/pricecheck");
-		disc.addMouseListener(new MouseAdapter()
-		{
-			public void mousePressed(MouseEvent e)
-			{
-				LinkBrowser.browse("https://discord.gg/pricecheck");
-			}
-		});
 		v.add(gap(10));
-		v.add(disc);
+		v.add(discordCard());
 
-		final JLabel footer = new JLabel("PriceCheck");
+		final JLabel footer = new JLabel("PriceCheck v" + PriceCheckPlugin.VERSION);
 		footer.setForeground(Palette.SUBTLE);
 		footer.setFont(footer.getFont().deriveFont(10f));
 		footer.setAlignmentX(Component.LEFT_ALIGNMENT);
