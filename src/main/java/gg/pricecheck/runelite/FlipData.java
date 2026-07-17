@@ -25,6 +25,11 @@ public class FlipData
 	private Long limit;             // null = no published buy limit for this item
 	private long vol1h;
 	private String risk;            // null = clean board row; else why it missed one quality bar
+	private String quote;           // "band" = laneBid/laneAsk are resting p25/p75 levels
+	private Long laneBid;           // big-lane resting quote (null = not a lane item)
+	private Long laneAsk;
+	private Double laneOdds;        // measured sell-fill odds for the lane play
+	private Double laneHold;        // expected hold in hours
 	                                // ("age" | "qty" | "ev" | "profit")
 
 	String riskLabel()

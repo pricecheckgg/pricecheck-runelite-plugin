@@ -148,17 +148,44 @@ class GeChatboxHelper
 		{
 			return;   // no live data yet — stay silent rather than suggest something wrong
 		}
-		// Top-left, dark ink, exactly the proven layout — gold text washes out on
-		// the parchment and right-alignment clipped at the screen edge on device.
-		addLine(parent, 5, "set to PriceCheck " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(price) + " gp", price);
+		// Big-lane items carry a measured resting quote (band levels when the
+		// series backs them): offer the snipe with its odds first, keep the
+		// instant line for context. Everything else keeps the proven line.
+		// Top-left, dark ink: gold text washes out on the parchment and
+		// right-alignment clipped at the screen edge on device.
+		int y = 5;
+		final Long laneP = live == null ? null : (isBuy ? live.getLaneBid() : live.getLaneAsk());
+		if (laneP != null && laneP > 0 && laneP != price)
+		{
+			String tag = "";
+			if (live.getLaneOdds() != null && live.getLaneOdds() > 0)
+			{
+				tag = " (" + Math.round(live.getLaneOdds() * 100) + "% fill"
+					+ (live.getLaneHold() != null && live.getLaneHold() > 0 ? ", ~" + hold(live.getLaneHold()) : "") + ")";
+			}
+			addLine(parent, y, "set to PriceCheck snipe: " + Fmt.full(laneP) + " gp" + tag, laneP);
+			y += 15;
+			addLine(parent, y, "set to instant " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(price) + " gp", price);
+			y += 15;
+		}
+		else
+		{
+			addLine(parent, y, "set to PriceCheck " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(price) + " gp", price);
+			y += 15;
+		}
 		if (isSell)
 		{
 			final TrackedItem t = trackedFor(itemId);
 			if (t != null && t.getFloor() > 0)
 			{
-				addLine(parent, 20, "set to your break-even floor: " + Fmt.full(t.getFloor()) + " gp", t.getFloor());
+				addLine(parent, y, "set to your break-even floor: " + Fmt.full(t.getFloor()) + " gp", t.getFloor());
 			}
 		}
+	}
+
+	private static String hold(double hrs)
+	{
+		return hrs >= 1 ? (Math.round(hrs * 10) / 10.0) + "h" : Math.round(hrs * 60) + "m";
 	}
 
 	private void addLine(Widget parent, int y, String label, long price)
