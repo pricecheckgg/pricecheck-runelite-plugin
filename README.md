@@ -13,8 +13,6 @@ Works with no account and no key. Everything runs locally in your client:
   basis and hold time.
 - Session profit with honest active-time gp/hr, daily and weekly totals, win
   rate, tax paid. Margin checks are tagged and kept out of the win rate.
-- Missed trades while logged out? The GE History tab can be imported in two
-  clicks; duplicates are impossible by construction.
 - Right-click any flip or position to delete it.
 
 Optional, off by default: **Sync flip log** backs the log up to your PriceCheck
@@ -60,13 +58,12 @@ Java 11. The sideloadable jar lands in `build/libs/`.
 ## Layout
 
 - `FlipLogEngine` — the local ledger: exact fills from offer-delta math, FIFO
-  flip matching, atomic persistence per game account, GE-history import diff,
+  flip matching, atomic persistence per game account,
   multi-machine adoption.
 - `PriceCheckPlugin` — lifecycle, event intake, pollers.
 - `PriceCheckPanel` — sidebar (Flips, Log, Plan, Settings tabs).
 - `PriceCheckApiClient` — all network calls; a Bearer key and JSON in/out.
 - `GeChatboxHelper` — click-to-fill price lines and GE search suggestions.
-- `GeHistoryReader` — parses the in-game GE History tab for import.
 - `TelemetryCollector` — the opt-in market-data contribution queue.
 - `GeTax` — GE tax exactly as the game applies it (2% floored, 5m cap).
 

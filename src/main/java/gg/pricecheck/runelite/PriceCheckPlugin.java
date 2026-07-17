@@ -32,7 +32,7 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 @PluginDescriptor(
 	name = "PriceCheck",
-	description = "Free exact flip tracker (profit, open positions, GE history import) plus PriceCheck's live flip board, offer advisor and GE click-to-fill for subscribers.",
+	description = "Free exact flip tracker (profit, open positions, web portfolio sync) plus PriceCheck's live flip board, offer advisor and GE click-to-fill for subscribers.",
 	tags = {"flip", "margin", "grand exchange", "ge", "money", "pricecheck"}
 )
 public class PriceCheckPlugin extends Plugin
