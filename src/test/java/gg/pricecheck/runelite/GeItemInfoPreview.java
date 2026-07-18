@@ -47,7 +47,7 @@ public final class GeItemInfoPreview
 			s.high[i] = mid + spread / 2;
 			s.low[i] = mid - spread / 2;
 			s.hvol[i] = 1 + (i * 7) % 4;
-			s.lvol[i] = 1 + (i * 5) % 3;
+			s.lvol[i] = 1 + (i * 5) % 3 + (i > 40 ? 3 : 0);
 		}
 
 		final GeItemInfoPainter.Context c = new GeItemInfoPainter.Context();

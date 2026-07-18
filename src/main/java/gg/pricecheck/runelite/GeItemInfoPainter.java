@@ -153,7 +153,8 @@ final class GeItemInfoPainter
 			int hx = PAD + fm.stringWidth("Last trades seen") + 10;
 			final int hy = y + fm.getAscent();
 			hx = headerSideCount(g, fm, hx, hy, true, nBuy);
-			headerSideCount(g, fm, hx + 8, hy, false, tapeRows - nBuy);
+			hx = headerSideCount(g, fm, hx + 8, hy, false, tapeRows - nBuy);
+			paintPressure(g, c, fm, w, hx, hy);
 			y += lineH + 1;
 			for (int i = 0; i < tapeRows; i++)
 			{
@@ -312,6 +313,101 @@ final class GeItemInfoPainter
 			shadowed(g, c.stateText, right, y, c.stateColor != null ? c.stateColor : Palette.SUBTLE);
 		}
 		return right;
+	}
+
+	/**
+	 * Order-flow pressure over an adaptive recent window: what share of traded
+	 * units had a SELLER as the aggressor (hitting bids) versus a buyer
+	 * (lifting asks). Raw counts are incomparable across items, so the read is
+	 * a share, and the window widens (4h, then 8h, then 24h) until at least a
+	 * dozen units back it: a high-volume item reads its recent hours, a
+	 * Tumeken-class item reads its day, and the label says which. Returns
+	 * {sellPct, windowHours} or null when even the day is too quiet to call.
+	 */
+	private static long[] pressureOf(ItemChart.Series s, long nowTs)
+	{
+		if (s == null || s.ts == null || s.ts.length == 0)
+		{
+			return null;
+		}
+		for (final int hrs : new int[]{4, 8, 24})
+		{
+			final long cut = nowTs - hrs * 3600L;
+			long hv = 0;
+			long lv = 0;
+			for (int i = s.ts.length - 1; i >= 0 && s.ts[i] >= cut; i--)
+			{
+				hv += s.hvol != null && s.hvol[i] > 0 ? s.hvol[i] : 0;
+				lv += s.lvol != null && s.lvol[i] > 0 ? s.lvol[i] : 0;
+			}
+			final long total = hv + lv;
+			if (total >= 12 || (hrs == 24 && total >= 6))
+			{
+				return new long[]{Math.round(100.0 * lv / total), hrs};
+			}
+		}
+		return null;
+	}
+
+	/** The pressure read, right-aligned in the tape header: a split meter plus
+	 *  "selling 64% · 4h". Sheds the meter, then the window tag, when a narrow
+	 *  card leaves no room; never overprints the side counts. */
+	private static void paintPressure(Graphics2D g, Context c, FontMetrics fm, int w, int leftEdge, int hy)
+	{
+		final long[] pr = pressureOf(c.series, c.nowTs);
+		if (pr == null)
+		{
+			return;
+		}
+		final int sellPct = (int) pr[0];
+		final String verdict;
+		final Color col;
+		if (sellPct >= 58)
+		{
+			verdict = "selling " + sellPct + "%";
+			col = Palette.RED;
+		}
+		else if (sellPct <= 42)
+		{
+			verdict = "buying " + (100 - sellPct) + "%";
+			col = Palette.GREEN;
+		}
+		else
+		{
+			verdict = "balanced";
+			col = Palette.SUBTLE;
+		}
+		final int right = w - PAD;
+		final int avail = right - leftEdge - 10;
+		final int meterW = 30;
+		String text = verdict + " · " + pr[1] + "h";
+		boolean meter = true;
+		if (fm.stringWidth(text) + meterW + 5 > avail)
+		{
+			meter = false;
+			if (fm.stringWidth(text) > avail)
+			{
+				text = verdict;
+				if (fm.stringWidth(text) > avail)
+				{
+					return;
+				}
+			}
+		}
+		final int tx = right - fm.stringWidth(text);
+		shadowed(g, text, tx, hy, col);
+		if (meter)
+		{
+			final int mx = tx - meterW - 5;
+			final int my = hy - 6;
+			final int green = Math.round(meterW * (100 - sellPct) / 100f);
+			g.setColor(SHADOW);
+			g.fillRect(mx + 1, my + 1, meterW, 6);
+			g.setColor(Palette.GREEN);
+			g.fillRect(mx, my, green, 6);
+			g.setColor(Palette.RED);
+			g.fillRect(mx + green, my, meterW - green, 6);
+		}
 	}
 
 	/** One "triangle + count" chip in the tape header; returns the x after it. */
