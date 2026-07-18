@@ -716,9 +716,9 @@ class PriceCheckPanel extends PluginPanel
 			{
 				logList.add(note("Buy and sell on the GE and flips appear here. No key needed.", Palette.SUBTLE));
 			}
-			for (final FlipLogEngine.Flip f : s.recent)
+			for (final java.util.List<FlipLogEngine.Flip> group : groupFills(s.recent))
 			{
-				logList.add(logFlipRow(f));
+				logList.add(logFlipRow(group));
 				logList.add(gap(5));
 			}
 			logList.add(Box.createVerticalGlue());
@@ -805,7 +805,83 @@ class PriceCheckPanel extends PluginPanel
 			+ String.format(java.util.Locale.ROOT, fine ? "%.2f" : "%.1f", shown) + "%";
 	}
 
-	private JPanel logFlipRow(FlipLogEngine.Flip f)
+	/** One big offer filling in chunks writes one log record per partial; as
+	 * a LIST that reads as spam. Consecutive fills of the same item at the
+	 * same unit sell price within half an hour of each other display as one
+	 * row. The underlying records stay exact; this only groups the view. */
+	private static java.util.List<java.util.List<FlipLogEngine.Flip>> groupFills(java.util.List<FlipLogEngine.Flip> recent)
+	{
+		final java.util.List<java.util.List<FlipLogEngine.Flip>> out = new ArrayList<>();
+		for (final FlipLogEngine.Flip f : recent)
+		{
+			final java.util.List<FlipLogEngine.Flip> last = out.isEmpty() ? null : out.get(out.size() - 1);
+			if (last != null && sameFill(last.get(last.size() - 1), f))
+			{
+				last.add(f);
+			}
+			else
+			{
+				final java.util.List<FlipLogEngine.Flip> g = new ArrayList<>();
+				g.add(f);
+				out.add(g);
+			}
+		}
+		return out;
+	}
+
+	private static boolean sameFill(FlipLogEngine.Flip a, FlipLogEngine.Flip b)
+	{
+		if (a.itemId != b.itemId || a.check != b.check || a.qty <= 0 || b.qty <= 0)
+		{
+			return false;
+		}
+		// Same unit sell price and adjacent in time. recent is newest first,
+		// so b closed before a.
+		return a.sellGross / a.qty == b.sellGross / b.qty
+			&& Math.abs(a.closedAt - b.closedAt) <= 30 * 60_000L;
+	}
+
+	private JPanel logFlipRow(java.util.List<FlipLogEngine.Flip> group)
+	{
+		// Collapse the group to one display flip: sums for the money fields,
+		// the full time span, the newest entry's name.
+		final FlipLogEngine.Flip newest = group.get(0);
+		final FlipLogEngine.Flip f;
+		if (group.size() == 1)
+		{
+			f = newest;
+		}
+		else
+		{
+			f = new FlipLogEngine.Flip();
+			f.id = newest.id;
+			f.itemId = newest.itemId;
+			f.name = newest.name;
+			f.check = newest.check;
+			long openedAt = Long.MAX_VALUE;
+			long closedAt = 0;
+			for (final FlipLogEngine.Flip m : group)
+			{
+				f.qty += m.qty;
+				f.buyGross += m.buyGross;
+				f.sellGross += m.sellGross;
+				f.tax += m.tax;
+				f.profit += m.profit;
+				openedAt = Math.min(openedAt, m.openedAt);
+				closedAt = Math.max(closedAt, m.closedAt);
+			}
+			f.openedAt = openedAt;
+			f.closedAt = closedAt;
+		}
+		final JPanel row = logFlipRowSingle(f, group);
+		if (group.size() > 1)
+		{
+			row.setToolTipText(group.size() + " partial fills of one offer, shown as one flip");
+		}
+		return row;
+	}
+
+	private JPanel logFlipRowSingle(FlipLogEngine.Flip f, java.util.List<FlipLogEngine.Flip> group)
 	{
 		final JPanel rowP = new JPanel(new BorderLayout(6, 0));
 		rowP.setBackground(CARD);
@@ -837,10 +913,18 @@ class PriceCheckPanel extends PluginPanel
 		rowP.add(icon, BorderLayout.WEST);
 		rowP.add(center, BorderLayout.CENTER);
 		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
+		final int fills = group.size();
 		attachDeleteMenu(rowP, "Delete flip…",
 			"Delete this " + (f.name != null ? f.name : ("#" + f.itemId)) + " flip (" + gpSign(f.profit) + ")?\n"
+				+ (fills > 1 ? "It is " + fills + " partial fills shown as one row; all of them go.\n" : "")
 				+ "It comes out of your log and totals everywhere. Open positions are not restored.",
-			() -> listener.onDeleteFlip(f.id));
+			() ->
+			{
+				for (final FlipLogEngine.Flip m : group)
+				{
+					listener.onDeleteFlip(m.id);
+				}
+			});
 		return rowP;
 	}
 
