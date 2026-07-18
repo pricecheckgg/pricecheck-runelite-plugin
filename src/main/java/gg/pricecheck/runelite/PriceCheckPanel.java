@@ -315,6 +315,32 @@ class PriceCheckPanel extends PluginPanel
 		}
 	}
 
+	/** A small painted ">" between buy and sell — the RuneScape font has no arrow glyph. */
+	private static final class Chevron extends JComponent
+	{
+		private final Color color;
+
+		Chevron(Color c)
+		{
+			color = c;
+			setPreferredSize(new Dimension(6, 12));
+			setMinimumSize(getPreferredSize());
+			setMaximumSize(getPreferredSize());
+			setAlignmentY(0.5f);
+		}
+
+		@Override
+		protected void paintComponent(Graphics g)
+		{
+			final Graphics2D g2 = (Graphics2D) g;
+			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			g2.setColor(color);
+			final int cy = getHeight() / 2;
+			g2.drawLine(1, cy - 3, 4, cy);
+			g2.drawLine(4, cy, 1, cy + 3);
+		}
+	}
+
 	/** Signed gp at three significant figures: +873k, +3.99m, -12.4m, +1.02b. */
 	private static void setStat(JLabel cell, long v)
 	{
@@ -1365,7 +1391,7 @@ class PriceCheckPanel extends PluginPanel
 		// Tracking section
 		if (!searching && !lastTracked.isEmpty())
 		{
-			list.add(sectionHeader("Tracking (" + lastTracked.size() + ")"));
+			list.add(sectionHeader("Tracking · " + lastTracked.size()));
 			for (TrackedItem t : lastTracked) { list.add(trackingCard(t)); list.add(gap(6)); }
 			list.add(gap(6));
 		}
@@ -1389,7 +1415,7 @@ class PriceCheckPanel extends PluginPanel
 
 		final String header = searching
 			? (pending ? "Searching \"" + q + "\"…" : shown.size() + " match \"" + q + "\"")
-			: (minEvPerHrK > 0 ? shown.size() + " flips · ≥" + minEvPerHrK + "k/hr" : shown.size() + " flips · by EV/hr");
+			: (minEvPerHrK > 0 ? shown.size() + " flips · " + minEvPerHrK + "k+/hr" : shown.size() + " flips · by EV/hr");
 		list.add(sectionHeader(header));
 
 		if (authState == PriceCheckApiClient.AuthState.ERROR)
@@ -1415,8 +1441,9 @@ class PriceCheckPanel extends PluginPanel
 		list.repaint();
 	}
 
-	// ── flip row: icon | name (wraps) / buy→sell+profit / EV | track toggle ──
-	private JPanel flipRow(FlipData f, boolean tracked)
+	// ── flip row: icon | name (wraps) / buy>sell+profit / EV | track toggle ──
+	// Package-visible for the headless preview harness.
+	JPanel flipRow(FlipData f, boolean tracked)
 	{
 		final JPanel rowP = new JPanel(new BorderLayout(6, 0));
 		rowP.setBackground(CARD);
@@ -1426,7 +1453,7 @@ class PriceCheckPanel extends PluginPanel
 		final JLabel icon = new JLabel();
 		icon.setPreferredSize(new Dimension(28, 32));
 		icon.setHorizontalAlignment(SwingConstants.CENTER);
-		itemManager.getImage(f.getGeId()).addTo(icon);
+		if (itemManager != null) { itemManager.getImage(f.getGeId()).addTo(icon); }
 
 		// The name gets the whole first line and wraps instead of truncating —
 		// the fixed body width makes the HTML label report a real wrapped
@@ -1436,7 +1463,16 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel line1 = row();
 		line1.add(name, BorderLayout.CENTER);
 
-		final JLabel bs = mono(Fmt.compact(f.getBuy()) + " → " + Fmt.compact(f.getSell()), Palette.SUBTLE);
+		// Buy-to-sell with a painted chevron: the RuneScape font has no arrow
+		// glyph, so typing one renders a garbage box.
+		final JPanel bs = new JPanel();
+		bs.setLayout(new BoxLayout(bs, BoxLayout.X_AXIS));
+		bs.setOpaque(false);
+		bs.add(mono(Fmt.compact(f.getBuy()), Palette.LIGHT));
+		bs.add(Box.createRigidArea(new Dimension(5, 0)));
+		bs.add(new Chevron(Palette.SUBTLE));
+		bs.add(Box.createRigidArea(new Dimension(5, 0)));
+		bs.add(mono(Fmt.compact(f.getSell()), Palette.LIGHT));
 		final JLabel profit = mono("+" + Fmt.compact(f.getProfit()), f.getProfit() >= 0 ? Palette.GREEN : Palette.RED);
 		profit.setHorizontalAlignment(SwingConstants.RIGHT);
 		final JPanel line2 = row();

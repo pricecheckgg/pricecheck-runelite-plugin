@@ -40,11 +40,11 @@ public class FlipData
 		}
 		switch (risk)
 		{
-			case "age": return "stale prints";
-			case "qty": return "slow fills";
-			case "ev": return "low EV";
-			case "profit": return "small margin";
-			default: return risk;
+			case "age": return "Stale Prints";
+			case "qty": return "Slow Fills";
+			case "ev": return "Low EV";
+			case "profit": return "Small Margin";
+			default: return risk.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + risk.substring(1);
 		}
 	}
 }
