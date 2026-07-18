@@ -85,7 +85,9 @@ class GeItemCardOverlay extends Overlay
 	{
 		final List<Object[]> hits = new ArrayList<>();
 		buttons = hits;
-		if (!config.geItemCard() || !plugin.isGrandExchangeOpen())
+		// Market data is a Trader Pro surface; the server refuses it for free
+		// keys and the cards stay fully dark rather than rendering shells.
+		if (!config.geItemCard() || !plugin.isGrandExchangeOpen() || !plugin.marketDataOk())
 		{
 			plugin.noteViewedItem(0);
 			return null;

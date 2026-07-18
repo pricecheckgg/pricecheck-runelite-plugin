@@ -611,6 +611,7 @@ public class PriceCheckPlugin extends Plugin
 		healItemNames();
 		final String key = config.apiKey();
 		final PriceCheckApiClient.FlipsResult flips = api.getFlips(key, FLIP_LIMIT);
+		marketDataOk = flips.state == PriceCheckApiClient.AuthState.OK;
 		final PriceCheckApiClient.TrackedResult tracked = api.getTracked(key);
 		p.update(flips, tracked, config.minEvPerHrK());
 		final FlipLogEngine engine = flipLog;
@@ -925,6 +926,15 @@ public class PriceCheckPlugin extends Plugin
 	TrackedOffer trackedAt(int slot)
 	{
 		return slot >= 0 && slot < SLOTS ? tracked.get(slot) : null;
+	}
+
+	// The last flips poll's verdict on market-data access. Premium surfaces
+	// (the GE cards) stay dark for free keys instead of rendering shells.
+	private volatile boolean marketDataOk;
+
+	boolean marketDataOk()
+	{
+		return marketDataOk;
 	}
 
 	// ── per-slot waiting clock ──
