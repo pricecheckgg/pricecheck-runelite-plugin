@@ -136,10 +136,24 @@ final class GeItemInfoPainter
 		paintChart(g, c, PAD, y, w - 2 * PAD, CHART_H, fm, false);
 		y += CHART_H + 4;
 
-		// Tape: the prints this client has watched arrive, newest first.
+		// Tape: the prints this client has watched arrive, newest first. The
+		// header carries the side split of exactly these rows, so the counts
+		// always reconcile with what is listed below them.
 		if (tapeRows > 0)
 		{
 			shadowed(g, "Last trades seen", PAD, y + fm.getAscent(), Palette.SUBTLE);
+			int nBuy = 0;
+			for (int i = 0; i < tapeRows; i++)
+			{
+				if (c.prints.get(c.prints.size() - 1 - i).buySide)
+				{
+					nBuy++;
+				}
+			}
+			int hx = PAD + fm.stringWidth("Last trades seen") + 10;
+			final int hy = y + fm.getAscent();
+			hx = headerSideCount(g, fm, hx, hy, true, nBuy);
+			headerSideCount(g, fm, hx + 8, hy, false, tapeRows - nBuy);
 			y += lineH + 1;
 			for (int i = 0; i < tapeRows; i++)
 			{
@@ -300,48 +314,32 @@ final class GeItemInfoPainter
 		return right;
 	}
 
-	/** The day's traded units by side, next to the volume pane: an up triangle
-	 *  with the insta-buy total, a down triangle with the insta-sell total,
-	 *  same visual language as the tape rows. */
-	private static void paintVolumeTotals(Graphics2D g, ChartKit.Display d, int x, int y)
+	/** One "triangle + count" chip in the tape header; returns the x after it. */
+	private static int headerSideCount(Graphics2D g, FontMetrics fm, int x, int y, boolean up, int n)
 	{
-		long buys = 0;
-		long sells = 0;
-		for (int b = 0; b < d.n; b++)
+		final Path2D tri = new Path2D.Float();
+		if (up)
 		{
-			buys += d.volHi[b];
-			sells += d.volLo[b];
+			tri.moveTo(x, y);
+			tri.lineTo(x + 7, y);
+			tri.lineTo(x + 3.5, y - 6);
 		}
-		if (buys + sells <= 0)
+		else
 		{
-			return;
+			tri.moveTo(x, y - 6);
+			tri.lineTo(x + 7, y - 6);
+			tri.lineTo(x + 3.5, y);
 		}
-		for (int row = 0; row < 2; row++)
-		{
-			final boolean up = row == 0;
-			final int ty = y + row * 11 + 8;
-			final Path2D tri = new Path2D.Float();
-			if (up)
-			{
-				tri.moveTo(x, ty);
-				tri.lineTo(x + 7, ty);
-				tri.lineTo(x + 3.5, ty - 6);
-			}
-			else
-			{
-				tri.moveTo(x, ty - 6);
-				tri.lineTo(x + 7, ty - 6);
-				tri.lineTo(x + 3.5, ty);
-			}
-			tri.closePath();
-			g.setColor(SHADOW);
-			g.translate(1, 1);
-			g.fill(tri);
-			g.translate(-1, -1);
-			g.setColor(up ? Palette.GREEN : Palette.RED);
-			g.fill(tri);
-			shadowed(g, Fmt.compact(up ? buys : sells), x + 11, ty, Palette.SUBTLE);
-		}
+		tri.closePath();
+		g.setColor(SHADOW);
+		g.translate(1, 1);
+		g.fill(tri);
+		g.translate(-1, -1);
+		g.setColor(up ? Palette.GREEN : Palette.RED);
+		g.fill(tri);
+		final String s = String.valueOf(n);
+		shadowed(g, s, x + 10, y, up ? Palette.GREEN : Palette.RED);
+		return x + 10 + fm.stringWidth(s);
 	}
 
 	/** Lots sorted by unit price, with lots that read identically at compact
@@ -447,7 +445,6 @@ final class GeItemInfoPainter
 		else
 		{
 			ChartKit.paintVolumeBars(g, d, x0, y0 + plotH + 3, plotW, volH);
-			paintVolumeTotals(g, d, x0 + plotW + 5, y0 + plotH + 3);
 		}
 
 		// Your offers: labeled with the exact numbers. When both sides ride
