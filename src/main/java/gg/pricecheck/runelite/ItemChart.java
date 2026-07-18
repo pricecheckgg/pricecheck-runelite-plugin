@@ -47,7 +47,7 @@ class ItemChart extends JComponent
 	private static final int PAD_L = 4;
 	private static final int PAD_R = 54;   // price labels live here
 	private static final int AXIS_H = 13;
-	private static final int FILL_H = 8;
+	private static final int FILL_H = 20;  // stacked volume bars below the plot
 
 	private Series s;
 
@@ -105,7 +105,7 @@ class ItemChart extends JComponent
 		ChartKit.paintPriceGrid(g2, d, fm, PAD_L, chartY, chartW, chartH, Palette.LIGHT);
 		ChartKit.paintCorridor(g2, d, PAD_L, chartY, chartW, chartH);
 		ChartKit.paintLevelGuides(g2, d, PAD_L, chartY, chartW, chartH);
-		ChartKit.paintFillStrip(g2, d, PAD_L, chartY + chartH + 2, chartW, FILL_H - 2);
+		ChartKit.paintVolumeBars(g2, d, PAD_L, chartY + chartH + 2, chartW, FILL_H - 2);
 
 		// Manipulation flags: a red tick at the top of the flagged window.
 		if (ser.manip != null && ser.ts != null)

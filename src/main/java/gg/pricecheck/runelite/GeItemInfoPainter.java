@@ -377,7 +377,10 @@ final class GeItemInfoPainter
 	private static void paintChart(Graphics2D g, Context c, int x0, int y0, int cw, int ch, FontMetrics fm, boolean compact)
 	{
 		final int plotW = cw - PRICE_GUTTER;
-		final int plotH = ch - 8;   // room for the volume strip below
+		// Full cards carry a real volume pane below the plot; minis keep the
+		// slim strip so their charts keep the vertical room.
+		final int volH = compact ? 5 : 24;
+		final int plotH = ch - volH - 3;
 		final long lotUnit = c.lotQty > 0 ? c.lotCost / c.lotQty : 0;
 		final long[] scalePrices = new long[c.youBuys.length + c.youSells.length + 1];
 		System.arraycopy(c.youBuys, 0, scalePrices, 0, c.youBuys.length);
@@ -393,7 +396,20 @@ final class GeItemInfoPainter
 		ChartKit.paintTimeGrid(g, d, x0, y0, plotW, plotH);
 		ChartKit.paintCorridor(g, d, x0, y0, plotW, plotH);
 		ChartKit.paintLevelGuides(g, d, x0, y0, plotW, plotH);
-		ChartKit.paintFillStrip(g, d, x0, y0 + plotH + 2, plotW, 5);
+		if (compact)
+		{
+			ChartKit.paintFillStrip(g, d, x0, y0 + plotH + 2, plotW, volH);
+		}
+		else
+		{
+			final long volCap = ChartKit.paintVolumeBars(g, d, x0, y0 + plotH + 3, plotW, volH);
+			if (volCap > 0)
+			{
+				// A quiet scale note in the gutter: what a full-height bar means.
+				shadowed(g, Fmt.compact(volCap) + " vol", x0 + plotW + 4,
+					y0 + plotH + 3 + fm.getAscent() - 2, Palette.SUBTLE);
+			}
+		}
 
 		// Your offers: labeled with the exact numbers. When both sides ride
 		// the same chart, the label says which is which.

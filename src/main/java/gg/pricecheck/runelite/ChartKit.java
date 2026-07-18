@@ -305,6 +305,57 @@ final class ChartKit
 		}
 	}
 
+	/** Stacked per-bucket volume bars: bar height carries how much traded
+	 * (robust p95-based scale, so one dump cannot flatten the whole day) and
+	 * the split carries who aggressed, green insta-buys under red insta-sells.
+	 * Returns the units-per-full-bar scale so callers can label the pane. */
+	static long paintVolumeBars(Graphics2D g2, Display d, int x0, int y, int w, int h)
+	{
+		if (d.volMax <= 0)
+		{
+			return 0;
+		}
+		final long[] nz = new long[d.n];
+		int nv = 0;
+		for (int b = 0; b < d.n; b++)
+		{
+			if (d.vol[b] > 0)
+			{
+				nz[nv++] = d.vol[b];
+			}
+		}
+		final long[] used = Arrays.copyOf(nz, nv);
+		Arrays.sort(used);
+		final long p95 = used[Math.min(nv - 1, (int) (nv * 0.95))];
+		final long cap = Math.max(1, Math.min(d.volMax, p95 * 2));
+		final float bw = w / (float) d.n;
+		g2.setColor(GRID);
+		g2.drawLine(x0, y + h, x0 + w, y + h);
+		for (int b = 0; b < d.n; b++)
+		{
+			if (d.vol[b] <= 0)
+			{
+				continue;
+			}
+			final int hb = Math.max(2, Math.round(h * Math.min(1f, d.vol[b] / (float) cap)));
+			final int bx = Math.round(x0 + b * bw);
+			final int bpx = Math.max(1, Math.round(bw) - 1);
+			final long sides = d.volHi[b] + d.volLo[b];
+			final int hg = sides > 0 ? Math.round(hb * (d.volHi[b] / (float) sides)) : hb / 2;
+			if (hb - hg > 0)
+			{
+				g2.setColor(FILL_SELL);
+				g2.fillRect(bx, y + h - hb, bpx, hb - hg);
+			}
+			if (hg > 0)
+			{
+				g2.setColor(FILL_BUY);
+				g2.fillRect(bx, y + h - hg, bpx, hg);
+			}
+		}
+		return cap;
+	}
+
 	/** Dotted full-width guides at the live market edges (the newest print on
 	 * each side), so the whole day reads against where the market is NOW. */
 	static void paintLevelGuides(Graphics2D g2, Display d, int x0, int y0, int w, int h)
