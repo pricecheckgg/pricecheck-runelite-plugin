@@ -223,7 +223,8 @@ class GeItemCardOverlay extends Overlay
 		for (final int geId : items.keySet())
 		{
 			final boolean wantFull = geId == expandedItem && !collapsed;
-			final int est = wantFull ? 335 : (collapsed ? 28 : 108);
+			// Full estimate covers a ten-row tape (the painter's cap).
+			final int est = wantFull ? 400 : (collapsed ? 28 : 108);
 			// Move to the next column when this card will not fit here at its
 			// wanted size but would at a fresh column top.
 			while (col < cols.size() - 1 && budget - y < est && budget - cols.get(col + 1).y >= est)
@@ -244,7 +245,7 @@ class GeItemCardOverlay extends Overlay
 				}
 				break;
 			}
-			final boolean canFull = wantFull && left >= 335;
+			final boolean canFull = wantFull && left >= 400;
 			final boolean canChart = !collapsed && left >= 108;
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, canFull || canChart);
 			final Dimension d;

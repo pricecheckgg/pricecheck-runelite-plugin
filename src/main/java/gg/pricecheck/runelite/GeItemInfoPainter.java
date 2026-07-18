@@ -102,7 +102,7 @@ final class GeItemInfoPainter
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
 
 		final int lineH = fm.getHeight();
-		final int tapeRows = Math.min(c.prints != null ? c.prints.size() : 0, 4);
+		final int tapeRows = Math.min(c.prints != null ? c.prints.size() : 0, 10);
 		final boolean holding = c.lotQty > 0;
 		final int h = PAD + lineH + 6 + CHART_H + 6 + (tapeRows > 0 ? tapeRows * 13 + 14 : 0)
 			+ (holding ? lineH : 0) + 2 * lineH + PAD + 2;
