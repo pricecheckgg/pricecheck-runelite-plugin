@@ -94,16 +94,12 @@ class GeChatboxHelper
 			return;
 		}
 		// Search closed (item picked, escape, interface change): restore what the
-		// suggestions mode touched. MES_TEXT2 is a static widget, so a hidden
-		// flag would otherwise leak into the next thing that uses the chatbox.
+		// suggestions mode touched. MES_TEXT and MES_TEXT2 are static widgets,
+		// so a hidden flag would otherwise leak into the next thing that uses
+		// the chatbox.
 		if (suggestActive && client.getVarcIntValue(VARC_INPUT_TYPE) != INPUT_TYPE_GE_SEARCH)
 		{
-			suggestActive = false;
-			final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
-			if (echo != null)
-			{
-				echo.setHidden(false);
-			}
+			standDown(false);
 		}
 		if (!config.gePriceButtons())
 		{
@@ -242,6 +238,7 @@ class GeChatboxHelper
 	// the title hands back to normal typing on click.
 
 	private boolean suggestActive = false;
+	private Widget banner;
 
 	void onScriptPostFired(ScriptPostFired e)
 	{
@@ -263,30 +260,40 @@ class GeChatboxHelper
 		{
 			// The game's own "Previous search" panel (the Show-last-searched
 			// setting) owns the empty-input layout; drawing over it garbles
-			// both. Yield, and hand back anything we already took.
-			if (SENTINEL.equals(client.getVarcStrValue(VARC_INPUT_TEXT)))
-			{
-				client.setVarcStrValue(VARC_INPUT_TEXT, "");
-				final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
-				if (echo != null)
-				{
-					echo.setHidden(false);
-				}
-				suggestActive = false;
-			}
+			// both. Yield, and hand back everything we took: banner, title,
+			// echo, and the sentinel if it is ours.
+			standDown(SENTINEL.equals(client.getVarcStrValue(VARC_INPUT_TEXT)));
 			return;
 		}
 		final String cur = client.getVarcStrValue(VARC_INPUT_TEXT);
 		if (cur != null && !cur.isEmpty() && !cur.equals(SENTINEL))
 		{
-			return;   // a real search is already in the buffer — don't hijack it
+			// A real search is in the buffer — don't hijack it, and if we were
+			// active a moment ago make sure nothing of ours lingers over it.
+			if (suggestActive || banner != null)
+			{
+				standDown(false);
+			}
+			return;
 		}
 		if (suggestionIds().length == 0)
 		{
+			if (suggestActive || banner != null)
+			{
+				standDown(false);
+			}
 			return;   // nothing to show yet (no key / board still loading)
 		}
 		client.setVarcStrValue(VARC_INPUT_TEXT, SENTINEL);
 		suggestActive = true;
+		// The banner owns the title row while we are active: hide BOTH native
+		// occupants (the "What would you like to buy?" title and the input
+		// echo), or whichever one the game draws bleeds through our text.
+		final Widget title = client.getWidget(InterfaceID.Chatbox.MES_TEXT);
+		if (title != null)
+		{
+			title.setHidden(true);
+		}
 		final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
 		if (echo != null)
 		{
@@ -294,6 +301,40 @@ class GeChatboxHelper
 		}
 		injectSearchBanner();
 		replaySearch();
+	}
+
+	/**
+	 * Give the title row back to the game: banner gone, title and echo
+	 * restored, and the sentinel cleared when asked. Safe to call in any
+	 * state; every path that stops suggesting funnels through here so no
+	 * combination of rebuilds can leave our banner over native text.
+	 */
+	private void standDown(boolean clearSentinel)
+	{
+		suggestActive = false;
+		if (banner != null)
+		{
+			banner.setHidden(true);
+			banner = null;
+		}
+		final Widget title = client.getWidget(InterfaceID.Chatbox.MES_TEXT);
+		if (title != null)
+		{
+			title.setHidden(false);
+		}
+		final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
+		if (echo != null)
+		{
+			echo.setHidden(false);
+		}
+		if (clearSentinel)
+		{
+			final String cur = client.getVarcStrValue(VARC_INPUT_TEXT);
+			if (cur != null && cur.startsWith(SENTINEL))
+			{
+				client.setVarcStrValue(VARC_INPUT_TEXT, cur.substring(SENTINEL.length()));
+			}
+		}
 	}
 
 	/** Plugin disable: put the chatbox back exactly as the client expects it.
@@ -307,17 +348,7 @@ class GeChatboxHelper
 			{
 				return;
 			}
-			suggestActive = false;
-			final String cur = client.getVarcStrValue(VARC_INPUT_TEXT);
-			if (cur != null && cur.startsWith(SENTINEL))
-			{
-				client.setVarcStrValue(VARC_INPUT_TEXT, cur.substring(SENTINEL.length()));
-			}
-			final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
-			if (echo != null)
-			{
-				echo.setHidden(false);
-			}
+			standDown(true);
 			replaySearch();
 		});
 	}
@@ -326,13 +357,12 @@ class GeChatboxHelper
 	// so the normal "start typing" panel returns.
 	private void deactivateSuggestions()
 	{
-		suggestActive = false;
+		standDown(true);
 		client.setVarcStrValue(VARC_INPUT_TEXT, "");
 		final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
 		if (echo != null)
 		{
 			echo.setText("*");
-			echo.setHidden(false);
 		}
 		replaySearch();
 	}
@@ -375,7 +405,14 @@ class GeChatboxHelper
 		{
 			return;
 		}
+		// One banner at a time: a rebuild can re-activate before the old child
+		// is torn down, and a second copy doubles the text.
+		if (banner != null)
+		{
+			banner.setHidden(true);
+		}
 		final Widget w = parent.createChild(-1, WidgetType.TEXT);
+		banner = w;
 		w.setText("Your tracked items + best flips, ranked. Click here to type a search instead.");
 		w.setTextColor(INK);
 		w.setFontId(FontID.VERDANA_11_BOLD);
