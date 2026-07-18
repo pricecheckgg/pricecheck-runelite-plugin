@@ -40,7 +40,7 @@ public class PriceCheckPlugin extends Plugin
 	// Displayed version. Source of truth for what the panel shows: the Hub
 	// rebuilds with its own build.gradle, so a gradle-only version never
 	// reaches users. Keep build.gradle's version in sync for the dev jar name.
-	public static final String VERSION = "0.3.0";
+	public static final String VERSION = "0.4.0";
 
 	private static final int SLOTS = 8;
 	private static final int PANEL_REFRESH_SECONDS = 6;
@@ -194,10 +194,16 @@ public class PriceCheckPlugin extends Plugin
 				poller.execute(() ->
 				{
 					final AccountInfo acct = api.getAccount(config.apiKey());
+					trialActive = acct != null && acct.isTrial();
 					final PriceCheckPanel p = panel;
 					if (p != null)
 					{
 						p.setAccount(acct);
+					}
+					// A trial learned after login still binds the account.
+					if (trialActive)
+					{
+						maybeBindTrial();
 					}
 				});
 			}
@@ -672,13 +678,13 @@ public class PriceCheckPlugin extends Plugin
 		else if (gs == net.runelite.api.GameState.LOGGED_IN && flipLog != null)
 		{
 			flipLog.setAccount(client.getAccountHash());
-			// Trial binding: ties this game account to an active trial. The
-			// server no-ops for everyone else, so one call per login is fine.
-			final long acctHash = client.getAccountHash();
-			if (acctHash != 0 && acctHash != -1 && acctHash != trialBoundHash)
+			// Trial binding: ties this game account to an active trial. Sent
+			// ONLY while a trial is active; the trial terms the user accepted
+			// at checkout disclose the per-account binding.
+			lastLoginHash = client.getAccountHash();
+			if (trialActive)
 			{
-				trialBoundHash = acctHash;
-				poller.execute(() -> api.bindTrialAccount(config.apiKey(), acctHash));
+				poller.execute(this::maybeBindTrial);
 			}
 			final FlipLogEngine engine = flipLog;
 			if (syncs)
@@ -941,8 +947,22 @@ public class PriceCheckPlugin extends Plugin
 	// The last flips poll's verdict on market-data access. Premium surfaces
 	// (the GE cards) stay dark for free keys instead of rendering shells.
 	private volatile boolean marketDataOk;
-	// Last game account offered to the trial-bind endpoint this session.
+	// Trial state from the last /me, and the bind bookkeeping. The bind only
+	// ever fires while a trial is active.
+	private volatile boolean trialActive;
+	private volatile long lastLoginHash;
 	private volatile long trialBoundHash;
+
+	private void maybeBindTrial()
+	{
+		final long acctHash = lastLoginHash;
+		if (!trialActive || acctHash == 0 || acctHash == -1 || acctHash == trialBoundHash)
+		{
+			return;
+		}
+		trialBoundHash = acctHash;
+		api.bindTrialAccount(config.apiKey(), acctHash);
+	}
 
 	boolean marketDataOk()
 	{
