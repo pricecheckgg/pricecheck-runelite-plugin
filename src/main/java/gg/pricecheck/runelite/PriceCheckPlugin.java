@@ -100,6 +100,7 @@ public class PriceCheckPlugin extends Plugin
 	};
 	private OfferAdvisorSlotOverlay slotOverlay;
 	private OfferSetupOverlay setupOverlay;
+	private GeItemCardOverlay geCardOverlay;
 	private ScheduledFuture<?> panelTask;
 	private ScheduledFuture<?> advisorTask;
 	private ScheduledFuture<?> telemetryTask;
@@ -249,6 +250,8 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(slotOverlay);
 		setupOverlay = new OfferSetupOverlay(client, this, config);
 		overlayManager.add(setupOverlay);
+		geCardOverlay = new GeItemCardOverlay(client, this, config);
+		overlayManager.add(geCardOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->
 		{
@@ -511,6 +514,11 @@ public class PriceCheckPlugin extends Plugin
 			overlayManager.remove(setupOverlay);
 			setupOverlay = null;
 		}
+		if (geCardOverlay != null)
+		{
+			overlayManager.remove(geCardOverlay);
+			geCardOverlay = null;
+		}
 		for (int i = 0; i < SLOTS; i++)
 		{
 			tracked.set(i, null);
@@ -735,6 +743,120 @@ public class PriceCheckPlugin extends Plugin
 	// notes it here so the poller pulls its live price for the "type X" hint.
 	private volatile int setupItemId = 0;
 
+	// ── GE item card state ──
+	// The item whose offer screen is open right now (setup or status view),
+	// its cached series, and the prints this client has watched arrive: every
+	// advisor poll where the item's insta price moved is one observed trade.
+	private volatile int viewedItemId = 0;
+	private volatile PriceCheckApiClient.SeriesData cardSeries;
+	private volatile int cardSeriesItem = 0;
+	private volatile long cardSeriesAtMs = 0;
+	private final java.util.ArrayDeque<GeItemInfoPainter.Print> cardPrints = new java.util.ArrayDeque<>();
+	private int printsItemId = 0;
+	private long printsLastHigh = 0;
+	private long printsLastLow = 0;
+
+	/** Called from the card overlay's render with whatever item the open GE
+	 * screen shows (0 = none). Schedules the series fetch on change. */
+	void noteViewedItem(int geId)
+	{
+		if (geId == viewedItemId)
+		{
+			return;
+		}
+		viewedItemId = geId;
+		if (poller != null && geId > 0)
+		{
+			poller.execute(this::refreshCardSeries);
+			poller.execute(this::refreshAdvisor);
+		}
+	}
+
+	private void refreshCardSeries()
+	{
+		final int geId = viewedItemId;
+		if (geId <= 0)
+		{
+			return;
+		}
+		if (geId == cardSeriesItem && System.currentTimeMillis() - cardSeriesAtMs < 60_000L)
+		{
+			return;
+		}
+		final PriceCheckApiClient.SeriesData d = api.fetchSeries(config.apiKey(), geId);
+		if (d != null)
+		{
+			cardSeries = d;
+			cardSeriesItem = geId;
+			cardSeriesAtMs = System.currentTimeMillis();
+		}
+	}
+
+	PriceCheckApiClient.SeriesData cardSeriesFor(int geId)
+	{
+		// Opportunistic refresh: the poller owns the fetch, render just reads.
+		if (geId > 0 && poller != null && (geId != cardSeriesItem || System.currentTimeMillis() - cardSeriesAtMs > 60_000L))
+		{
+			poller.execute(this::refreshCardSeries);
+		}
+		return geId == cardSeriesItem ? cardSeries : null;
+	}
+
+	java.util.List<GeItemInfoPainter.Print> cardPrintsFor(int geId)
+	{
+		synchronized (cardPrints)
+		{
+			if (geId != printsItemId)
+			{
+				return Collections.emptyList();
+			}
+			return new ArrayList<>(cardPrints);
+		}
+	}
+
+	/** One advisor poll's worth of print detection for the viewed item. */
+	private void samplePrints(Map<Integer, FlipData> live)
+	{
+		final int geId = viewedItemId;
+		if (geId <= 0)
+		{
+			return;
+		}
+		final FlipData f = live.get(geId);
+		if (f == null)
+		{
+			return;
+		}
+		final long now = System.currentTimeMillis() / 1000L;
+		synchronized (cardPrints)
+		{
+			if (printsItemId != geId)
+			{
+				printsItemId = geId;
+				cardPrints.clear();
+				printsLastHigh = f.getSell();
+				printsLastLow = f.getBuy();
+				return;
+			}
+			// The high moving = someone insta-bought at the new high; the low
+			// moving = someone insta-sold into the new low.
+			if (f.getSell() > 0 && f.getSell() != printsLastHigh)
+			{
+				cardPrints.addLast(new GeItemInfoPainter.Print(now, f.getSell(), true));
+				printsLastHigh = f.getSell();
+			}
+			if (f.getBuy() > 0 && f.getBuy() != printsLastLow)
+			{
+				cardPrints.addLast(new GeItemInfoPainter.Print(now, f.getBuy(), false));
+				printsLastLow = f.getBuy();
+			}
+			while (cardPrints.size() > 24)
+			{
+				cardPrints.removeFirst();
+			}
+		}
+	}
+
 	void noteSetupItem(int geId)
 	{
 		if (geId != setupItemId)
@@ -745,6 +867,11 @@ public class PriceCheckPlugin extends Plugin
 				poller.execute(this::refreshAdvisor);   // fetch its price now, no 3s wait
 			}
 		}
+	}
+
+	int setupItem()
+	{
+		return setupItemId;
 	}
 
 	// Live market row for one item (from the poller's cache), or null if not loaded.
@@ -770,6 +897,11 @@ public class PriceCheckPlugin extends Plugin
 		{
 			ids.add(setup);
 		}
+		final int viewed = viewedItemId; // the item the GE card is showing
+		if (viewed > 0)
+		{
+			ids.add(viewed);
+		}
 		if (ids.isEmpty())
 		{
 			liveByItem = Collections.emptyMap();
@@ -781,6 +913,7 @@ public class PriceCheckPlugin extends Plugin
 			if (!fresh.isEmpty())
 			{
 				liveByItem = fresh;
+				samplePrints(fresh);
 			}
 		}
 		recomputeAdvice();

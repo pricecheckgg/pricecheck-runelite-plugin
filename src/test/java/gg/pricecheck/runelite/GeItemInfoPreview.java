@@ -52,7 +52,6 @@ public final class GeItemInfoPreview
 
 		final GeItemInfoPainter.Context c = new GeItemInfoPainter.Context();
 		c.itemName = "Heavy ballista";
-		c.side = "SELL";
 		c.yourPrice = 1_050_000;
 		c.stateText = "OK +26.2k";
 		c.stateColor = Palette.GREEN;
@@ -65,7 +64,8 @@ public final class GeItemInfoPreview
 		prints.add(new GeItemInfoPainter.Print(c.nowTs - 40, 1_049_900, true));
 		c.prints = prints;
 		c.fillPct = 71;
-		c.netIfFills = 26_253;
+		c.outcomeText = "If it sells: +26.25k after tax";
+		c.outcomeColor = Palette.GREEN;
 
 		final int w = 300;
 		final int h = 320;

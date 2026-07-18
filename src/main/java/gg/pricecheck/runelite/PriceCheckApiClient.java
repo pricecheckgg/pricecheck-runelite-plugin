@@ -126,6 +126,84 @@ public class PriceCheckApiClient
 		List<FlipData> flips;
 	}
 
+	/** A day of 5m windows for one item, plus the board's live read of it. */
+	static final class SeriesData
+	{
+		long[] ts;
+		long[] ah;
+		long[] al;
+		int[] hv;
+		int[] lv;
+		long quoteBuy;
+		long quoteSell;
+		int fillPct = -1;
+	}
+
+	private static final class SeriesResponse
+	{
+		SeriesBody series;
+		QuoteBody quote;
+	}
+
+	private static final class SeriesBody
+	{
+		long[] ts;
+		long[] ah;
+		long[] al;
+		int[] hv;
+		int[] lv;
+	}
+
+	private static final class QuoteBody
+	{
+		long buy;
+		long sell;
+		int fillPct;
+	}
+
+	/** Fetch the evidence-chart series for one item. Null on any failure. */
+	SeriesData fetchSeries(String key, int geId)
+	{
+		if (key == null || key.trim().isEmpty() || geId <= 0)
+		{
+			return null;
+		}
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("series").addPathSegment(String.valueOf(geId)).build())
+			.header("Authorization", "Bearer " + key.trim())
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			if (!res.isSuccessful() || res.body() == null)
+			{
+				return null;
+			}
+			final SeriesResponse parsed = gson.fromJson(res.body().string(), SeriesResponse.class);
+			if (parsed == null || parsed.series == null || parsed.series.ts == null)
+			{
+				return null;
+			}
+			final SeriesData out = new SeriesData();
+			out.ts = parsed.series.ts;
+			out.ah = parsed.series.ah;
+			out.al = parsed.series.al;
+			out.hv = parsed.series.hv;
+			out.lv = parsed.series.lv;
+			if (parsed.quote != null)
+			{
+				out.quoteBuy = parsed.quote.buy;
+				out.quoteSell = parsed.quote.sell;
+				out.fillPct = parsed.quote.fillPct;
+			}
+			return out;
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck series fetch failed", e);
+			return null;
+		}
+	}
+
 	/** Server-side search over ALL tradeable items (not just the ranked flips). */
 	FlipsResult searchItems(String key, String query)
 	{

@@ -118,4 +118,15 @@ public interface PriceCheckConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "geItemCard",
+		name = "GE: item evidence card",
+		description = "Beside the open offer screen: the day's traded corridor with your offer drawn on it, the trades arriving live, measured fill odds, and the after-tax outcome. Hold Shift to peek past it.",
+		position = 10
+	)
+	default boolean geItemCard()
+	{
+		return true;
+	}
 }

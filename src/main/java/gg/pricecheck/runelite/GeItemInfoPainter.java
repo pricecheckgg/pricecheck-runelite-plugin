@@ -40,14 +40,14 @@ final class GeItemInfoPainter
 	static final class Context
 	{
 		String itemName;
-		String side;          // "SELL" or "BUY"
 		long yourPrice;
 		String stateText;     // e.g. "OK +26.2k if it sells"
 		Color stateColor;
 		ItemChart.Series series;   // tight window, e.g. last 6h
 		List<Print> prints;        // newest last
-		int fillPct = -1;          // measured odds at your price, -1 unknown
-		long netIfFills;           // post-tax outcome of this offer
+		int fillPct = -1;          // measured odds at the board's prices, -1 unknown
+		String outcomeText;        // bottom line, prebuilt by the caller
+		Color outcomeColor;
 		long nowTs;
 	}
 
@@ -151,12 +151,13 @@ final class GeItemInfoPainter
 		// The measured read, in plain words.
 		if (c.fillPct >= 0)
 		{
-			shadowed(g, "Offers at yours filled " + c.fillPct + "% of recent 4h windows", PAD, y + fm.getAscent(), Palette.SUBTLE);
+			shadowed(g, "Board prices filled " + c.fillPct + "% of recent 4h windows", PAD, y + fm.getAscent(), Palette.SUBTLE);
 		}
 		y += lineH;
-		final String outcome = ("SELL".equals(c.side) ? "If it sells: " : "If it fills: ")
-			+ (c.netIfFills >= 0 ? "+" : "") + Fmt.compact(c.netIfFills) + " after tax";
-		shadowed(g, outcome, PAD, y + fm.getAscent(), c.netIfFills >= 0 ? Palette.GREEN : Palette.RED);
+		if (c.outcomeText != null)
+		{
+			shadowed(g, c.outcomeText, PAD, y + fm.getAscent(), c.outcomeColor != null ? c.outcomeColor : Palette.SUBTLE);
+		}
 
 		return new Dimension(W, h);
 	}
