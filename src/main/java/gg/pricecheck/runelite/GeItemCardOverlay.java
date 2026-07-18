@@ -341,6 +341,7 @@ class GeItemCardOverlay extends Overlay
 			c.lotQty = holding[0];
 			c.lotCost = holding[1];
 			c.lotOpenedAtMs = holding[2];
+			c.lotEntries = plugin.lotsFor(geId).toArray(new long[0][]);
 		}
 		if (withSeries)
 		{

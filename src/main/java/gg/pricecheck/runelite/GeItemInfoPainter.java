@@ -66,6 +66,10 @@ final class GeItemInfoPainter
 		long lotQty;
 		long lotCost;              // total gp paid
 		long lotOpenedAtMs;
+		// The individual lots behind those totals, oldest first: {qty, unit
+		// cost, openedAt ms}. When they differ in price the holding line
+		// itemises them instead of pretending one blended entry.
+		long[][] lotEntries;
 
 		long refSell()
 		{
@@ -186,20 +190,73 @@ final class GeItemInfoPainter
 			y += tapeRows * 13 + 2;
 		}
 
-		// Your position, priced at the live edge.
+		// Your position, priced at the live edge. Lots bought at different
+		// prices itemise ("1 @ 816.1m + 3 @ 817m") when that fits on the
+		// line; otherwise the range. Lots that read identically at display
+		// precision merge first, and a single price renders as before.
 		if (holding)
 		{
 			final long unit = c.lotCost / c.lotQty;
-			String hold = "Holding " + Fmt.full(c.lotQty) + " @ " + Fmt.compact(unit);
 			Color holdCol = Palette.SUBTLE;
+			String tailFull = "";
+			String tailShort = "";
 			final long edge = lastHighOf(c.series);
 			if (edge > 0)
 			{
 				final long pnl = c.lotQty * GeTax.net(unit, edge);
-				hold += " · " + (pnl >= 0 ? "+" : "") + Fmt.compact(pnl) + " after tax at the bid";
+				final String p = (pnl >= 0 ? "+" : "") + Fmt.compact(pnl);
+				tailFull = " · " + p + " after tax at the bid";
+				tailShort = " · " + p + " at bid";
 				holdCol = pnl >= 0 ? Palette.GREEN : Palette.RED;
 			}
-			shadowed(g, hold, PAD, y + fm.getAscent(), holdCol);
+			// Fitting ladder: the real lots are the point, so the itemised form
+			// wins even at the cost of the longer profit tail. The blended
+			// average is the last resort, and says it is one.
+			final int maxW = W - 2 * PAD;
+			String hold = null;
+			String tail = tailFull;
+			final java.util.List<long[]> merged = mergedLots(c.lotEntries);
+			if (merged.size() > 1 && merged.size() <= 4)
+			{
+				final StringBuilder sb = new StringBuilder("Holding ");
+				for (int i = 0; i < merged.size(); i++)
+				{
+					if (i > 0)
+					{
+						sb.append(" + ");
+					}
+					sb.append(Fmt.full(merged.get(i)[0])).append(" @ ").append(Fmt.compact(merged.get(i)[1]));
+				}
+				if (fm.stringWidth(sb + tailFull) <= maxW)
+				{
+					hold = sb.toString();
+				}
+				else if (fm.stringWidth(sb + tailShort) <= maxW)
+				{
+					hold = sb.toString();
+					tail = tailShort;
+				}
+			}
+			if (hold == null && merged.size() > 1)
+			{
+				final String range = "Holding " + Fmt.full(c.lotQty) + " avg " + Fmt.compact(unit)
+					+ " (" + Fmt.compact(merged.get(0)[1]) + " to " + Fmt.compact(merged.get(merged.size() - 1)[1]) + ")";
+				if (fm.stringWidth(range + tailShort) <= maxW)
+				{
+					hold = range;
+					tail = tailShort;
+				}
+				else
+				{
+					hold = "Holding " + Fmt.full(c.lotQty) + " avg " + Fmt.compact(unit);
+					tail = fm.stringWidth(hold + tailFull) <= maxW ? tailFull : tailShort;
+				}
+			}
+			if (hold == null)
+			{
+				hold = "Holding " + Fmt.full(c.lotQty) + " @ " + Fmt.compact(unit);
+			}
+			shadowed(g, clip(hold + tail, fm, maxW), PAD, y + fm.getAscent(), holdCol);
 			y += lineH;
 		}
 
@@ -235,6 +292,31 @@ final class GeItemInfoPainter
 			shadowed(g, c.stateText, right, y, c.stateColor != null ? c.stateColor : Palette.SUBTLE);
 		}
 		return right;
+	}
+
+	/** Lots sorted by unit price, with lots that read identically at compact
+	 *  display precision merged into one {qty, unit} row. */
+	private static java.util.List<long[]> mergedLots(long[][] lots)
+	{
+		final java.util.List<long[]> out = new java.util.ArrayList<>();
+		if (lots == null)
+		{
+			return out;
+		}
+		final long[][] sorted = lots.clone();
+		java.util.Arrays.sort(sorted, (a, b) -> Long.compare(a[1], b[1]));
+		for (final long[] l : sorted)
+		{
+			if (!out.isEmpty() && Fmt.compact(out.get(out.size() - 1)[1]).equals(Fmt.compact(l[1])))
+			{
+				out.get(out.size() - 1)[0] += l[0];
+			}
+			else
+			{
+				out.add(new long[]{l[0], l[1]});
+			}
+		}
+		return out;
 	}
 
 	/** Trim to fit, with a plain two-dot tail (the client font has no ellipsis glyph). */
@@ -370,18 +452,34 @@ final class GeItemInfoPainter
 			g.setColor(basis);
 			g.drawLine(bx, by, x0 + plotW, by);
 			g.setStroke(new BasicStroke(1f));
-			final Path2D diamond = new Path2D.Float();
-			diamond.moveTo(bx, by - 4);
-			diamond.lineTo(bx + 4, by);
-			diamond.lineTo(bx, by + 4);
-			diamond.lineTo(bx - 4, by);
-			diamond.closePath();
-			g.setColor(SHADOW);
-			g.translate(1, 1);
-			g.fill(diamond);
-			g.translate(-1, -1);
-			g.setColor(basis);
-			g.fill(diamond);
+			// One diamond per lot at its own entry price and time, so a
+			// position built from several buys shows each of them where they
+			// actually happened. Single-lot positions look exactly as before.
+			final long[][] lots = c.lotEntries != null && c.lotEntries.length > 0
+				? c.lotEntries : new long[][]{{c.lotQty, lotUnit, c.lotOpenedAtMs}};
+			for (final long[] l : lots)
+			{
+				final long lts = l[2] / 1000L;
+				final int lx = lts <= d.tMin ? x0
+					: Math.round(ChartKit.x(d, Math.min(lts, d.tMax), x0, plotW));
+				final int ly = Math.round(ChartKit.y(d, l[1], y0, plotH));
+				if (ly < y0 || ly > y0 + plotH)
+				{
+					continue;
+				}
+				final Path2D diamond = new Path2D.Float();
+				diamond.moveTo(lx, ly - 4);
+				diamond.lineTo(lx + 4, ly);
+				diamond.lineTo(lx, ly + 4);
+				diamond.lineTo(lx - 4, ly);
+				diamond.closePath();
+				g.setColor(SHADOW);
+				g.translate(1, 1);
+				g.fill(diamond);
+				g.translate(-1, -1);
+				g.setColor(basis);
+				g.fill(diamond);
+			}
 		}
 
 		// The last trades from the tape, placed on the chart where they

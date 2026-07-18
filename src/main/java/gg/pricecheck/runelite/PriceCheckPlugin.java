@@ -1119,6 +1119,23 @@ public class PriceCheckPlugin extends Plugin
 		return qty > 0 ? new long[]{qty, cost, opened} : null;
 	}
 
+	/** The individual open lots for an item, oldest first: {qty, unit cost,
+	 *  openedAt ms} per lot, so surfaces can show what was actually paid
+	 *  instead of a blended average. */
+	List<long[]> lotsFor(int geId)
+	{
+		final List<long[]> out = new ArrayList<>();
+		for (final FlipLogEngine.Lot l : openLots)
+		{
+			if (l.itemId == geId && l.qty > 0)
+			{
+				out.add(new long[]{l.qty, l.cost / l.qty, l.openedAt});
+			}
+		}
+		out.sort((a, b) -> Long.compare(a[2], b[2]));
+		return out;
+	}
+
 	// ── per-slot waiting clock ──
 	// How long an offer has sat without progress: reset when the offer
 	// changes identity or its filled quantity moves. Drives the slot bar's

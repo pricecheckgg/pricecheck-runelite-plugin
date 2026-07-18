@@ -74,6 +74,15 @@ public final class GeItemInfoPreview
 		c.fillPct = 71;
 		c.outcomeText = "If it sells: +26.25k after tax";
 		c.outcomeColor = Palette.GREEN;
+		// Held across three separate buys at different prices.
+		c.lotQty = 4;
+		c.lotCost = 1_016_000 + 2 * 1_022_500 + 1_037_900;
+		c.lotOpenedAtMs = (t0 + 20 * 300L) * 1000L;
+		c.lotEntries = new long[][]{
+			{1, 1_016_000, (t0 + 20 * 300L) * 1000L},
+			{2, 1_022_500, (t0 + 38 * 300L) * 1000L},
+			{1, 1_037_900, (t0 + 61 * 300L) * 1000L},
+		};
 
 		final int w = 300;
 		final int h = 320;
@@ -128,10 +137,14 @@ public final class GeItemInfoPreview
 			cs.lvol[i] = 35 + (i * 7) % 80;
 		}
 		g1.series = cs;
-		// An open position bought mid-window, in profit at the edge.
-		g1.lotQty = 120;
-		g1.lotCost = 120 * 18_050L;
+		// An open position built from two buys at different prices.
+		g1.lotQty = 200;
+		g1.lotCost = 120 * 18_050L + 80 * 18_420L;
 		g1.lotOpenedAtMs = (t0 + 96 * 300L) * 1000L;
+		g1.lotEntries = new long[][]{
+			{120, 18_050, (t0 + 96 * 300L) * 1000L},
+			{80, 18_420, (t0 + 210 * 300L) * 1000L},
+		};
 		final GeItemInfoPainter.Context g2c = new GeItemInfoPainter.Context();
 		g2c.itemName = "Rune platebody";
 		g2c.youSells = new long[]{38_900};
