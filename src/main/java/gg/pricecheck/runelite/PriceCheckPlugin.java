@@ -700,6 +700,7 @@ public class PriceCheckPlugin extends Plugin
 	{
 		// Fires on the client thread; snapshot immediately, then recompute off-thread.
 		tracked.set(event.getSlot(), TrackedOffer.of(event.getSlot(), event.getOffer()));
+		noteSlotActivity(event.getSlot(), event.getOffer());
 		if (flipLog != null)
 		{
 			flipLog.setAccount(client.getAccountHash());
@@ -919,6 +920,44 @@ public class PriceCheckPlugin extends Plugin
 	int setupItem()
 	{
 		return setupItemId;
+	}
+
+	TrackedOffer trackedAt(int slot)
+	{
+		return slot >= 0 && slot < SLOTS ? tracked.get(slot) : null;
+	}
+
+	// ── per-slot waiting clock ──
+	// How long an offer has sat without progress: reset when the offer
+	// changes identity or its filled quantity moves. Drives the slot bar's
+	// "sitting 12m" nudge.
+	private final long[] slotQuietSince = new long[SLOTS];
+	private final long[] slotIdentity = new long[SLOTS];
+
+	private void noteSlotActivity(int slot, net.runelite.api.GrandExchangeOffer o)
+	{
+		if (slot < 0 || slot >= SLOTS)
+		{
+			return;
+		}
+		final long ident = o == null || o.getItemId() <= 0 ? 0
+			: (o.getItemId() * 1_000_003L) ^ (o.getPrice() * 31L) ^ (o.getQuantitySold() * 7L)
+				^ (o.getState() != null ? o.getState().ordinal() : 0);
+		if (ident != slotIdentity[slot])
+		{
+			slotIdentity[slot] = ident;
+			slotQuietSince[slot] = System.currentTimeMillis();
+		}
+	}
+
+	/** Millis this slot's offer has sat with no state or fill movement. */
+	long slotQuietMs(int slot)
+	{
+		if (slot < 0 || slot >= SLOTS || slotQuietSince[slot] == 0)
+		{
+			return 0;
+		}
+		return System.currentTimeMillis() - slotQuietSince[slot];
 	}
 
 	// Live market row for one item (from the poller's cache), or null if not loaded.

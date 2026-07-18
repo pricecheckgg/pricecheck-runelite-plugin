@@ -110,12 +110,25 @@ class OfferAdvisorSlotOverlay extends Overlay
 			{
 				continue;
 			}
-			paintSlot(g, fm, b, a.getKind(), a.getColor(), label);
+			// The measured extras: fill odds from the cached series, and how
+			// long the offer has sat without movement.
+			int fillPct = -1;
+			final TrackedOffer t = plugin.trackedAt(i);
+			if (t != null && t.isRelevant())
+			{
+				final PriceCheckApiClient.SeriesData sd = plugin.cardSeriesFor(t.getItemId());
+				if (sd != null)
+				{
+					fillPct = sd.fillPct;
+				}
+			}
+			final long quietMs = plugin.slotQuietMs(i);
+			paintSlot(g, fm, b, a.getKind(), a.getColor(), label, fillPct, quietMs);
 		}
 		return null;
 	}
 
-	private void paintSlot(Graphics2D g, FontMetrics fm, Rectangle b, OfferAdvice.Kind kind, Color col, String label)
+	private void paintSlot(Graphics2D g, FontMetrics fm, Rectangle b, OfferAdvice.Kind kind, Color col, String label, int fillPct, long quietMs)
 	{
 		final boolean dead = kind == OfferAdvice.Kind.DEAD;
 		final boolean onTrack = kind == OfferAdvice.Kind.ON_TRACK;
@@ -146,6 +159,14 @@ class OfferAdvisorSlotOverlay extends Overlay
 		g.setColor(Palette.INK);
 		g.fillRoundRect(barX, barY, barW, BAR_H, 6, 6);
 		g.fillRect(barX, barY, barW, 6);
+		// Measured fill odds as a quiet wash from the left: a 96% offer
+		// looks alive across the room, a 39% one looks thin.
+		if (fillPct > 0)
+		{
+			g.setColor(new Color(col.getRed(), col.getGreen(), col.getBlue(), 26));
+			final int washW = Math.max(4, barW * Math.min(fillPct, 100) / 100);
+			g.fillRoundRect(barX, barY, washW, BAR_H, 6, 6);
+		}
 		g.setColor(col);
 		g.fillRect(barX, barY, barW, 2);   // signature coloured top edge
 
@@ -174,6 +195,33 @@ class OfferAdvisorSlotOverlay extends Overlay
 		g.drawString(text, cx + 1, ty + 1);
 		g.setColor(col);
 		g.drawString(text, cx, ty);
+
+		// Right segment, only when it will not crowd the verdict: a sitting
+		// offer's quiet time (the adjust nudge) beats the odds number.
+		String side = null;
+		Color sideCol = Palette.SUBTLE_CANVAS;
+		if (quiet && quietMs >= 10 * 60_000L)
+		{
+			final long m = quietMs / 60_000L;
+			side = (m >= 60 ? (m / 60) + "h" + (m % 60 > 0 ? " " + (m % 60) + "m" : "") : m + "m");
+			sideCol = Palette.AMBER;
+		}
+		else if (fillPct > 0)
+		{
+			side = fillPct + "%";
+		}
+		if (side != null)
+		{
+			final int sw = fm.stringWidth(side);
+			final int sx = barX + barW - sw - 5;
+			if (sx > cx + fm.stringWidth(text) + 8)
+			{
+				g.setColor(new Color(0, 0, 0, 205));
+				g.drawString(side, sx + 1, ty + 1);
+				g.setColor(sideCol);
+				g.drawString(side, sx, ty);
+			}
+		}
 	}
 
 	// 7x5 filled triangle, vertically centred on midY, with a shadow pass.
