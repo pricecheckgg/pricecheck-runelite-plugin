@@ -3,8 +3,6 @@ package gg.pricecheck.runelite;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
@@ -13,19 +11,17 @@ import java.util.regex.Pattern;
 import net.runelite.api.Client;
 import net.runelite.api.KeyCode;
 import net.runelite.api.widgets.Widget;
-import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * The "type THIS" overlay. On the Grand Exchange Set-up-offer screen it reads the
- * item you're pricing and the live market, then shows the exact price to type in
- * the Price-per-item field. Renders as ONE compact chip sitting fully below the
- * field's ring, caret pointing up at the field, so it never covers the typed
- * price, the item name, or the presets. The ring colour carries the state:
- * gold = here's the price, red = what you typed will not fill, amber = it
- * fills but you're giving margin away.
+ * The price-state ring. On the Grand Exchange Set-up-offer screen it reads the
+ * item you're pricing and the live market, then wraps the Price-per-item field
+ * in a state-coloured ring: gold = on market, red = what you typed will not
+ * fill, amber = it fills but you're giving margin away. Just the ring, no
+ * text: the setup screen is dense and everything on it matters, so the exact
+ * numbers stay in the evidence card and the click-to-fill price lines.
  */
 class OfferSetupOverlay extends Overlay
 {
@@ -36,7 +32,6 @@ class OfferSetupOverlay extends Overlay
 
 	private static final Stroke RING = new BasicStroke(2f);
 	private static final Stroke HALO_STROKE = new BasicStroke(4f);
-	private static final int PAD = 6;
 
 	private final Client client;
 	private final PriceCheckPlugin plugin;
@@ -58,7 +53,7 @@ class OfferSetupOverlay extends Overlay
 		{
 			return null;
 		}
-		// Hold Shift to peek under the ring + chip.
+		// Hold Shift to peek under the ring.
 		if (client.isKeyPressed(KeyCode.KC_SHIFT))
 		{
 			return null;
@@ -123,64 +118,24 @@ class OfferSetupOverlay extends Overlay
 
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-		if (live == null)
-		{
-			drawRing(g, b, Palette.GOLD);
-			drawChip(g, b, Palette.GOLD, line(seg("PriceCheck…", small(g), Palette.SUBTLE_CANVAS)));
-			return null;
-		}
-
-		final long target = sell ? live.getSell() : live.getBuy();
+		final long target = live == null ? 0 : (sell ? live.getSell() : live.getBuy());
 		if (target <= 0)
 		{
 			drawRing(g, b, Palette.GOLD);
-			drawChip(g, b, Palette.GOLD, line(seg("no live price", small(g), Palette.SUBTLE_CANVAS)));
 			return null;
 		}
 
-		// One line: the number is the payload. The suffix is either the margin
-		// (all good) or the correction (typed price is off market), and the ring
-		// colour repeats the state so it reads without the text.
+		// Ring colour only: gold when the typed price is on market (within 1%),
+		// red when it will not fill, amber when it fills but gives margin away.
 		Color state = Palette.GOLD;
-		Seg tail = seg("+" + Fmt.compact(live.getProfit()), small(g), Palette.GREEN);
 		final long tol = Math.max(target / 100, 1);
 		if (entered > 0 && Math.abs(entered - target) > tol)
 		{
-			final long d = Math.abs(entered - target);
-			if (sell)
-			{
-				if (entered > target)
-				{
-					state = Palette.RED;
-					tail = seg("drop " + Fmt.compact(d) + " to fill", small(g), Palette.RED);
-				}
-				else
-				{
-					state = Palette.AMBER;
-					tail = seg("under market by " + Fmt.compact(d), small(g), Palette.AMBER);
-				}
-			}
-			else
-			{
-				if (entered < target)
-				{
-					state = Palette.RED;
-					tail = seg("raise " + Fmt.compact(d) + " to fill", small(g), Palette.RED);
-				}
-				else
-				{
-					state = Palette.AMBER;   // overpay fills, just worse
-					tail = seg("overpaying by " + Fmt.compact(d), small(g), Palette.AMBER);
-				}
-			}
+			final boolean noFill = sell ? entered > target : entered < target;
+			state = noFill ? Palette.RED : Palette.AMBER;
 		}
 
 		drawRing(g, b, state);
-		drawChip(g, b, state, line(
-			seg("Type ", small(g), Palette.SUBTLE_CANVAS),
-			seg(Fmt.full(target), bold(g), Color.WHITE),
-			seg(" · ", small(g), Palette.SUBTLE_CANVAS),
-			tail));
 		return null;
 	}
 
@@ -194,117 +149,6 @@ class OfferSetupOverlay extends Overlay
 		g.setColor(col);
 		g.drawRoundRect(b.x - 2, b.y - 2, b.width + 3, b.height + 3, 8, 8);
 	}
-
-	// ── chip layout: one line, fully below the ring ──
-	private void drawChip(Graphics2D g, Rectangle field, Color border, Line ln)
-	{
-		final int w = ln.width() + PAD * 2;
-		final int h = ln.height() + 4;
-
-		// Centre on the field, clamp to the canvas; sit fully BELOW the ring
-		// with the caret bridging the gap, so nothing the player reads is
-		// covered: not the typed price, not the item name above it.
-		int x = field.x + (field.width - w) / 2;
-		final int cw = client.getCanvasWidth();
-		if (cw > 0 && x + w > cw - 2)
-		{
-			x = cw - w - 2;
-		}
-		if (x < 2)
-		{
-			x = 2;
-		}
-		int y = field.y + field.height + 7;
-		final int ch = client.getCanvasHeight();
-		final boolean above = ch > 0 && y + h > ch - 2;
-		if (above)
-		{
-			y = field.y - h - 9;   // no room below: sit fully above the ring
-		}
-
-		g.translate(1, 1);
-		g.setColor(new Color(0, 0, 0, 90));
-		g.fillRoundRect(x, y, w, h, 8, 8);
-		g.translate(-1, -1);
-		g.setColor(Palette.INK);
-		g.fillRoundRect(x, y, w, h, 8, 8);
-		g.setStroke(new BasicStroke(1f));
-		g.setColor(new Color(border.getRed(), border.getGreen(), border.getBlue(), 200));
-		g.drawRoundRect(x, y, w, h, 8, 8);
-
-		// Caret tying the chip to the field it talks about, like the chart
-		// tags: accent triangle at the field-facing edge, at the field's
-		// centre when it sits inside the chip's span.
-		final int fx = Math.max(x + 10, Math.min(field.x + field.width / 2, x + w - 10));
-		final java.awt.geom.Path2D caret = new java.awt.geom.Path2D.Float();
-		if (above)
-		{
-			caret.moveTo(fx - 4, y + h);
-			caret.lineTo(fx + 4, y + h);
-			caret.lineTo(fx, y + h + 5);
-		}
-		else
-		{
-			caret.moveTo(fx - 4, y);
-			caret.lineTo(fx + 4, y);
-			caret.lineTo(fx, y - 5);
-		}
-		caret.closePath();
-		g.setColor(new Color(border.getRed(), border.getGreen(), border.getBlue(), 220));
-		g.fill(caret);
-
-		int tx = x + PAD;
-		final int ascent = ln.ascent();
-		final int ty = y + (h - ln.height()) / 2;
-		for (final Seg s : ln.segs)
-		{
-			g.setFont(s.font);
-			final FontMetrics fm = g.getFontMetrics();
-			g.setColor(new Color(0, 0, 0, 190));
-			g.drawString(s.text, tx + 1, ty + ascent + 1);
-			g.setColor(s.color);
-			g.drawString(s.text, tx, ty + ascent);
-			tx += fm.stringWidth(s.text);
-		}
-	}
-
-	// ── tiny text model (per-segment font/colour) ──
-	private static final class Seg
-	{
-		final String text; final Font font; final Color color;
-		Seg(String t, Font f, Color c) { text = t; font = f; color = c; }
-	}
-
-	private final class Line
-	{
-		final Seg[] segs;
-		Line(Seg[] s) { segs = s; }
-		int width()
-		{
-			int w = 0;
-			for (final Seg s : segs) { w += fm(s.font).stringWidth(s.text); }
-			return w;
-		}
-		int ascent()
-		{
-			int a = 0;
-			for (final Seg s : segs) { a = Math.max(a, fm(s.font).getAscent()); }
-			return a;
-		}
-		int height()
-		{
-			int hgt = 0;
-			for (final Seg s : segs) { hgt = Math.max(hgt, fm(s.font).getHeight()); }
-			return hgt;
-		}
-	}
-
-	private Graphics2D g2;
-	private FontMetrics fm(Font f) { return g2.getFontMetrics(f); }
-	private Seg seg(String t, Font f, Color c) { return new Seg(t, f, c); }
-	private Line line(Seg... s) { return new Line(s); }
-	private Font bold(Graphics2D g) { g2 = g; return FontManager.getRunescapeBoldFont(); }
-	private Font small(Graphics2D g) { g2 = g; return FontManager.getRunescapeSmallFont(); }
 
 	// ── widget helpers ──
 	private static Widget[] allChildren(Widget panel)
