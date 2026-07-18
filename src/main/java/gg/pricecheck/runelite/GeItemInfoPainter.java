@@ -106,7 +106,7 @@ final class GeItemInfoPainter
 		y += 4;
 
 		// Chart: corridor + your offer line.
-		paintChart(g, c, PAD, y, W - 2 * PAD, CHART_H, fm);
+		paintChart(g, c, PAD, y, W - 2 * PAD, CHART_H, fm, false);
 		y += CHART_H + 4;
 
 		// Tape: the prints this client has watched arrive, newest first.
@@ -213,12 +213,12 @@ final class GeItemInfoPainter
 		paintVerdicts(g, c, fm, W, y);
 		if (!chartless)
 		{
-			paintChart(g, c, PAD, 7 + lineH + 2, W - 2 * PAD, chartH + 6, fm);
+			paintChart(g, c, PAD, 7 + lineH + 2, W - 2 * PAD, chartH + 6, fm, true);
 		}
 		return new Dimension(W, h);
 	}
 
-	private static void paintChart(Graphics2D g, Context c, int x0, int y0, int cw, int ch, FontMetrics fm)
+	private static void paintChart(Graphics2D g, Context c, int x0, int y0, int cw, int ch, FontMetrics fm, boolean compact)
 	{
 		final int plotW = cw - PRICE_GUTTER;
 		final int plotH = ch - 8;   // room for the volume strip below
@@ -283,14 +283,16 @@ final class GeItemInfoPainter
 		paintLastPrint(g, d, true, x0, y0, plotW, plotH, fm2, occupied);
 		paintLastPrint(g, d, false, x0, y0, plotW, plotH, fm2, occupied);
 
-		// Price gridlines, labels only where the gutter is free.
+		// Price gridlines. Their labels are the lowest tier: full cards show
+		// them where the gutter is free, minis skip them entirely so the
+		// numbers that matter keep their air.
 		for (int i = 0; i < 3; i++)
 		{
 			final long p = d.pMin + (d.pMax - d.pMin) * i / 2;
 			final int yy = Math.round(ChartKit.y(d, p, y0, plotH));
 			g.setColor(ChartKit.GRID);
 			g.drawLine(x0, yy, x0 + plotW, yy);
-			if (isFree(occupied, yy - 5, yy + 5))
+			if (!compact && isFree(occupied, yy - 5, yy + 5))
 			{
 				g.setColor(Palette.SUBTLE_CANVAS);
 				g.drawString(Fmt.compact(p), x0 + plotW + 6,
@@ -300,7 +302,15 @@ final class GeItemInfoPainter
 
 		for (final int[] t : tags)
 		{
-			yourLine(g, prices.get(t[3]), t[0], t[1], t[2] == 1, x0, plotW, fm2, chipH);
+			final long price = prices.get(t[3]);
+			final boolean sellSide = t[2] == 1;
+			// Seated = your price already competes at the live edge: a sell
+			// at or under the last insta-buy, a buy at or over the last
+			// insta-sell. Anything else is off-market and worth adjusting.
+			final boolean seated = sellSide
+				? d.lastHigh > 0 && price <= d.lastHigh
+				: d.lastLow > 0 && price >= d.lastLow;
+			yourLine(g, price, t[0], t[1], sellSide, seated, x0, plotW, fm2, chipH);
 		}
 	}
 
@@ -321,7 +331,9 @@ final class GeItemInfoPainter
 		g.fillOval(px - 3, py - 3, 6, 6);
 
 		// Gutter label: nudge downward until clear of the chips, flipping
-		// upward when that would leave the plot, and never past its edges.
+		// upward when that would leave the plot. A label that cannot find a
+		// free spot is DROPPED, never drawn over a neighbour; the dot on the
+		// series still marks the level.
 		final int lh = fm.getHeight();
 		final int maxY = y0 + plotH + 2;
 		final int minY = y0 + fm.getAscent() - 2;
@@ -340,8 +352,15 @@ final class GeItemInfoPainter
 		while (!isFree(occupied, ly - fm.getAscent(), ly + 2) && guard++ < 8)
 		{
 			ly -= lh / 2 + 2;
+			if (ly < minY)
+			{
+				return;
+			}
 		}
-		ly = Math.max(minY, Math.min(ly, maxY));
+		if (ly < minY || ly > maxY || !isFree(occupied, ly - fm.getAscent(), ly + 2))
+		{
+			return;
+		}
 		occupied.add(new int[]{ly - fm.getAscent(), ly + 2});
 		shadowed(g, Fmt.compact(price), x0 + plotW + 6, ly, col);
 	}
@@ -359,10 +378,14 @@ final class GeItemInfoPainter
 	}
 
 	/** Your price as a terminal-style axis tag: soft glow under a dashed
-	 * line, and an ink chip with a side letter and a caret at the level. */
-	private static void yourLine(Graphics2D g, long price, int lineY, int tagY, boolean sell, int x0, int plotW, FontMetrics fm, int chipH)
+	 * line, and an ink chip with a side letter and a caret at the level.
+	 * Seated offers (already competing at the live edge) wear a solid border
+	 * and a side-coloured caret; off-market ones go dashed with an amber
+	 * caret, the quiet "worth adjusting" cue. */
+	private static void yourLine(Graphics2D g, long price, int lineY, int tagY, boolean sell, boolean seated, int x0, int plotW, FontMetrics fm, int chipH)
 	{
 		final Color accent = sell ? Palette.GREEN : Palette.RED;
+		final Color caretCol = seated ? accent : Palette.AMBER;
 		g.setStroke(new BasicStroke(3f));
 		g.setColor(new Color(255, 255, 255, 34));
 		g.drawLine(x0, lineY, x0 + plotW, lineY);
@@ -382,12 +405,17 @@ final class GeItemInfoPainter
 		caret.lineTo(chipX + 1, tagY - 4);
 		caret.lineTo(chipX + 1, tagY + 4);
 		caret.closePath();
-		g.setColor(accent);
+		g.setColor(caretCol);
 		g.fill(caret);
 		g.setColor(Palette.INK);
 		g.fillRoundRect(chipX, chipY, lw + tw + 12, chipH, 6, 6);
 		g.setColor(accent);
+		if (!seated)
+		{
+			g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{3f, 2f}, 0f));
+		}
 		g.drawRoundRect(chipX, chipY, lw + tw + 12, chipH, 6, 6);
+		g.setStroke(new BasicStroke(1f));
 		g.drawString(letter, chipX + 5, chipY + fm.getAscent());
 		g.setColor(Color.WHITE);
 		g.drawString(label, chipX + 5 + lw + 3, chipY + fm.getAscent());
