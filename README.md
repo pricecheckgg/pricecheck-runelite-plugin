@@ -36,8 +36,10 @@ features, each off by default and individually toggled, send exactly what
 their config warning states: the flip-log sync sends your GE trades and open
 positions with an anonymous per-account identifier; "Contribute market data"
 sends your own GE offer fill events; the planner's capital auto-detect sends
-your liquid gp total. Your RSN, game credentials, and chat are never read or
-sent. PriceCheck's servers are not controlled or verified by the RuneLite
+your liquid gp total. While a PriceCheck trial is active, the plugin sends
+that same anonymous per-account identifier once per game account to bind the
+trial to it, as the trial terms state. Your RSN, game credentials, and chat
+are never read or sent. PriceCheck's servers are not controlled or verified by the RuneLite
 Developers.
 
 ## Build

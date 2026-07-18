@@ -793,6 +793,9 @@ public class PriceCheckPlugin extends Plugin
 		}
 	};
 	private final Set<Integer> seriesFetching = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+	// Failed fetches back off so a missing series or a network flap cannot
+	// queue a request per render frame on the single poller thread.
+	private final Map<Integer, Long> seriesFailedAt = java.util.Collections.synchronizedMap(new java.util.HashMap<>());
 	// Prints per item: every advisor poll where an item's insta price moved is
 	// one observed trade. Tracks all items the poll fetches (your offers plus
 	// the viewed item), bounded per item, pruned when an item leaves the set.
@@ -843,6 +846,11 @@ public class PriceCheckPlugin extends Plugin
 				{
 					seriesCache.put(geId, new CachedSeries(d, System.currentTimeMillis()));
 				}
+				seriesFailedAt.remove(geId);
+			}
+			else
+			{
+				seriesFailedAt.put(geId, System.currentTimeMillis());
 			}
 		}
 		finally
@@ -863,7 +871,9 @@ public class PriceCheckPlugin extends Plugin
 		{
 			c = seriesCache.get(geId);
 		}
-		if (poller != null && (c == null || System.currentTimeMillis() - c.atMs > 60_000L))
+		final Long failed = seriesFailedAt.get(geId);
+		final boolean coolingDown = failed != null && System.currentTimeMillis() - failed < 45_000L;
+		if (poller != null && !coolingDown && (c == null || System.currentTimeMillis() - c.atMs > 60_000L))
 		{
 			poller.execute(() -> refreshSeries(geId));
 		}
@@ -1110,7 +1120,15 @@ public class PriceCheckPlugin extends Plugin
 			{
 				refreshPanel();
 				refreshAdvisor();
-				if (p != null) { p.setAccount(api.getAccount(config.apiKey())); }
+				// Key changes go through here too; the trial gate must track
+				// the new key's entitlement, not the old one's.
+				final AccountInfo acct = api.getAccount(config.apiKey());
+				trialActive = acct != null && acct.isTrial();
+				if (trialActive)
+				{
+					maybeBindTrial();
+				}
+				if (p != null) { p.setAccount(acct); }
 			});
 		}
 		else if ("minEvPerHrK".equals(key))

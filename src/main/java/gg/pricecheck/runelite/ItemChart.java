@@ -17,7 +17,7 @@ import net.runelite.client.ui.FontManager;
  * after-tax spread paid, wick envelope, price grid, volume strip), with the
  * engine's current quotes as labeled price lines, your own logged fills as
  * exact-price markers, manipulation windows ticked, and the forecast band
- * noted. Everything on it is measured; nothing is a model's opinion.
+ * noted.
  */
 class ItemChart extends JComponent
 {
