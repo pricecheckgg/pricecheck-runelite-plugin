@@ -345,6 +345,55 @@ class PriceCheckPanel extends PluginPanel
 		}
 	}
 
+	/** Painted checkbox faces: a dark rounded box, gold check when selected.
+	 * The stock Swing checkbox is the one control that never matches the
+	 * panel's look. */
+	private static final class BoxIcon implements javax.swing.Icon
+	{
+		private final boolean checked;
+
+		BoxIcon(boolean checked)
+		{
+			this.checked = checked;
+		}
+
+		public int getIconWidth()
+		{
+			return 15;
+		}
+
+		public int getIconHeight()
+		{
+			return 15;
+		}
+
+		public void paintIcon(Component c, Graphics g, int x, int y)
+		{
+			final Graphics2D g2 = (Graphics2D) g.create();
+			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			g2.translate(x, y);
+			g2.setColor(ColorScheme.DARKER_GRAY_COLOR);
+			g2.fillRoundRect(0, 0, 14, 14, 4, 4);
+			g2.setColor(new Color(0x55, 0x50, 0x45));
+			g2.drawRoundRect(0, 0, 14, 14, 4, 4);
+			if (checked)
+			{
+				g2.setStroke(new BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+				g2.setColor(Palette.GOLD);
+				g2.drawLine(3, 7, 6, 10);
+				g2.drawLine(6, 10, 11, 4);
+			}
+			g2.dispose();
+		}
+	}
+
+	private static void styleCheckbox(JCheckBox box)
+	{
+		box.setIcon(new BoxIcon(false));
+		box.setSelectedIcon(new BoxIcon(true));
+		box.setIconTextGap(8);
+	}
+
 	/** A painted check, plus, or cross — the RuneScape font has none of them. */
 	private static final class Mark extends JComponent
 	{
@@ -1217,6 +1266,36 @@ class PriceCheckPanel extends PluginPanel
 		saveKeyBtn.setFocusPainted(false);
 		saveKeyBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
 		saveKeyBtn.setAlignmentX(Component.LEFT_ALIGNMENT);
+		// Flat, panel-native button: same surface as the key field, hairline
+		// frame, gold on hover once a plausible key is in the field.
+		saveKeyBtn.setContentAreaFilled(false);
+		saveKeyBtn.setOpaque(true);
+		saveKeyBtn.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		saveKeyBtn.setForeground(Palette.LIGHT);
+		saveKeyBtn.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createLineBorder(HAIRLINE),
+			BorderFactory.createEmptyBorder(4, 0, 4, 0)));
+		saveKeyBtn.addMouseListener(new MouseAdapter()
+		{
+			public void mouseEntered(MouseEvent e)
+			{
+				if (saveKeyBtn.isEnabled())
+				{
+					saveKeyBtn.setForeground(Palette.GOLD);
+					saveKeyBtn.setBorder(BorderFactory.createCompoundBorder(
+						BorderFactory.createLineBorder(new Color(0xe6, 0xc6, 0x67, 110)),
+						BorderFactory.createEmptyBorder(4, 0, 4, 0)));
+				}
+			}
+
+			public void mouseExited(MouseEvent e)
+			{
+				saveKeyBtn.setForeground(Palette.LIGHT);
+				saveKeyBtn.setBorder(BorderFactory.createCompoundBorder(
+					BorderFactory.createLineBorder(HAIRLINE),
+					BorderFactory.createEmptyBorder(4, 0, 4, 0)));
+			}
+		});
 		keyField.getDocument().addDocumentListener(new DocumentListener()
 		{
 			private void changed()
@@ -1267,6 +1346,7 @@ class PriceCheckPanel extends PluginPanel
 		syncToggle.setOpaque(false);
 		syncToggle.setForeground(Color.WHITE);
 		syncToggle.setFocusPainted(false);
+		styleCheckbox(syncToggle);
 		syncToggle.setAlignmentX(Component.LEFT_ALIGNMENT);
 		syncToggle.setToolTipText("Back up your flip log to your PriceCheck account and see it at flipping.pricecheck.gg/portfolio");
 		syncToggle.setSelected(config.syncFlipLog());
@@ -1309,6 +1389,7 @@ class PriceCheckPanel extends PluginPanel
 		advisorToggle.setOpaque(false);
 		advisorToggle.setForeground(Color.WHITE);
 		advisorToggle.setFocusPainted(false);
+		styleCheckbox(advisorToggle);
 		advisorToggle.setAlignmentX(Component.LEFT_ALIGNMENT);
 		advisorToggle.setSelected(config.showAdvisor());
 		advisorToggle.addItemListener(e ->
@@ -1328,6 +1409,15 @@ class PriceCheckPanel extends PluginPanel
 		minEvSpinner.setValue(config.minEvPerHrK());
 		minEvSpinner.setPreferredSize(new Dimension(64, 24));
 		minEvSpinner.setMaximumSize(new Dimension(64, 24));
+		final javax.swing.JComponent spinEd = minEvSpinner.getEditor();
+		if (spinEd instanceof JSpinner.DefaultEditor)
+		{
+			final javax.swing.JTextField tf = ((JSpinner.DefaultEditor) spinEd).getTextField();
+			tf.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+			tf.setForeground(Palette.LIGHT);
+			tf.setCaretColor(Color.WHITE);
+			tf.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+		}
 		minEvSpinner.addChangeListener(e ->
 		{
 			if (!settingsMuted)
