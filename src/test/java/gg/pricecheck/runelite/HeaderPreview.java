@@ -60,7 +60,9 @@ public final class HeaderPreview
 			s.allProfit = 3_990_000;
 			s.allTax = 8_190_000;
 			s.allFlips = 131;
+			s.allWins = 123;
 			s.winRatePct = 94;
+			s.avgRoiPct = 1.83;
 			s.checks = 2;
 			s.untrackedSells = 9908;
 			s.pendingSync = 0;
@@ -79,7 +81,9 @@ public final class HeaderPreview
 			s.allProfit = 1_020_000_000L;
 			s.allTax = 42_000_000;
 			s.allFlips = 4212;
+			s.allWins = 2990;
 			s.winRatePct = 71;
+			s.avgRoiPct = -0.42;
 			s.checks = 155;
 			s.pendingSync = 37;
 		}

@@ -192,7 +192,11 @@ class FlipLogEngine
 		long allProfit;
 		long allTax;
 		int allFlips;
+		int allWins;
 		int winRatePct = -1;
+		// Capital-weighted: total profit vs total gp spent across the retained
+		// flip history, checks excluded. NaN until a flip with a cost exists.
+		double avgRoiPct = Double.NaN;
 		int checks;
 		long sessionProfit;
 		long sessionGpHr = Long.MIN_VALUE;   // MIN_VALUE = not enough active time yet
@@ -778,11 +782,26 @@ class FlipLogEngine
 		s.allProfit = data.allProfit;
 		s.allTax = data.allTax;
 		s.allFlips = data.allFlips;
+		s.allWins = data.allWins;
 		s.checks = data.checks;
 		s.untrackedSells = data.untrackedSells;
 		if (data.allFlips > 0)
 		{
 			s.winRatePct = Math.round(100f * data.allWins / data.allFlips);
+		}
+		long roiNum = 0;
+		long roiDen = 0;
+		for (final Flip f : data.flips)
+		{
+			if (!f.check && f.buyGross > 0)
+			{
+				roiNum += f.profit;
+				roiDen += f.buyGross;
+			}
+		}
+		if (roiDen > 0)
+		{
+			s.avgRoiPct = 100.0 * roiNum / roiDen;
 		}
 		s.sessionProfit = sessionProfit;
 		final long active = activeMs + (lastEventMs > 0 ? Math.min(now - lastEventMs, ACTIVE_WINDOW_MS) : 0);

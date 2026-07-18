@@ -280,7 +280,9 @@ class PriceCheckPanel extends PluginPanel
 	private final JLabel cellToday = new JLabel(" ");
 	private final JLabel cellWeek = new JLabel(" ");
 	private final JLabel cellAll = new JLabel(" ");
-	private final JLabel logMeta = new JLabel(" ");
+	private final JLabel cellFlips = new JLabel(" ");
+	private final JLabel cellWon = new JLabel(" ");
+	private final JLabel cellRoi = new JLabel(" ");
 	private final Dot logSyncDot = new Dot();
 	private final JLabel logSync = new JLabel(" ");
 	private final JPanel logList = new JPanel();
@@ -439,11 +441,17 @@ class PriceCheckPanel extends PluginPanel
 		head.add(hairline());
 		head.add(Box.createVerticalStrut(6));
 
-		logMeta.setFont(FontManager.getRunescapeSmallFont());
-		logMeta.setForeground(Palette.SUBTLE);
-		logMeta.setAlignmentX(Component.LEFT_ALIGNMENT);
-		head.add(logMeta);
-		head.add(Box.createVerticalStrut(5));
+		// Second strip: the ledger's shape rather than its gp. Checks and
+		// untracked sells live in the tooltips — detail, not headline.
+		final JPanel cols2 = new JPanel(new GridLayout(1, 3, 8, 0));
+		cols2.setBackground(CARD);
+		cols2.setAlignmentX(Component.LEFT_ALIGNMENT);
+		cols2.add(statCol("FLIPS", cellFlips));
+		cols2.add(statCol("WON", cellWon));
+		cols2.add(statCol("AVG ROI", cellRoi));
+		cols2.setMaximumSize(new Dimension(Integer.MAX_VALUE, cols2.getPreferredSize().height));
+		head.add(cols2);
+		head.add(Box.createVerticalStrut(8));
 
 		// Sync status: painted dot + one short line. Opens the web portfolio
 		// once backed up, Settings while local-only.
@@ -537,19 +545,33 @@ class PriceCheckPanel extends PluginPanel
 			}
 			heroValue.setText(s.sessionProfit == 0 ? "0 gp" : statGp(s.sessionProfit));
 			heroValue.setForeground(s.sessionProfit > 0 ? Palette.GREEN : (s.sessionProfit < 0 ? Palette.RED : Palette.SUBTLE));
-			heroSub.setText(s.sessionGpHr != Long.MIN_VALUE
-				? statGp(s.sessionGpHr) + "/hr while flipping"
-				: (s.sessionProfit == 0 ? "no flips yet this session" : "gp/hr shows after a few active minutes"));
+			heroSub.setText(s.sessionProfit == 0 && s.sessionGpHr <= 0
+				? "no flips yet this session"
+				: (s.sessionGpHr != Long.MIN_VALUE
+					? statGp(s.sessionGpHr) + "/hr while flipping"
+					: "gp/hr shows after a few active minutes"));
 			setStat(cellToday, s.todayProfit);
 			setStat(cellWeek, s.weekProfit);
 			setStat(cellAll, s.allProfit);
 			cellAll.setToolTipText("Tax paid: " + Fmt.compact(s.allTax) + " gp");
-			logMeta.setText(s.allFlips + " flips"
-				+ (s.winRatePct >= 0 ? " · " + s.winRatePct + "% won" : "")
-				+ (s.checks > 0 ? " · " + s.checks + " checks" : ""));
-			logMeta.setToolTipText(s.untrackedSells > 0
-				? s.untrackedSells + " sold items had no tracked buy, so they count at zero cost"
-				: null);
+			cellFlips.setText(Fmt.full(s.allFlips));
+			cellFlips.setForeground(Palette.LIGHT);
+			cellFlips.setToolTipText((s.checks > 0 ? s.checks + " margin checks kept out of these totals" : "Margin checks are kept out of these totals")
+				+ (s.untrackedSells > 0 ? ". " + s.untrackedSells + " sold items had no tracked buy, so they count at zero cost" : ""));
+			cellWon.setText(s.winRatePct >= 0 ? s.winRatePct + "%" : "-");
+			cellWon.setForeground(Palette.LIGHT);
+			cellWon.setToolTipText(s.winRatePct >= 0 ? s.allWins + " of " + s.allFlips + " closed in profit" : null);
+			if (Double.isNaN(s.avgRoiPct))
+			{
+				cellRoi.setText("-");
+				cellRoi.setForeground(Palette.SUBTLE);
+			}
+			else
+			{
+				cellRoi.setText(pctSigned(s.avgRoiPct));
+				cellRoi.setForeground(s.avgRoiPct > 0 ? Palette.GREEN : (s.avgRoiPct < 0 ? Palette.RED : Palette.SUBTLE));
+			}
+			cellRoi.setToolTipText("Profit vs gp spent across your logged flips, checks excluded");
 			syncOpensWeb = hasKey && s.pendingSync == 0;
 			logSyncDot.setColor(hasKey ? (s.pendingSync > 0 ? Palette.AMBER : Palette.GREEN) : Palette.SUBTLE);
 			// Two-tone: state stays quiet, the clickable action reads as a link.
@@ -651,15 +673,19 @@ class PriceCheckPanel extends PluginPanel
 		{
 			return Fmt.full(Math.max(0, f.qty)) + " ×";
 		}
-		// One decimal normally; two when that would show a flat 0.0 for a real
-		// gain or loss (big-ticket flips live in the hundredths).
-		final double raw = 100.0 * f.profit / f.buyGross;
-		final double roi = Math.round(raw * 10) / 10.0;
-		final boolean fine = roi == 0 && f.profit != 0;
-		final double shown = fine ? Math.round(raw * 100) / 100.0 : roi;
-		final String roiStr = (shown > 0 ? "+" : "")
+		return Fmt.full(f.qty) + " @ " + Fmt.compact(f.buyGross / f.qty)
+			+ " · " + pctSigned(100.0 * f.profit / f.buyGross);
+	}
+
+	/** Signed percent, one decimal — two when that would show a flat 0.0 for a
+	 * real gain or loss (big-ticket flips live in the hundredths). */
+	private static String pctSigned(double raw)
+	{
+		final double r1 = Math.round(raw * 10) / 10.0;
+		final boolean fine = r1 == 0 && raw != 0;
+		final double shown = fine ? Math.round(raw * 100) / 100.0 : r1;
+		return (shown > 0 ? "+" : "")
 			+ String.format(java.util.Locale.ROOT, fine ? "%.2f" : "%.1f", shown) + "%";
-		return Fmt.full(f.qty) + " @ " + Fmt.compact(f.buyGross / f.qty) + " · " + roiStr;
 	}
 
 	private JPanel logFlipRow(FlipLogEngine.Flip f)
