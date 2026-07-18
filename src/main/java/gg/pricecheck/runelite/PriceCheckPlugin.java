@@ -90,8 +90,12 @@ public class PriceCheckPlugin extends Plugin
 		@Override
 		public java.awt.event.MouseEvent mousePressed(java.awt.event.MouseEvent e)
 		{
-			if (advisorOverlay != null
-				&& advisorOverlay.handleClick(e.getPoint(), client.isKeyPressed(net.runelite.api.KeyCode.KC_SHIFT)))
+			final boolean shift = client.isKeyPressed(net.runelite.api.KeyCode.KC_SHIFT);
+			if (advisorOverlay != null && advisorOverlay.handleClick(e.getPoint(), shift))
+			{
+				e.consume();
+			}
+			else if (geCardOverlay != null && geCardOverlay.handleClick(e.getPoint(), shift))
 			{
 				e.consume();
 			}
@@ -251,7 +255,7 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(slotOverlay);
 		setupOverlay = new OfferSetupOverlay(client, this, config);
 		overlayManager.add(setupOverlay);
-		geCardOverlay = new GeItemCardOverlay(client, this, config);
+		geCardOverlay = new GeItemCardOverlay(client, this, config, configManager);
 		overlayManager.add(geCardOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->

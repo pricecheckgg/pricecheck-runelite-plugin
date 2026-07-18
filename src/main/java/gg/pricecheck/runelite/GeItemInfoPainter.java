@@ -40,10 +40,13 @@ final class GeItemInfoPainter
 	static final class Context
 	{
 		String itemName;
-		long yourPrice;
-		String stateText;     // e.g. "OK +26.2k if it sells"
+		long youBuy;          // your active buy offer price (0 = none)
+		long youSell;         // your active sell offer price (0 = none)
+		String stateText;     // e.g. "OK +26.2k"
 		Color stateColor;
-		ItemChart.Series series;   // tight window, e.g. last 6h
+		String stateText2;    // second verdict when both sides are live
+		Color stateColor2;
+		ItemChart.Series series;
 		List<Print> prints;        // newest last
 		int fillPct = -1;          // measured odds at the board's prices, -1 unknown
 		String outcomeText;        // bottom line, prebuilt by the caller
@@ -83,14 +86,10 @@ final class GeItemInfoPainter
 		g.setColor(FRAME);
 		g.drawRoundRect(0, 0, W - 1, h - 1, 8, 8);
 
-		// Header: item + live verdict from the advisor.
+		// Header: item + live verdicts from the advisor.
 		int y = PAD + fm.getAscent() - 2;
 		shadowed(g, c.itemName, PAD, y, NAME);
-		if (c.stateText != null)
-		{
-			final int tw = fm.stringWidth(c.stateText);
-			shadowed(g, c.stateText, W - PAD - tw, y, c.stateColor != null ? c.stateColor : Palette.SUBTLE);
-		}
+		paintVerdicts(g, c, fm, W, y);
 		y += 6;
 		g.setColor(RULE);
 		g.drawLine(PAD - 2, y, W - PAD + 2, y);
@@ -134,8 +133,12 @@ final class GeItemInfoPainter
 				shadowed(g, Fmt.full(p.price), PAD + 14, ty, NAME);
 				final long ago = Math.max(0, c.nowTs - p.ts);
 				final String age = ago < 60 ? ago + "s ago" : (ago / 60) + "m ago";
-				final String delta = c.yourPrice > 0
-					? (p.price >= c.yourPrice ? "+" : "-") + Fmt.compact(Math.abs(p.price - c.yourPrice)) + " vs you"
+				// Deltas read against the side the print competes with: buys
+				// arriving compare to your sell, sells to your buy.
+				final long ref = p.buySide ? (c.youSell > 0 ? c.youSell : c.youBuy)
+					: (c.youBuy > 0 ? c.youBuy : c.youSell);
+				final String delta = ref > 0
+					? (p.price >= ref ? "+" : "-") + Fmt.compact(Math.abs(p.price - ref)) + " vs you"
 					: "";
 				shadowed(g, delta, W / 2 - 10, ty, Palette.SUBTLE);
 				final int aw = fm.stringWidth(age);
@@ -158,11 +161,58 @@ final class GeItemInfoPainter
 		return new Dimension(W, h);
 	}
 
+	private static void paintVerdicts(Graphics2D g, Context c, FontMetrics fm, int width, int y)
+	{
+		int right = width - PAD;
+		if (c.stateText2 != null)
+		{
+			right -= fm.stringWidth(c.stateText2);
+			shadowed(g, c.stateText2, right, y, c.stateColor2 != null ? c.stateColor2 : Palette.SUBTLE);
+			right -= fm.stringWidth(" · ");
+			shadowed(g, " · ", right, y, Palette.SUBTLE);
+		}
+		if (c.stateText != null)
+		{
+			right -= fm.stringWidth(c.stateText);
+			shadowed(g, c.stateText, right, y, c.stateColor != null ? c.stateColor : Palette.SUBTLE);
+		}
+	}
+
+	/** The compact stack card for the GE grid view: header + chart, nothing
+	 * else. Both of your offer sides draw on the one chart. */
+	static Dimension paintCompact(Graphics2D g, Context c)
+	{
+		final Font small = net.runelite.client.ui.FontManager.getRunescapeSmallFont();
+		g.setFont(small);
+		final FontMetrics fm = g.getFontMetrics();
+		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+
+		final int lineH = fm.getHeight();
+		final boolean chartless = c.series == null;
+		final int chartH = chartless ? 0 : 68;
+		final int h = 7 + lineH + (chartless ? 5 : 4 + chartH + 8);
+
+		g.setColor(Palette.INK);
+		g.fillRoundRect(0, 0, W - 1, h - 1, 8, 8);
+		g.setColor(FRAME);
+		g.drawRoundRect(0, 0, W - 1, h - 1, 8, 8);
+
+		final int y = 7 + fm.getAscent() - 2;
+		shadowed(g, c.itemName, PAD, y, NAME);
+		paintVerdicts(g, c, fm, W, y);
+		if (!chartless)
+		{
+			paintChart(g, c, PAD, 7 + lineH + 2, W - 2 * PAD, chartH + 6, fm);
+		}
+		return new Dimension(W, h);
+	}
+
 	private static void paintChart(Graphics2D g, Context c, int x0, int y0, int cw, int ch, FontMetrics fm)
 	{
 		final int plotW = cw - PRICE_GUTTER;
 		final int plotH = ch - 8;   // room for the volume strip below
-		final ChartKit.Display d = ChartKit.build(c.series, plotW, c.yourPrice);
+		final ChartKit.Display d = ChartKit.build(c.series, plotW, c.youBuy, c.youSell);
 		if (d == null)
 		{
 			shadowed(g, "No trade history yet", x0 + 4, y0 + ch / 2, Palette.SUBTLE);
@@ -173,16 +223,32 @@ final class GeItemInfoPainter
 		ChartKit.paintCorridor(g, d, x0, y0, plotW, plotH);
 		ChartKit.paintFillStrip(g, d, x0, y0 + plotH + 2, plotW, 5);
 
-		// Your offer: the one line that matters, labeled with the exact number.
-		if (c.yourPrice > 0)
+		// Your offers: labeled with the exact numbers. When both sides ride
+		// the same chart, the label says which is which.
+		// Label colors follow the corridor edge each side competes on: your
+		// sell fills against the green insta-buy edge, your buy against the
+		// red insta-sell edge. Spatial match beats color morality.
+		final boolean both = c.youBuy > 0 && c.youSell > 0;
+		if (c.youSell > 0)
 		{
-			final int yy = Math.round(ChartKit.y(d, c.yourPrice, y0, plotH));
-			g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{3f, 3f}, 0f));
-			g.setColor(YOURS);
-			g.drawLine(x0, yy, x0 + plotW, yy);
-			g.setStroke(new BasicStroke(1f));
-			shadowed(g, "you " + Fmt.compact(c.yourPrice), x0 + plotW + 3, yy + 4, Color.WHITE);
+			yourLine(g, d, c.youSell, (both ? "sell " : "you ") + Fmt.compact(c.youSell),
+				both ? Palette.GREEN : Color.WHITE, x0, y0, plotW, plotH);
 		}
+		if (c.youBuy > 0)
+		{
+			yourLine(g, d, c.youBuy, (both ? "buy " : "you ") + Fmt.compact(c.youBuy),
+				both ? Palette.RED : Color.WHITE, x0, y0, plotW, plotH);
+		}
+	}
+
+	private static void yourLine(Graphics2D g, ChartKit.Display d, long price, String label, Color labelColor, int x0, int y0, int plotW, int plotH)
+	{
+		final int yy = Math.round(ChartKit.y(d, price, y0, plotH));
+		g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{3f, 3f}, 0f));
+		g.setColor(YOURS);
+		g.drawLine(x0, yy, x0 + plotW, yy);
+		g.setStroke(new BasicStroke(1f));
+		shadowed(g, label, x0 + plotW + 3, yy + 4, labelColor);
 	}
 
 	private static void shadowed(Graphics2D g, String s, int x, int yy, Color c)

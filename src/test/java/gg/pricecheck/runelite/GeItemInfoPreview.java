@@ -52,7 +52,7 @@ public final class GeItemInfoPreview
 
 		final GeItemInfoPainter.Context c = new GeItemInfoPainter.Context();
 		c.itemName = "Heavy ballista";
-		c.yourPrice = 1_050_000;
+		c.youSell = 1_050_000;
 		c.stateText = "OK +26.2k";
 		c.stateColor = Palette.GREEN;
 		c.series = s;
@@ -85,5 +85,59 @@ public final class GeItemInfoPreview
 		g.dispose();
 		ImageIO.write(img, "png", new File(out));
 		System.out.println("wrote " + out);
+
+		// Second scene: the grid stack, one compact card per distinct item.
+		// Antifire rides both sides on one chart; the second card is a single
+		// sell with no chart yet (loading state).
+		final GeItemInfoPainter.Context g1 = new GeItemInfoPainter.Context();
+		g1.itemName = "Extended super antifire(4)";
+		g1.youBuy = 18_140;
+		g1.youSell = 18_760;
+		g1.stateText = "OK +394";
+		g1.stateColor = Palette.GREEN;
+		g1.stateText2 = "OK +317";
+		g1.stateColor2 = Palette.GREEN;
+		final ItemChart.Series cs = new ItemChart.Series();
+		final int cn = 288;
+		cs.ts = new long[cn];
+		cs.high = new long[cn];
+		cs.low = new long[cn];
+		cs.hvol = new int[cn];
+		cs.lvol = new int[cn];
+		for (int i = 0; i < cn; i++)
+		{
+			cs.ts[i] = t0 + i * 300L;
+			final double wobble = Math.sin(i / 13.0) * 160 + Math.sin(i / 47.0) * 260;
+			final long mid = 18_400 + (long) wobble;
+			final long spread = 420 + (i % 7) * 40;
+			if (i % 17 == 5)
+			{
+				continue;
+			}
+			cs.high[i] = mid + spread / 2;
+			cs.low[i] = mid - spread / 2;
+			cs.hvol[i] = 40 + (i * 13) % 90;
+			cs.lvol[i] = 35 + (i * 7) % 80;
+		}
+		g1.series = cs;
+		final GeItemInfoPainter.Context g2c = new GeItemInfoPainter.Context();
+		g2c.itemName = "Rune platebody";
+		g2c.youSell = 38_900;
+		g2c.stateText = "OK +512";
+		g2c.stateColor = Palette.GREEN;
+
+		final BufferedImage img2 = new BufferedImage(320 * 2, 300 * 2, BufferedImage.TYPE_INT_RGB);
+		final Graphics2D gg = img2.createGraphics();
+		gg.scale(2, 2);
+		gg.setColor(new Color(0x49, 0x42, 0x36));
+		gg.fillRect(0, 0, 320, 300);
+		gg.translate(12, 10);
+		final java.awt.Dimension d1 = GeItemInfoPainter.paintCompact(gg, g1);
+		gg.translate(0, d1.height + 6);
+		GeItemInfoPainter.paintCompact(gg, g2c);
+		gg.dispose();
+		final String out2 = out.replace(".png", "-stack.png");
+		ImageIO.write(img2, "png", new File(out2));
+		System.out.println("wrote " + out2);
 	}
 }
