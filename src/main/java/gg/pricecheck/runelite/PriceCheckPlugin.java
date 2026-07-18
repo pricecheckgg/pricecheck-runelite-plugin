@@ -617,7 +617,9 @@ public class PriceCheckPlugin extends Plugin
 		final FlipLogEngine engine = flipLog;
 		if (engine != null)
 		{
-			p.setFlipLog(engine.summary(), syncEnabled());
+			final FlipLogEngine.Summary logSummary = engine.summary();
+			p.setFlipLog(logSummary, syncEnabled());
+			openLots = logSummary.openLots != null ? logSummary.openLots : Collections.emptyList();
 		}
 		final GeChatboxHelper g = geHelper;
 		if (g != null)
@@ -935,6 +937,29 @@ public class PriceCheckPlugin extends Plugin
 	boolean marketDataOk()
 	{
 		return marketDataOk;
+	}
+
+	// Open lots from the flip log, refreshed with the panel cycle: the GE
+	// cards draw your cost basis from them.
+	private volatile List<FlipLogEngine.Lot> openLots = Collections.emptyList();
+
+	/** Aggregated holding for one item: {qty, totalCost, earliestOpenedAtMs},
+	 * or null when nothing is held. */
+	long[] holdingFor(int geId)
+	{
+		long qty = 0;
+		long cost = 0;
+		long opened = Long.MAX_VALUE;
+		for (final FlipLogEngine.Lot l : openLots)
+		{
+			if (l.itemId == geId && l.qty > 0)
+			{
+				qty += l.qty;
+				cost += l.cost;
+				opened = Math.min(opened, l.openedAt);
+			}
+		}
+		return qty > 0 ? new long[]{qty, cost, opened} : null;
 	}
 
 	// ── per-slot waiting clock ──

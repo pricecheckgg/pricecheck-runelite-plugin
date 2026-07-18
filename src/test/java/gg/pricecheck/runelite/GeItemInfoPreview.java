@@ -120,6 +120,10 @@ public final class GeItemInfoPreview
 			cs.lvol[i] = 35 + (i * 7) % 80;
 		}
 		g1.series = cs;
+		// An open position bought mid-window, in profit at the edge.
+		g1.lotQty = 120;
+		g1.lotCost = 120 * 18_050L;
+		g1.lotOpenedAtMs = (t0 + 96 * 300L) * 1000L;
 		final GeItemInfoPainter.Context g2c = new GeItemInfoPainter.Context();
 		g2c.itemName = "Rune platebody";
 		g2c.youSells = new long[]{38_900};

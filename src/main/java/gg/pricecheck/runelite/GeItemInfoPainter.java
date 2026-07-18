@@ -52,6 +52,10 @@ final class GeItemInfoPainter
 		String outcomeText;        // bottom line, prebuilt by the caller
 		Color outcomeColor;
 		long nowTs;
+		// Your open position from the flip log: what you hold and paid.
+		long lotQty;
+		long lotCost;              // total gp paid
+		long lotOpenedAtMs;
 
 		long refSell()
 		{
@@ -89,7 +93,9 @@ final class GeItemInfoPainter
 
 		final int lineH = fm.getHeight();
 		final int tapeRows = Math.min(c.prints != null ? c.prints.size() : 0, 4);
-		final int h = PAD + lineH + 6 + CHART_H + 6 + (tapeRows > 0 ? tapeRows * 13 + 14 : 0) + 2 * lineH + PAD + 2;
+		final boolean holding = c.lotQty > 0;
+		final int h = PAD + lineH + 6 + CHART_H + 6 + (tapeRows > 0 ? tapeRows * 13 + 14 : 0)
+			+ (holding ? lineH : 0) + 2 * lineH + PAD + 2;
 
 		g.setColor(Palette.INK);
 		g.fillRoundRect(0, 0, W - 1, h - 1, 8, 8);
@@ -157,6 +163,23 @@ final class GeItemInfoPainter
 			y += tapeRows * 13 + 2;
 		}
 
+		// Your position, priced at the live edge.
+		if (holding)
+		{
+			final long unit = c.lotCost / c.lotQty;
+			String hold = "Holding " + Fmt.full(c.lotQty) + " @ " + Fmt.compact(unit);
+			Color holdCol = Palette.SUBTLE;
+			final long edge = lastHighOf(c.series);
+			if (edge > 0)
+			{
+				final long pnl = c.lotQty * GeTax.net(unit, edge);
+				hold += " · " + (pnl >= 0 ? "+" : "") + Fmt.compact(pnl) + " after tax at the bid";
+				holdCol = pnl >= 0 ? Palette.GREEN : Palette.RED;
+			}
+			shadowed(g, hold, PAD, y + fm.getAscent(), holdCol);
+			y += lineH;
+		}
+
 		// The measured read, in plain words.
 		if (c.fillPct >= 0)
 		{
@@ -222,9 +245,11 @@ final class GeItemInfoPainter
 	{
 		final int plotW = cw - PRICE_GUTTER;
 		final int plotH = ch - 8;   // room for the volume strip below
-		final long[] scalePrices = new long[c.youBuys.length + c.youSells.length];
+		final long lotUnit = c.lotQty > 0 ? c.lotCost / c.lotQty : 0;
+		final long[] scalePrices = new long[c.youBuys.length + c.youSells.length + 1];
 		System.arraycopy(c.youBuys, 0, scalePrices, 0, c.youBuys.length);
 		System.arraycopy(c.youSells, 0, scalePrices, c.youBuys.length, c.youSells.length);
+		scalePrices[scalePrices.length - 1] = lotUnit;
 		final ChartKit.Display d = ChartKit.build(c.series, plotW, scalePrices);
 		if (d == null)
 		{
@@ -280,6 +305,38 @@ final class GeItemInfoPainter
 		{
 			occupied.add(new int[]{t[1] - chipH / 2 - 1, t[1] + chipH / 2 + 1});
 		}
+		// Your open position: the cost basis as a quiet dotted line on the
+		// plot with a diamond at the entry, warm gold when the live edge
+		// covers your breakeven after tax, dim red when underwater. No
+		// gutter label; the plot placement IS the information.
+		if (lotUnit > 0)
+		{
+			final boolean covered = d.lastHigh > 0 && d.lastHigh >= GeTax.breakevenSell(lotUnit);
+			final Color basis = covered
+				? new Color(0xe6, 0xc6, 0x67, 130)
+				: new Color(0xf2, 0x6b, 0x6d, 100);
+			final int by = Math.round(ChartKit.y(d, lotUnit, y0, plotH));
+			final long entryTs = c.lotOpenedAtMs / 1000L;
+			final int bx = entryTs <= d.tMin ? x0
+				: Math.round(ChartKit.x(d, Math.min(entryTs, d.tMax), x0, plotW));
+			g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{2f, 4f}, 0f));
+			g.setColor(basis);
+			g.drawLine(bx, by, x0 + plotW, by);
+			g.setStroke(new BasicStroke(1f));
+			final Path2D diamond = new Path2D.Float();
+			diamond.moveTo(bx, by - 4);
+			diamond.lineTo(bx + 4, by);
+			diamond.lineTo(bx, by + 4);
+			diamond.lineTo(bx - 4, by);
+			diamond.closePath();
+			g.setColor(SHADOW);
+			g.translate(1, 1);
+			g.fill(diamond);
+			g.translate(-1, -1);
+			g.setColor(basis);
+			g.fill(diamond);
+		}
+
 		paintLastPrint(g, d, true, x0, y0, plotW, plotH, fm2, occupied);
 		paintLastPrint(g, d, false, x0, y0, plotW, plotH, fm2, occupied);
 
@@ -363,6 +420,22 @@ final class GeItemInfoPainter
 		}
 		occupied.add(new int[]{ly - fm.getAscent(), ly + 2});
 		shadowed(g, Fmt.compact(price), x0 + plotW + 6, ly, col);
+	}
+
+	private static long lastHighOf(ItemChart.Series s)
+	{
+		if (s == null || s.high == null)
+		{
+			return 0;
+		}
+		for (int i = s.high.length - 1; i >= 0; i--)
+		{
+			if (s.high[i] > 0)
+			{
+				return s.high[i];
+			}
+		}
+		return 0;
 	}
 
 	private static boolean isFree(java.util.List<int[]> occupied, int top, int bottom)

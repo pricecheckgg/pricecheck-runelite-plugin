@@ -334,6 +334,13 @@ class GeItemCardOverlay extends Overlay
 		c.itemName = live != null && live.getName() != null ? live.getName() : ("#" + geId);
 		c.nowTs = System.currentTimeMillis() / 1000L;
 		c.prints = plugin.cardPrintsFor(geId);
+		final long[] holding = plugin.holdingFor(geId);
+		if (holding != null)
+		{
+			c.lotQty = holding[0];
+			c.lotCost = holding[1];
+			c.lotOpenedAtMs = holding[2];
+		}
 		if (withSeries)
 		{
 			final PriceCheckApiClient.SeriesData sd = plugin.cardSeriesFor(geId);
