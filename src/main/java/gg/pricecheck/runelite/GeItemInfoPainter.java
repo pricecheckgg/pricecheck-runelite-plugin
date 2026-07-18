@@ -55,10 +55,6 @@ final class GeItemInfoPainter
 	private static final Color RULE = new Color(0xe6, 0xc6, 0x67, 38);
 	private static final Color SHADOW = new Color(0, 0, 0, 180);
 	private static final Color NAME = new Color(0xde, 0xd8, 0xc8);
-	private static final Color CORRIDOR = new Color(255, 255, 255, 22);
-	private static final Color CORRIDOR_PAID = new Color(0xe6, 0xc6, 0x67, 58);
-	private static final Color LINE_HIGH = new Color(0x5d, 0xf2, 0x9a, 170);
-	private static final Color LINE_LOW = new Color(0xf2, 0x6b, 0x6d, 170);
 	private static final Color YOURS = new Color(255, 255, 255, 220);
 
 	private static final int W = 284;
@@ -164,83 +160,29 @@ final class GeItemInfoPainter
 
 	private static void paintChart(Graphics2D g, Context c, int x0, int y0, int cw, int ch, FontMetrics fm)
 	{
-		final ItemChart.Series d = c.series;
-		if (d == null || d.ts == null || d.ts.length < 2)
+		final int plotW = cw - PRICE_GUTTER;
+		final int plotH = ch - 8;   // room for the volume strip below
+		final ChartKit.Display d = ChartKit.build(c.series, plotW, c.yourPrice);
+		if (d == null)
 		{
 			shadowed(g, "No trade history yet", x0 + 4, y0 + ch / 2, Palette.SUBTLE);
 			return;
 		}
-		final int n = d.ts.length;
-		final int plotW = cw - PRICE_GUTTER;
 
-		long min = Long.MAX_VALUE;
-		long max = Long.MIN_VALUE;
-		for (int i = 0; i < n; i++)
-		{
-			if (d.low[i] > 0) { min = Math.min(min, d.low[i]); }
-			if (d.high[i] > 0) { max = Math.max(max, d.high[i]); }
-		}
-		if (c.yourPrice > 0) { min = Math.min(min, c.yourPrice); max = Math.max(max, c.yourPrice); }
-		if (min >= max) { min = max - 1; }
-		final long span = max - min;
-		min -= span / 10;
-		max += span / 10;
-
-		final float dx = plotW / (float) (n - 1);
-
-		for (int i = 0; i < n - 1; i++)
-		{
-			if (d.high[i] <= 0 || d.low[i] <= 0 || d.high[i + 1] <= 0 || d.low[i + 1] <= 0)
-			{
-				continue;
-			}
-			final Path2D p = new Path2D.Float();
-			p.moveTo(x0 + i * dx, y(d.high[i], min, max, y0, ch));
-			p.lineTo(x0 + (i + 1) * dx, y(d.high[i + 1], min, max, y0, ch));
-			p.lineTo(x0 + (i + 1) * dx, y(d.low[i + 1], min, max, y0, ch));
-			p.lineTo(x0 + i * dx, y(d.low[i], min, max, y0, ch));
-			p.closePath();
-			g.setColor(GeTax.net(d.low[i] + 1, d.high[i] - 1) > 0 ? CORRIDOR_PAID : CORRIDOR);
-			g.fill(p);
-		}
-		g.setStroke(new BasicStroke(1.1f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-		line(g, d.high, LINE_HIGH, x0, y0, ch, dx, min, max);
-		line(g, d.low, LINE_LOW, x0, y0, ch, dx, min, max);
+		ChartKit.paintPriceGrid(g, d, fm, x0, y0, plotW, plotH, Palette.SUBTLE);
+		ChartKit.paintCorridor(g, d, x0, y0, plotW, plotH);
+		ChartKit.paintFillStrip(g, d, x0, y0 + plotH + 2, plotW, 5);
 
 		// Your offer: the one line that matters, labeled with the exact number.
 		if (c.yourPrice > 0)
 		{
-			final int yy = Math.round(y(c.yourPrice, min, max, y0, ch));
+			final int yy = Math.round(ChartKit.y(d, c.yourPrice, y0, plotH));
 			g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{3f, 3f}, 0f));
 			g.setColor(YOURS);
 			g.drawLine(x0, yy, x0 + plotW, yy);
 			g.setStroke(new BasicStroke(1f));
 			shadowed(g, "you " + Fmt.compact(c.yourPrice), x0 + plotW + 3, yy + 4, Color.WHITE);
 		}
-	}
-
-	private static void line(Graphics2D g, long[] v, Color col, int x0, int y0, int ch, float dx, long min, long max)
-	{
-		g.setColor(col);
-		Path2D p = null;
-		for (int i = 0; i < v.length; i++)
-		{
-			if (v[i] <= 0)
-			{
-				if (p != null) { g.draw(p); p = null; }
-				continue;
-			}
-			final float x = x0 + i * dx;
-			final float yy = y(v[i], min, max, y0, ch);
-			if (p == null) { p = new Path2D.Float(); p.moveTo(x, yy); }
-			else { p.lineTo(x, yy); }
-		}
-		if (p != null) { g.draw(p); }
-	}
-
-	private static float y(long v, long min, long max, int y0, int ch)
-	{
-		return y0 + ch - ((v - min) / (float) (max - min)) * ch;
 	}
 
 	private static void shadowed(Graphics2D g, String s, int x, int yy, Color c)
