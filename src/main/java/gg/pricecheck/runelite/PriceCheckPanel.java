@@ -1602,14 +1602,20 @@ class PriceCheckPanel extends PluginPanel
 			}
 			acctName.setText(acct.getUsername() != null ? acct.getUsername() : "PriceCheck member");
 			final String plan = acct.getPlan() == null ? "" : acct.getPlan();
-			final String pill = !acct.isPremium() ? "FREE"
+			final String pill = acct.isTrial() ? "TRIAL"
+				: !acct.isPremium() ? "FREE"
 				: ("pro".equals(plan) || "premium".equals(plan)) ? "TRADER PRO" : "TRADER";
 			acctPlan.setText(" " + pill + " ");
 			// License line: what the plan is doing and when it runs out. "Renews"
 			// for a live subscription, "left" for comped/prepaid time, no date talk
 			// for a lifetime grant. The watchlist count rides along at the end.
 			String lic;
-			if (!acct.isPremium())
+			if (acct.isTrial())
+			{
+				lic = "Trial · day " + Math.max(1, acct.getTrialDay()) + " of " + Math.max(1, acct.getTrialDays())
+					+ " · " + acct.getTrialRemainingMin() + "m left today";
+			}
+			else if (!acct.isPremium())
 			{
 				lic = "Free plan";
 			}

@@ -14,4 +14,9 @@ public class AccountInfo
 	private int trackedCount;
 	private Long expiresAt;      // license end, epoch ms; null = no expiry
 	private String source;       // how it is paid: "stripe" renews, anything else just runs out
+	// Trial shape, when the entitlement is a trial: 1 metered hour a day.
+	private boolean trial;
+	private int trialRemainingMin;
+	private int trialDay;
+	private int trialDays;
 }
