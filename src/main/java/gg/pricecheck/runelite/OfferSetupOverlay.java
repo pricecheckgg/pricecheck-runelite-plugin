@@ -21,11 +21,11 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 /**
  * The "type THIS" overlay. On the Grand Exchange Set-up-offer screen it reads the
  * item you're pricing and the live market, then shows the exact price to type in
- * the Price-per-item field. Renders as ONE compact chip straddling the top edge
- * of the field's ring, so the only thing it can cover is the static
- * "Price per item:" caption, never the item description or the presets. The
- * ring colour carries the state: gold = here's the price, red = what you typed
- * will not fill, amber = it fills but you're giving margin away.
+ * the Price-per-item field. Renders as ONE compact chip sitting fully below the
+ * field's ring, caret pointing up at the field, so it never covers the typed
+ * price, the item name, or the presets. The ring colour carries the state:
+ * gold = here's the price, red = what you typed will not fill, amber = it
+ * fills but you're giving margin away.
  */
 class OfferSetupOverlay extends Overlay
 {
@@ -195,15 +195,15 @@ class OfferSetupOverlay extends Overlay
 		g.drawRoundRect(b.x - 2, b.y - 2, b.width + 3, b.height + 3, 8, 8);
 	}
 
-	// ── chip layout: one line, straddling the ring's top edge ──
+	// ── chip layout: one line, fully below the ring ──
 	private void drawChip(Graphics2D g, Rectangle field, Color border, Line ln)
 	{
 		final int w = ln.width() + PAD * 2;
 		final int h = ln.height() + 4;
 
-		// Centre on the field, clamp to the canvas; straddle the TOP edge of the
-		// ring so the chip covers the caption row above the field, never the
-		// item description or the preset buttons.
+		// Centre on the field, clamp to the canvas; sit fully BELOW the ring
+		// with the caret bridging the gap, so nothing the player reads is
+		// covered: not the typed price, not the item name above it.
 		int x = field.x + (field.width - w) / 2;
 		final int cw = client.getCanvasWidth();
 		if (cw > 0 && x + w > cw - 2)
@@ -214,11 +214,12 @@ class OfferSetupOverlay extends Overlay
 		{
 			x = 2;
 		}
-		int y = field.y - h + 4;
-		final boolean above = y >= 2;
-		if (!above)
+		int y = field.y + field.height + 7;
+		final int ch = client.getCanvasHeight();
+		final boolean above = ch > 0 && y + h > ch - 2;
+		if (above)
 		{
-			y = field.y + field.height - 4;   // no room above: straddle the bottom edge
+			y = field.y - h - 9;   // no room below: sit fully above the ring
 		}
 
 		g.translate(1, 1);
