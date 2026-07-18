@@ -775,10 +775,11 @@ public class PriceCheckPlugin extends Plugin
 		}
 	};
 	private final Set<Integer> seriesFetching = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
-	private final java.util.ArrayDeque<GeItemInfoPainter.Print> cardPrints = new java.util.ArrayDeque<>();
-	private int printsItemId = 0;
-	private long printsLastHigh = 0;
-	private long printsLastLow = 0;
+	// Prints per item: every advisor poll where an item's insta price moved is
+	// one observed trade. Tracks all items the poll fetches (your offers plus
+	// the viewed item), bounded per item, pruned when an item leaves the set.
+	private final Map<Integer, java.util.ArrayDeque<GeItemInfoPainter.Print>> cardPrints = new java.util.HashMap<>();
+	private final Map<Integer, long[]> printsLast = new java.util.HashMap<>();
 
 	/** Called from the card overlay's render with whatever item the open GE
 	 * screen shows (0 = none). Schedules the series fetch on change. */
@@ -855,53 +856,50 @@ public class PriceCheckPlugin extends Plugin
 	{
 		synchronized (cardPrints)
 		{
-			if (geId != printsItemId)
-			{
-				return Collections.emptyList();
-			}
-			return new ArrayList<>(cardPrints);
+			final java.util.ArrayDeque<GeItemInfoPainter.Print> q = cardPrints.get(geId);
+			return q == null ? Collections.emptyList() : new ArrayList<>(q);
 		}
 	}
 
-	/** One advisor poll's worth of print detection for the viewed item. */
+	/** One advisor poll's worth of print detection across the fetched items. */
 	private void samplePrints(Map<Integer, FlipData> live)
 	{
-		final int geId = viewedItemId;
-		if (geId <= 0)
-		{
-			return;
-		}
-		final FlipData f = live.get(geId);
-		if (f == null)
-		{
-			return;
-		}
 		final long now = System.currentTimeMillis() / 1000L;
 		synchronized (cardPrints)
 		{
-			if (printsItemId != geId)
+			cardPrints.keySet().retainAll(live.keySet());
+			printsLast.keySet().retainAll(live.keySet());
+			for (final Map.Entry<Integer, FlipData> e : live.entrySet())
 			{
-				printsItemId = geId;
-				cardPrints.clear();
-				printsLastHigh = f.getSell();
-				printsLastLow = f.getBuy();
-				return;
-			}
-			// The high moving = someone insta-bought at the new high; the low
-			// moving = someone insta-sold into the new low.
-			if (f.getSell() > 0 && f.getSell() != printsLastHigh)
-			{
-				cardPrints.addLast(new GeItemInfoPainter.Print(now, f.getSell(), true));
-				printsLastHigh = f.getSell();
-			}
-			if (f.getBuy() > 0 && f.getBuy() != printsLastLow)
-			{
-				cardPrints.addLast(new GeItemInfoPainter.Print(now, f.getBuy(), false));
-				printsLastLow = f.getBuy();
-			}
-			while (cardPrints.size() > 24)
-			{
-				cardPrints.removeFirst();
+				final FlipData f = e.getValue();
+				if (f == null)
+				{
+					continue;
+				}
+				final long[] last = printsLast.get(e.getKey());
+				if (last == null)
+				{
+					printsLast.put(e.getKey(), new long[]{f.getSell(), f.getBuy()});
+					continue;
+				}
+				final java.util.ArrayDeque<GeItemInfoPainter.Print> q =
+					cardPrints.computeIfAbsent(e.getKey(), k -> new java.util.ArrayDeque<>());
+				// The high moving = someone insta-bought at the new high; the
+				// low moving = someone insta-sold into the new low.
+				if (f.getSell() > 0 && f.getSell() != last[0])
+				{
+					q.addLast(new GeItemInfoPainter.Print(now, f.getSell(), true));
+					last[0] = f.getSell();
+				}
+				if (f.getBuy() > 0 && f.getBuy() != last[1])
+				{
+					q.addLast(new GeItemInfoPainter.Print(now, f.getBuy(), false));
+					last[1] = f.getBuy();
+				}
+				while (q.size() > 24)
+				{
+					q.removeFirst();
+				}
 			}
 		}
 	}

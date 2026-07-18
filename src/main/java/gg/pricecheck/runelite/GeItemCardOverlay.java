@@ -5,8 +5,11 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.runelite.api.Client;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
@@ -18,24 +21,25 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * The evidence cards beside the open Grand Exchange interface. Three views:
- * an offer's status screen and the set-up screen get the full card for that
- * item; the main grid gets one COMPACT card per distinct item across your
- * offers, buy and sell lines together on one chart when you ride both sides.
- * Hold Shift and a [-]/[+] appears on the top card: click it to collapse the
- * stack to slim verdict bars; the choice persists. Shift alone still peeks
- * on the single-item views, where the card can cover the world.
+ * The evidence cards beside the open Grand Exchange interface. The offer
+ * status and set-up screens get the full card for their item; the main grid
+ * gets one card per distinct item across your offers, every offer tagged on
+ * its chart with a side letter, one card even when you ride both sides.
+ * Hold Shift and each card grows a [+]/[-]: expand any card to the full
+ * evidence view (big chart, trades tape, measured reads) in place; the top
+ * card also keeps the stack-wide collapse to slim verdict bars. Expansion is
+ * per session; the collapse choice persists.
  */
 class GeItemCardOverlay extends Overlay
 {
 	private static final int GE_GROUP = 465;
 	private static final int[] SETUP_PANELS = { 15, 26 };
 	private static final int GE_SELECTED_SLOT_VARBIT = 4439;
-	private static final java.util.regex.Pattern PRICE = java.util.regex.Pattern.compile("^[0-9,]+ coins$");
 	private static final int CARD_W = 284;
 	private static final int BTN = 14;
 	private static final int MAX_CHARTED = 4;
 	private static final String COLLAPSED_KEY = "geCardsCollapsed";
+	private static final java.util.regex.Pattern PRICE = java.util.regex.Pattern.compile("^[0-9,]+ coins$");
 
 	private final Client client;
 	private final PriceCheckPlugin plugin;
@@ -43,8 +47,9 @@ class GeItemCardOverlay extends Overlay
 	private final ConfigManager configManager;
 
 	private boolean collapsed;
-	// Canvas-space hit box for the [-]/[+], valid only while Shift is held.
-	private volatile Rectangle toggleBounds;
+	private final Set<Integer> expandedItems = new java.util.HashSet<>();
+	// Canvas-space buttons drawn this frame, valid only while Shift is held.
+	private volatile List<Object[]> buttons = java.util.Collections.emptyList();
 
 	GeItemCardOverlay(Client client, PriceCheckPlugin plugin, PriceCheckConfig config, ConfigManager configManager)
 	{
@@ -58,31 +63,35 @@ class GeItemCardOverlay extends Overlay
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
 	}
 
-	/** Mouse hook from the plugin: toggles the stack when the button is visible. */
+	/** Mouse hook from the plugin: runs whichever button was clicked. */
 	boolean handleClick(Point p, boolean shiftHeld)
 	{
-		final Rectangle t = toggleBounds;
-		if (!shiftHeld || t == null || p == null || !t.contains(p))
+		if (!shiftHeld || p == null)
 		{
 			return false;
 		}
-		collapsed = !collapsed;
-		configManager.setConfiguration(PriceCheckConfig.GROUP, COLLAPSED_KEY, collapsed);
-		return true;
+		for (final Object[] b : buttons)
+		{
+			if (((Rectangle) b[0]).contains(p))
+			{
+				((Runnable) b[1]).run();
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
 	public Dimension render(Graphics2D g)
 	{
-		toggleBounds = null;
+		final List<Object[]> hits = new ArrayList<>();
+		buttons = hits;
 		if (!config.geItemCard() || !plugin.isGrandExchangeOpen())
 		{
 			plugin.noteViewedItem(0);
 			return null;
 		}
 
-		// Which view is up? A selected slot wins, then a visible setup panel,
-		// else the main grid.
 		final GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
 		int slotIdx = -1;
 		final int slotVal = client.getVarbitValue(GE_SELECTED_SLOT_VARBIT);
@@ -114,7 +123,9 @@ class GeItemCardOverlay extends Overlay
 			{
 				return null;
 			}
-			paintFull(g, anchor, geId, slotIdx, offers, 0, false);
+			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
+			addViewOutcome(c, offers[slotIdx]);
+			paintAt(g, anchor.x, anchor.y, () -> GeItemInfoPainter.paint(g, c));
 			return null;
 		}
 		if (setupPanel != null && plugin.setupItem() > 0)
@@ -150,37 +161,46 @@ class GeItemCardOverlay extends Overlay
 					entered = digits.isEmpty() ? 0 : Long.parseLong(digits);
 				}
 			}
-			paintFull(g, anchor, geId, -1, offers, entered, sellSide);
+			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
+			if (entered > 0)
+			{
+				if (sellSide)
+				{
+					c.youSells = append(c.youSells, entered);
+					c.outcomeText = "Nets " + Fmt.full(GeTax.net(0, entered)) + " after tax if it sells";
+					c.outcomeColor = Palette.LIGHT;
+				}
+				else
+				{
+					c.youBuys = append(c.youBuys, entered);
+					final FlipData live = plugin.liveFor(geId);
+					if (live != null && live.getSell() > 0)
+					{
+						final long m = GeTax.net(entered, live.getSell());
+						c.outcomeText = "Resells at market for " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
+						c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
+					}
+				}
+			}
+			paintAt(g, anchor.x, anchor.y, () -> GeItemInfoPainter.paint(g, c));
 			return null;
 		}
 
-		// Main grid: one compact card per distinct item across your offers.
+		// Main grid: one card per distinct item across your offers.
 		plugin.noteViewedItem(0);
 		if (offers == null)
 		{
 			return null;
 		}
-		final Map<Integer, long[]> byItem = new LinkedHashMap<>();   // geId -> {buyPrice, sellPrice, buySlot, sellSlot}
-		for (int i = 0; i < offers.length; i++)
+		final Map<Integer, Boolean> items = new LinkedHashMap<>();
+		for (final GrandExchangeOffer o : offers)
 		{
-			final GrandExchangeOffer o = offers[i];
-			if (o == null || o.getState() == GrandExchangeOfferState.EMPTY || o.getItemId() <= 0)
+			if (o != null && o.getState() != GrandExchangeOfferState.EMPTY && o.getItemId() > 0)
 			{
-				continue;
-			}
-			final long[] e = byItem.computeIfAbsent(o.getItemId(), k -> new long[]{0, 0, -1, -1});
-			if (isBuySide(o.getState()))
-			{
-				e[0] = o.getPrice();
-				e[2] = i;
-			}
-			else
-			{
-				e[1] = o.getPrice();
-				e[3] = i;
+				items.put(o.getItemId(), Boolean.TRUE);
 			}
 		}
-		if (byItem.isEmpty())
+		if (items.isEmpty())
 		{
 			return null;
 		}
@@ -188,53 +208,94 @@ class GeItemCardOverlay extends Overlay
 		final boolean shift = client.isKeyPressed(KeyCode.KC_SHIFT);
 		int y = anchor.y;
 		int idx = 0;
-		for (final Map.Entry<Integer, long[]> e : byItem.entrySet())
+		for (final int geId : items.keySet())
 		{
-			final int geId = e.getKey();
-			final long[] v = e.getValue();
-			final GeItemInfoPainter.Context c = new GeItemInfoPainter.Context();
-			final FlipData live = plugin.liveFor(geId);
-			c.itemName = live != null && live.getName() != null ? live.getName() : ("#" + geId);
-			c.youBuy = v[0];
-			c.youSell = v[1];
-			fillVerdicts(c, (int) v[2], (int) v[3]);
-			if (!collapsed && idx < MAX_CHARTED)
+			final boolean expanded = expandedItems.contains(geId);
+			final GeItemInfoPainter.Context c = buildContext(geId, offers, expanded);
+			final Dimension d;
+			final int yy = y;
+			if (expanded && !collapsed)
 			{
-				final PriceCheckApiClient.SeriesData sd = plugin.cardSeriesFor(geId);
-				c.series = toSeries(sd, live);
+				final FlipData live = plugin.liveFor(geId);
+				if (c.outcomeText == null && live != null)
+				{
+					final long m = live.getProfit();
+					c.outcomeText = "Board margin " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
+					c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
+				}
+				d = paintAt(g, anchor.x, yy, () -> GeItemInfoPainter.paint(g, c));
 			}
-			g.translate(anchor.x, y);
-			final Dimension d = GeItemInfoPainter.paintCompact(g, c);
-			if (idx == 0 && shift)
+			else
 			{
-				paintToggle(g, d.width, anchor.x, y);
+				if (collapsed || idx >= MAX_CHARTED)
+				{
+					c.series = null;
+				}
+				d = paintAt(g, anchor.x, yy, () -> GeItemInfoPainter.paintCompact(g, c));
 			}
-			g.translate(-anchor.x, -y);
+			if (shift)
+			{
+				// Per-card grow or shrink; the top card also carries the
+				// stack-wide bars toggle to its left.
+				final int bx = d.width - BTN - 4;
+				paintButton(g, anchor.x + bx, yy + 4, expanded);
+				hits.add(new Object[]{new Rectangle(anchor.x + bx, yy + 4, BTN, BTN), (Runnable) () ->
+				{
+					if (expandedItems.contains(geId))
+					{
+						expandedItems.remove(geId);
+					}
+					else
+					{
+						expandedItems.add(geId);
+					}
+				}});
+				if (idx == 0)
+				{
+					final int bx2 = bx - BTN - 6;
+					paintBarsButton(g, anchor.x + bx2, yy + 4);
+					hits.add(new Object[]{new Rectangle(anchor.x + bx2, yy + 4, BTN, BTN), (Runnable) () ->
+					{
+						collapsed = !collapsed;
+						configManager.setConfiguration(PriceCheckConfig.GROUP, COLLAPSED_KEY, collapsed);
+					}});
+				}
+			}
 			y += d.height + 6;
 			idx++;
 		}
 		return null;
 	}
 
-	private void paintFull(Graphics2D g, Point anchor, int geId, int slotIdx, GrandExchangeOffer[] offers, long setupPrice, boolean setupSell)
+	/** Everything both card sizes need for one item: series when asked, all
+	 * your offers as side tags, per-side verdicts with B/S prefixes. */
+	private GeItemInfoPainter.Context buildContext(int geId, GrandExchangeOffer[] offers, boolean withSeries)
 	{
-		final PriceCheckApiClient.SeriesData sd = plugin.cardSeriesFor(geId);
 		final FlipData live = plugin.liveFor(geId);
-
 		final GeItemInfoPainter.Context c = new GeItemInfoPainter.Context();
 		c.itemName = live != null && live.getName() != null ? live.getName() : ("#" + geId);
 		c.nowTs = System.currentTimeMillis() / 1000L;
 		c.prints = plugin.cardPrintsFor(geId);
-		c.series = toSeries(sd, live);
-		if (sd != null)
+		if (withSeries)
 		{
-			c.fillPct = sd.fillPct;
+			final PriceCheckApiClient.SeriesData sd = plugin.cardSeriesFor(geId);
+			if (sd != null && sd.ts != null && sd.ts.length >= 2)
+			{
+				final ItemChart.Series s = new ItemChart.Series();
+				s.ts = sd.ts;
+				s.high = sd.ah;
+				s.low = sd.al;
+				s.hvol = sd.hv;
+				s.lvol = sd.lv;
+				if (live != null)
+				{
+					s.quoteBuy = live.getBuy();
+					s.quoteSell = live.getSell();
+				}
+				c.series = s;
+				c.fillPct = sd.fillPct;
+			}
 		}
-
-		// Every side you have live on this item draws on the chart, whichever
-		// screen you opened it from.
-		long viewPrice = 0;
-		boolean viewBuying = false;
 		int buySlot = -1;
 		int sellSlot = -1;
 		if (offers != null)
@@ -248,77 +309,22 @@ class GeItemCardOverlay extends Overlay
 				}
 				if (isBuySide(o.getState()))
 				{
-					c.youBuy = o.getPrice();
-					buySlot = i;
+					c.youBuys = append(c.youBuys, o.getPrice());
+					if (buySlot < 0)
+					{
+						buySlot = i;
+					}
 				}
 				else
 				{
-					c.youSell = o.getPrice();
-					sellSlot = i;
-				}
-				if (i == slotIdx)
-				{
-					viewPrice = o.getPrice();
-					viewBuying = isBuySide(o.getState());
+					c.youSells = append(c.youSells, o.getPrice());
+					if (sellSlot < 0)
+					{
+						sellSlot = i;
+					}
 				}
 			}
 		}
-		fillVerdicts(c, buySlot, sellSlot);
-
-		// The price being typed on the setup screen tracks live and wins the
-		// tag for its side; the outcome line reads from it too.
-		if (setupPrice > 0)
-		{
-			if (setupSell)
-			{
-				c.youSell = setupPrice;
-				c.outcomeText = "Nets " + Fmt.full(GeTax.net(0, setupPrice)) + " after tax if it sells";
-				c.outcomeColor = Palette.LIGHT;
-			}
-			else
-			{
-				c.youBuy = setupPrice;
-				if (live != null && live.getSell() > 0)
-				{
-					final long m = GeTax.net(setupPrice, live.getSell());
-					c.outcomeText = "Resells at market for " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
-					c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
-				}
-			}
-		}
-
-		if (slotIdx >= 0 && viewPrice > 0)
-		{
-			if (viewBuying)
-			{
-				if (live != null && live.getSell() > 0)
-				{
-					final long m = GeTax.net(viewPrice, live.getSell());
-					c.outcomeText = "Resells at market for " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
-					c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
-				}
-			}
-			else
-			{
-				c.outcomeText = "Nets " + Fmt.full(GeTax.net(0, viewPrice)) + " after tax if it sells";
-				c.outcomeColor = Palette.LIGHT;
-			}
-		}
-		else if (c.outcomeText == null && live != null)
-		{
-			final long m = live.getProfit();
-			c.outcomeText = "Board margin " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
-			c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
-		}
-
-		g.translate(anchor.x, anchor.y);
-		GeItemInfoPainter.paint(g, c);
-		g.translate(-anchor.x, -anchor.y);
-	}
-
-	/** Advisor verdicts for this item's slots: buy side first, sell second. */
-	private void fillVerdicts(GeItemInfoPainter.Context c, int buySlot, int sellSlot)
-	{
 		for (final OfferAdvice a : plugin.getAdvice())
 		{
 			if (a.getKind() == OfferAdvice.Kind.NO_DATA)
@@ -327,16 +333,15 @@ class GeItemCardOverlay extends Overlay
 			}
 			if (a.getSlot() == buySlot && c.stateText == null)
 			{
-				c.stateText = a.getShortText();
+				c.stateText = "B " + a.getShortText();
 				c.stateColor = a.getColor();
 			}
 			else if (a.getSlot() == sellSlot && c.stateText2 == null)
 			{
-				c.stateText2 = a.getShortText();
+				c.stateText2 = "S " + a.getShortText();
 				c.stateColor2 = a.getColor();
 			}
 		}
-		// A single verdict reads better in the first seat.
 		if (c.stateText == null && c.stateText2 != null)
 		{
 			c.stateText = c.stateText2;
@@ -344,26 +349,75 @@ class GeItemCardOverlay extends Overlay
 			c.stateText2 = null;
 			c.stateColor2 = null;
 		}
+		return c;
 	}
 
-	private static ItemChart.Series toSeries(PriceCheckApiClient.SeriesData sd, FlipData live)
+	/** The outcome line for the offer whose status screen is open. */
+	private void addViewOutcome(GeItemInfoPainter.Context c, GrandExchangeOffer o)
 	{
-		if (sd == null || sd.ts == null || sd.ts.length < 2)
+		final long price = o.getPrice();
+		if (price <= 0)
 		{
-			return null;
+			return;
 		}
-		final ItemChart.Series s = new ItemChart.Series();
-		s.ts = sd.ts;
-		s.high = sd.ah;
-		s.low = sd.al;
-		s.hvol = sd.hv;
-		s.lvol = sd.lv;
-		if (live != null)
+		if (isBuySide(o.getState()))
 		{
-			s.quoteBuy = live.getBuy();
-			s.quoteSell = live.getSell();
+			final FlipData live = plugin.liveFor(o.getItemId());
+			if (live != null && live.getSell() > 0)
+			{
+				final long m = GeTax.net(price, live.getSell());
+				c.outcomeText = "Resells at market for " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
+				c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
+			}
 		}
-		return s;
+		else
+		{
+			c.outcomeText = "Nets " + Fmt.full(GeTax.net(0, price)) + " after tax if it sells";
+			c.outcomeColor = Palette.LIGHT;
+		}
+	}
+
+	private static Dimension paintAt(Graphics2D g, int x, int y, java.util.function.Supplier<Dimension> painter)
+	{
+		g.translate(x, y);
+		final Dimension d = painter.get();
+		g.translate(-x, -y);
+		return d;
+	}
+
+	private static long[] append(long[] arr, long v)
+	{
+		final long[] out = java.util.Arrays.copyOf(arr, arr.length + 1);
+		out[arr.length] = v;
+		return out;
+	}
+
+	private void paintButton(Graphics2D g, int x, int y, boolean expanded)
+	{
+		g.setColor(new Color(0, 0, 0, 170));
+		g.fillRoundRect(x, y, BTN, BTN, 4, 4);
+		g.setColor(Palette.GOLD);
+		g.drawRoundRect(x, y, BTN, BTN, 4, 4);
+		final int cx = x + BTN / 2;
+		final int cy = y + BTN / 2;
+		g.drawLine(cx - 3, cy, cx + 3, cy);
+		if (!expanded)
+		{
+			g.drawLine(cx, cy - 3, cx, cy + 3);
+		}
+	}
+
+	private void paintBarsButton(Graphics2D g, int x, int y)
+	{
+		g.setColor(new Color(0, 0, 0, 170));
+		g.fillRoundRect(x, y, BTN, BTN, 4, 4);
+		g.setColor(Palette.SUBTLE);
+		g.drawRoundRect(x, y, BTN, BTN, 4, 4);
+		// Three little bars: the collapse-the-stack glyph.
+		for (int i = 0; i < 3; i++)
+		{
+			g.drawLine(x + 3, y + 4 + i * 3, x + BTN - 4, y + 4 + i * 3);
+		}
 	}
 
 	private static Widget[] allChildren(Widget panel)
@@ -409,23 +463,5 @@ class GeItemCardOverlay extends Overlay
 			return new Point(x, Math.max(4, b.y));
 		}
 		return new Point(10, 120);
-	}
-
-	private void paintToggle(Graphics2D g, int cardW, int absX, int absY)
-	{
-		final int bx = cardW - BTN - 4;
-		final int by = 4;
-		g.setColor(new Color(0, 0, 0, 170));
-		g.fillRoundRect(bx, by, BTN, BTN, 4, 4);
-		g.setColor(Palette.GOLD);
-		g.drawRoundRect(bx, by, BTN, BTN, 4, 4);
-		final int cx = bx + BTN / 2;
-		final int cy = by + BTN / 2;
-		g.drawLine(cx - 3, cy, cx + 3, cy);
-		if (collapsed)
-		{
-			g.drawLine(cx, cy - 3, cx, cy + 3);
-		}
-		toggleBounds = new Rectangle(absX + bx, absY + by, BTN, BTN);
 	}
 }

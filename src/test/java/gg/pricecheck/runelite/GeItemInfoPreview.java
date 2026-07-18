@@ -52,7 +52,7 @@ public final class GeItemInfoPreview
 
 		final GeItemInfoPainter.Context c = new GeItemInfoPainter.Context();
 		c.itemName = "Heavy ballista";
-		c.youSell = 1_050_000;
+		c.youSells = new long[]{1_050_000};
 		c.stateText = "OK +26.2k";
 		c.stateColor = Palette.GREEN;
 		c.series = s;
@@ -91,8 +91,8 @@ public final class GeItemInfoPreview
 		// sell with no chart yet (loading state).
 		final GeItemInfoPainter.Context g1 = new GeItemInfoPainter.Context();
 		g1.itemName = "Extended super antifire(4)";
-		g1.youBuy = 18_140;
-		g1.youSell = 18_760;
+		g1.youBuys = new long[]{18_140};
+		g1.youSells = new long[]{18_760};
 		g1.stateText = "OK +394";
 		g1.stateColor = Palette.GREEN;
 		g1.stateText2 = "OK +317";
@@ -122,7 +122,7 @@ public final class GeItemInfoPreview
 		g1.series = cs;
 		final GeItemInfoPainter.Context g2c = new GeItemInfoPainter.Context();
 		g2c.itemName = "Rune platebody";
-		g2c.youSell = 38_900;
+		g2c.youSells = new long[]{38_900};
 		g2c.stateText = "OK +512";
 		g2c.stateColor = Palette.GREEN;
 

@@ -40,11 +40,11 @@ final class GeItemInfoPainter
 	static final class Context
 	{
 		String itemName;
-		long youBuy;          // your active buy offer price (0 = none)
-		long youSell;         // your active sell offer price (0 = none)
-		String stateText;     // e.g. "OK +26.2k"
+		long[] youBuys = {};   // your active buy offer prices
+		long[] youSells = {};  // your active sell offer prices
+		String stateText;      // e.g. "B OK +26.2k"
 		Color stateColor;
-		String stateText2;    // second verdict when both sides are live
+		String stateText2;     // second verdict when both sides are live
 		Color stateColor2;
 		ItemChart.Series series;
 		List<Print> prints;        // newest last
@@ -52,6 +52,16 @@ final class GeItemInfoPainter
 		String outcomeText;        // bottom line, prebuilt by the caller
 		Color outcomeColor;
 		long nowTs;
+
+		long refSell()
+		{
+			return youSells.length > 0 ? youSells[0] : 0;
+		}
+
+		long refBuy()
+		{
+			return youBuys.length > 0 ? youBuys[0] : 0;
+		}
 	}
 
 	private static final Color FRAME = new Color(0xe6, 0xc6, 0x67, 62);
@@ -63,7 +73,7 @@ final class GeItemInfoPainter
 	private static final int W = 284;
 	private static final int PAD = 10;
 	private static final int CHART_H = 108;
-	private static final int PRICE_GUTTER = 56;
+	private static final int PRICE_GUTTER = 66;
 
 	private GeItemInfoPainter()
 	{
@@ -135,8 +145,8 @@ final class GeItemInfoPainter
 				final String age = ago < 60 ? ago + "s ago" : (ago / 60) + "m ago";
 				// Deltas read against the side the print competes with: buys
 				// arriving compare to your sell, sells to your buy.
-				final long ref = p.buySide ? (c.youSell > 0 ? c.youSell : c.youBuy)
-					: (c.youBuy > 0 ? c.youBuy : c.youSell);
+				final long ref = p.buySide ? (c.refSell() > 0 ? c.refSell() : c.refBuy())
+					: (c.refBuy() > 0 ? c.refBuy() : c.refSell());
 				final String delta = ref > 0
 					? (p.price >= ref ? "+" : "-") + Fmt.compact(Math.abs(p.price - ref)) + " vs you"
 					: "";
@@ -212,7 +222,10 @@ final class GeItemInfoPainter
 	{
 		final int plotW = cw - PRICE_GUTTER;
 		final int plotH = ch - 8;   // room for the volume strip below
-		final ChartKit.Display d = ChartKit.build(c.series, plotW, c.youBuy, c.youSell);
+		final long[] scalePrices = new long[c.youBuys.length + c.youSells.length];
+		System.arraycopy(c.youBuys, 0, scalePrices, 0, c.youBuys.length);
+		System.arraycopy(c.youSells, 0, scalePrices, c.youBuys.length, c.youSells.length);
+		final ChartKit.Display d = ChartKit.build(c.series, plotW, scalePrices);
 		if (d == null)
 		{
 			shadowed(g, "No trade history yet", x0 + 4, y0 + ch / 2, Palette.SUBTLE);
@@ -225,69 +238,79 @@ final class GeItemInfoPainter
 
 		// Your offers: labeled with the exact numbers. When both sides ride
 		// the same chart, the label says which is which.
-		// Accent colors follow the corridor edge each side competes on: your
-		// sell fills against the green insta-buy edge, your buy against the
-		// red insta-sell edge. The tag carries just the number; the border
-		// color says which side. Tags nudge apart when the prices sit close.
-		final boolean both = c.youBuy > 0 && c.youSell > 0;
+		// Every one of your offers gets a tag. Accent colors follow the
+		// corridor edge each side competes on: sells against the green
+		// insta-buy edge, buys against the red insta-sell edge, and the
+		// chip's side letter says it in words. Tags sweep apart when they
+		// would overlap.
 		final FontMetrics fm2 = g.getFontMetrics();
 		final int chipH = fm2.getHeight() + 2;
-		int ySell = c.youSell > 0 ? Math.round(ChartKit.y(d, c.youSell, y0, plotH)) : Integer.MIN_VALUE;
-		int yBuy = c.youBuy > 0 ? Math.round(ChartKit.y(d, c.youBuy, y0, plotH)) : Integer.MIN_VALUE;
-		if (both && Math.abs(ySell - yBuy) < chipH + 2)
+		final java.util.List<int[]> tags = new java.util.ArrayList<>();   // {lineY, tagY, isSell, priceIdx}
+		final java.util.List<Long> prices = new java.util.ArrayList<>();
+		for (final long p : c.youSells)
 		{
-			final int mid = (ySell + yBuy) / 2;
-			if (ySell <= yBuy)
+			if (p > 0)
 			{
-				ySell = mid - chipH / 2 - 1;
-				yBuy = ySell + chipH + 2;
-			}
-			else
-			{
-				yBuy = mid - chipH / 2 - 1;
-				ySell = yBuy + chipH + 2;
+				tags.add(new int[]{Math.round(ChartKit.y(d, p, y0, plotH)), 0, 1, prices.size()});
+				prices.add(p);
 			}
 		}
-		if (c.youSell > 0)
+		for (final long p : c.youBuys)
 		{
-			yourLine(g, d, c.youSell, ySell, both ? Palette.GREEN : Color.WHITE, x0, y0, plotW, plotH, fm2, chipH);
+			if (p > 0)
+			{
+				tags.add(new int[]{Math.round(ChartKit.y(d, p, y0, plotH)), 0, 0, prices.size()});
+				prices.add(p);
+			}
 		}
-		if (c.youBuy > 0)
+		// Sweep top-down: each tag sits at its line unless the one above
+		// pushes it.
+		tags.sort((a, b) -> Integer.compare(a[0], b[0]));
+		int prevBottom = Integer.MIN_VALUE;
+		for (final int[] t : tags)
 		{
-			yourLine(g, d, c.youBuy, yBuy, both ? Palette.RED : Color.WHITE, x0, y0, plotW, plotH, fm2, chipH);
+			t[1] = Math.max(t[0], prevBottom + chipH / 2 + 1);
+			prevBottom = t[1] + chipH / 2 + 1;
+		}
+		for (final int[] t : tags)
+		{
+			yourLine(g, prices.get(t[3]), t[0], t[1], t[2] == 1, x0, plotW, fm2, chipH);
 		}
 	}
 
 	/** Your price as a terminal-style axis tag: soft glow under a dashed
-	 * line, and an ink chip in the gutter with a caret pointing at it. */
-	private static void yourLine(Graphics2D g, ChartKit.Display d, long price, int tagY, Color accent, int x0, int y0, int plotW, int plotH, FontMetrics fm, int chipH)
+	 * line, and an ink chip with a side letter and a caret at the level. */
+	private static void yourLine(Graphics2D g, long price, int lineY, int tagY, boolean sell, int x0, int plotW, FontMetrics fm, int chipH)
 	{
-		final int yy = Math.round(ChartKit.y(d, price, y0, plotH));
+		final Color accent = sell ? Palette.GREEN : Palette.RED;
 		g.setStroke(new BasicStroke(3f));
 		g.setColor(new Color(255, 255, 255, 34));
-		g.drawLine(x0, yy, x0 + plotW, yy);
+		g.drawLine(x0, lineY, x0 + plotW, lineY);
 		g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{3f, 3f}, 0f));
 		g.setColor(YOURS);
-		g.drawLine(x0, yy, x0 + plotW, yy);
+		g.drawLine(x0, lineY, x0 + plotW, lineY);
 		g.setStroke(new BasicStroke(1f));
 
+		final String letter = sell ? "S" : "B";
 		final String label = Fmt.compact(price);
+		final int lw = fm.stringWidth(letter);
 		final int tw = fm.stringWidth(label);
 		final int chipX = x0 + plotW + 6;
 		final int chipY = tagY - chipH / 2;
 		final Path2D caret = new Path2D.Float();
-		caret.moveTo(x0 + plotW + 1, yy);
+		caret.moveTo(x0 + plotW + 1, lineY);
 		caret.lineTo(chipX + 1, tagY - 4);
 		caret.lineTo(chipX + 1, tagY + 4);
 		caret.closePath();
 		g.setColor(accent);
 		g.fill(caret);
 		g.setColor(Palette.INK);
-		g.fillRoundRect(chipX, chipY, tw + 9, chipH, 6, 6);
+		g.fillRoundRect(chipX, chipY, lw + tw + 12, chipH, 6, 6);
 		g.setColor(accent);
-		g.drawRoundRect(chipX, chipY, tw + 9, chipH, 6, 6);
+		g.drawRoundRect(chipX, chipY, lw + tw + 12, chipH, 6, 6);
+		g.drawString(letter, chipX + 5, chipY + fm.getAscent());
 		g.setColor(Color.WHITE);
-		g.drawString(label, chipX + 5, chipY + fm.getAscent());
+		g.drawString(label, chipX + 5 + lw + 3, chipY + fm.getAscent());
 	}
 
 	private static void shadowed(Graphics2D g, String s, int x, int yy, Color c)
