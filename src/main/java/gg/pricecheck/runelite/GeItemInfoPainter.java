@@ -302,7 +302,9 @@ final class GeItemInfoPainter
 			return;
 		}
 
+		ChartKit.paintTimeGrid(g, d, x0, y0, plotW, plotH);
 		ChartKit.paintCorridor(g, d, x0, y0, plotW, plotH);
+		ChartKit.paintLevelGuides(g, d, x0, y0, plotW, plotH);
 		ChartKit.paintFillStrip(g, d, x0, y0 + plotH + 2, plotW, 5);
 
 		// Your offers: labeled with the exact numbers. When both sides ride
@@ -433,9 +435,9 @@ final class GeItemInfoPainter
 		// Price gridlines. Their labels are the lowest tier: full cards show
 		// them where the gutter is free, minis skip them entirely so the
 		// numbers that matter keep their air.
-		for (int i = 0; i < 3; i++)
+		for (int i = 0; i < 4; i++)
 		{
-			final long p = d.pMin + (d.pMax - d.pMin) * i / 2;
+			final long p = d.pMin + (d.pMax - d.pMin) * i / 3;
 			final int yy = Math.round(ChartKit.y(d, p, y0, plotH));
 			g.setColor(ChartKit.GRID);
 			g.drawLine(x0, yy, x0 + plotW, yy);

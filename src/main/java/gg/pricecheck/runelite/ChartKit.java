@@ -18,12 +18,16 @@ import java.util.Arrays;
 final class ChartKit
 {
 	static final Color CORRIDOR = new Color(255, 255, 255, 26);
-	static final Color CORRIDOR_PAID = new Color(0xe6, 0xc6, 0x67, 64);
+	static final Color CORRIDOR_PAID = new Color(0xe6, 0xc6, 0x67, 78);
 	static final Color ENVELOPE = new Color(255, 255, 255, 12);
 	static final Color LINE_HIGH = new Color(0x5d, 0xf2, 0x9a, 185);
 	static final Color LINE_LOW = new Color(0xf2, 0x6b, 0x6d, 185);
 	static final Color GRID = new Color(255, 255, 255, 14);
 	static final Color FILL_CELL = new Color(0xe6, 0xc6, 0x67, 150);
+	static final Color FILL_BUY = new Color(0x5d, 0xf2, 0x9a, 150);
+	static final Color FILL_SELL = new Color(0xf2, 0x6b, 0x6d, 150);
+	static final Color GUIDE_HIGH = new Color(0x5d, 0xf2, 0x9a, 64);
+	static final Color GUIDE_LOW = new Color(0xf2, 0x6b, 0x6d, 64);
 
 	/** Bucketed, paint-ready view of a Series. */
 	static final class Display
@@ -35,6 +39,8 @@ final class ChartKit
 		double[] hiMax;   // wick extremes
 		double[] loMin;
 		long[] vol;       // traded units in the bucket, both sides
+		long[] volHi;     // insta-buy side units (aggressive buyers)
+		long[] volLo;     // insta-sell side units (aggressive sellers)
 		boolean[] paid;   // avg after-tax spread positive
 		long tMin;
 		long tMax;
@@ -71,6 +77,8 @@ final class ChartKit
 		d.hiMax = new double[nB];
 		d.loMin = new double[nB];
 		d.vol = new long[nB];
+		d.volHi = new long[nB];
+		d.volLo = new long[nB];
 		d.paid = new boolean[nB];
 		d.tMin = s.ts[0];
 		d.tMax = s.ts[len - 1];
@@ -98,6 +106,8 @@ final class ChartKit
 				d.loMin[b] = d.loMin[b] == 0 ? s.low[i] : Math.min(d.loMin[b], s.low[i]);
 			}
 			d.vol[b] += hv + lv;
+			d.volHi[b] += hv;
+			d.volLo[b] += lv;
 		}
 		for (int b = 0; b < nB; b++)
 		{
@@ -257,7 +267,9 @@ final class ChartKit
 		}
 	}
 
-	/** Per-bucket traded-volume strip, brightness by relative volume. */
+	/** Per-bucket traded-volume strip: brightness is relative volume, colour is
+	 * who was aggressing. Green = insta-buys dominated the bucket, red =
+	 * insta-sells did, gold = balanced. The day's pressure reads left to right. */
 	static void paintFillStrip(Graphics2D g2, Display d, int x0, int y, int w, int cellH)
 	{
 		if (d.volMax <= 0)
@@ -271,9 +283,44 @@ final class ChartKit
 			{
 				continue;
 			}
+			final Color base = d.volHi[b] > d.volLo[b] * 1.5 ? FILL_BUY
+				: d.volLo[b] > d.volHi[b] * 1.5 ? FILL_SELL : FILL_CELL;
 			final int a = 40 + (int) (115 * Math.min(1.0, d.vol[b] / (double) d.volMax));
-			g2.setColor(new Color(FILL_CELL.getRed(), FILL_CELL.getGreen(), FILL_CELL.getBlue(), a));
+			g2.setColor(new Color(base.getRed(), base.getGreen(), base.getBlue(), a));
 			g2.fillRect(Math.round(x0 + b * bw), y, Math.max(1, Math.round(bw) - 1), cellH);
+		}
+	}
+
+	/** Dotted full-width guides at the live market edges (the newest print on
+	 * each side), so the whole day reads against where the market is NOW. */
+	static void paintLevelGuides(Graphics2D g2, Display d, int x0, int y0, int w, int h)
+	{
+		final java.awt.Stroke prev = g2.getStroke();
+		g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{1f, 3f}, 0f));
+		if (d.lastHigh > d.pMin && d.lastHigh < d.pMax)
+		{
+			final int yy = Math.round(y(d, d.lastHigh, y0, h));
+			g2.setColor(GUIDE_HIGH);
+			g2.drawLine(x0, yy, x0 + w, yy);
+		}
+		if (d.lastLow > d.pMin && d.lastLow < d.pMax)
+		{
+			final int yy = Math.round(y(d, d.lastLow, y0, h));
+			g2.setColor(GUIDE_LOW);
+			g2.drawLine(x0, yy, x0 + w, yy);
+		}
+		g2.setStroke(prev);
+	}
+
+	/** Vertical rhythm lines at the six-hour UTC boundaries: time structure
+	 * without labels, for surfaces too tight to carry an hour axis. */
+	static void paintTimeGrid(Graphics2D g2, Display d, int x0, int y0, int w, int h)
+	{
+		g2.setColor(GRID);
+		for (long t = ((d.tMin / 21600) + 1) * 21600; t < d.tMax; t += 21600)
+		{
+			final int xx = Math.round(x(d, t, x0, w));
+			g2.drawLine(xx, y0, xx, y0 + h);
 		}
 	}
 }

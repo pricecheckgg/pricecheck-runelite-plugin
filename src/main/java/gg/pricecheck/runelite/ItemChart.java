@@ -104,6 +104,7 @@ class ItemChart extends JComponent
 
 		ChartKit.paintPriceGrid(g2, d, fm, PAD_L, chartY, chartW, chartH, Palette.LIGHT);
 		ChartKit.paintCorridor(g2, d, PAD_L, chartY, chartW, chartH);
+		ChartKit.paintLevelGuides(g2, d, PAD_L, chartY, chartW, chartH);
 		ChartKit.paintFillStrip(g2, d, PAD_L, chartY + chartH + 2, chartW, FILL_H - 2);
 
 		// Manipulation flags: a red tick at the top of the flagged window.
