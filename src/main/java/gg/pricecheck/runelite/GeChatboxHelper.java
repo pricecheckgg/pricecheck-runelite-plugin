@@ -259,6 +259,23 @@ class GeChatboxHelper
 		{
 			return;
 		}
+		if (nativePreviousSearchShown())
+		{
+			// The game's own "Previous search" panel (the Show-last-searched
+			// setting) owns the empty-input layout; drawing over it garbles
+			// both. Yield, and hand back anything we already took.
+			if (SENTINEL.equals(client.getVarcStrValue(VARC_INPUT_TEXT)))
+			{
+				client.setVarcStrValue(VARC_INPUT_TEXT, "");
+				final Widget echo = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
+				if (echo != null)
+				{
+					echo.setHidden(false);
+				}
+				suggestActive = false;
+			}
+			return;
+		}
 		final String cur = client.getVarcStrValue(VARC_INPUT_TEXT);
 		if (cur != null && !cur.isEmpty() && !cur.equals(SENTINEL))
 		{
@@ -318,6 +335,37 @@ class GeChatboxHelper
 			echo.setHidden(false);
 		}
 		replaySearch();
+	}
+
+	/** True when the chatbox is showing the game's previous-search panel. */
+	private boolean nativePreviousSearchShown()
+	{
+		final Widget layer = client.getWidget(InterfaceID.Chatbox.MES_LAYER);
+		if (layer == null)
+		{
+			return false;
+		}
+		final Widget[][] sets = { layer.getStaticChildren(), layer.getDynamicChildren(), layer.getNestedChildren() };
+		for (final Widget[] set : sets)
+		{
+			if (set == null)
+			{
+				continue;
+			}
+			for (final Widget w : set)
+			{
+				if (w == null || w.isHidden())
+				{
+					continue;
+				}
+				final String t = w.getText();
+				if (t != null && (t.contains("Previous search") || t.contains("Show last searched")))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	private void injectSearchBanner()
