@@ -232,7 +232,6 @@ final class GeItemInfoPainter
 			return;
 		}
 
-		ChartKit.paintPriceGrid(g, d, fm, x0, y0, plotW, plotH, Palette.SUBTLE);
 		ChartKit.paintCorridor(g, d, x0, y0, plotW, plotH);
 		ChartKit.paintFillStrip(g, d, x0, y0 + plotH + 2, plotW, 5);
 
@@ -272,10 +271,91 @@ final class GeItemInfoPainter
 			t[1] = Math.max(t[0], prevBottom + chipH / 2 + 1);
 			prevBottom = t[1] + chipH / 2 + 1;
 		}
+
+		// The last print on each side: a dot on the series end and its price
+		// in the gutter, the live edges you adjust an offer against. They
+		// shift out of the way of your chips; grid labels yield to both.
+		final java.util.List<int[]> occupied = new java.util.ArrayList<>();
+		for (final int[] t : tags)
+		{
+			occupied.add(new int[]{t[1] - chipH / 2 - 1, t[1] + chipH / 2 + 1});
+		}
+		paintLastPrint(g, d, true, x0, y0, plotW, plotH, fm2, occupied);
+		paintLastPrint(g, d, false, x0, y0, plotW, plotH, fm2, occupied);
+
+		// Price gridlines, labels only where the gutter is free.
+		for (int i = 0; i < 3; i++)
+		{
+			final long p = d.pMin + (d.pMax - d.pMin) * i / 2;
+			final int yy = Math.round(ChartKit.y(d, p, y0, plotH));
+			g.setColor(ChartKit.GRID);
+			g.drawLine(x0, yy, x0 + plotW, yy);
+			if (isFree(occupied, yy - 5, yy + 5))
+			{
+				g.setColor(Palette.SUBTLE_CANVAS);
+				g.drawString(Fmt.compact(p), x0 + plotW + 6,
+					Math.max(y0 + fm2.getAscent() - 2, yy + 4));
+			}
+		}
+
 		for (final int[] t : tags)
 		{
 			yourLine(g, prices.get(t[3]), t[0], t[1], t[2] == 1, x0, plotW, fm2, chipH);
 		}
+	}
+
+	private static void paintLastPrint(Graphics2D g, ChartKit.Display d, boolean high, int x0, int y0, int plotW, int plotH, FontMetrics fm, java.util.List<int[]> occupied)
+	{
+		final long price = high ? d.lastHigh : d.lastLow;
+		final long ts = high ? d.lastHighTs : d.lastLowTs;
+		if (price <= 0)
+		{
+			return;
+		}
+		final Color col = high ? Palette.GREEN : Palette.RED;
+		final int px = Math.round(ChartKit.x(d, ts, x0, plotW));
+		final int py = Math.round(ChartKit.y(d, price, y0, plotH));
+		g.setColor(SHADOW);
+		g.fillOval(px - 2, py - 2, 6, 6);
+		g.setColor(col);
+		g.fillOval(px - 3, py - 3, 6, 6);
+
+		// Gutter label: nudge downward until clear of the chips, flipping
+		// upward when that would leave the plot, and never past its edges.
+		final int lh = fm.getHeight();
+		final int maxY = y0 + plotH + 2;
+		final int minY = y0 + fm.getAscent() - 2;
+		int ly = py + 4;
+		int guard = 0;
+		while (!isFree(occupied, ly - fm.getAscent(), ly + 2) && guard++ < 8)
+		{
+			ly += lh / 2 + 2;
+			if (ly > maxY)
+			{
+				ly = py - lh / 2;
+				break;
+			}
+		}
+		guard = 0;
+		while (!isFree(occupied, ly - fm.getAscent(), ly + 2) && guard++ < 8)
+		{
+			ly -= lh / 2 + 2;
+		}
+		ly = Math.max(minY, Math.min(ly, maxY));
+		occupied.add(new int[]{ly - fm.getAscent(), ly + 2});
+		shadowed(g, Fmt.compact(price), x0 + plotW + 6, ly, col);
+	}
+
+	private static boolean isFree(java.util.List<int[]> occupied, int top, int bottom)
+	{
+		for (final int[] o : occupied)
+		{
+			if (top <= o[1] && bottom >= o[0])
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/** Your price as a terminal-style axis tag: soft glow under a dashed

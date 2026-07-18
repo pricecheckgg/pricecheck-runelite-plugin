@@ -36,7 +36,6 @@ class GeItemCardOverlay extends Overlay
 	private static final int GE_SELECTED_SLOT_VARBIT = 4439;
 	private static final int CARD_W = 284;
 	private static final int BTN = 14;
-	private static final int MAX_CHARTED = 4;
 	private static final String COLLAPSED_KEY = "geCardsCollapsed";
 	private static final java.util.regex.Pattern PRICE = java.util.regex.Pattern.compile("^[0-9,]+ coins$");
 
@@ -206,30 +205,49 @@ class GeItemCardOverlay extends Overlay
 		}
 
 		final boolean shift = client.isKeyPressed(KeyCode.KC_SHIFT);
-		// Height budget: the stack degrades before it can leave the screen.
-		// Full needs ~330px, a mini ~105, a bar ~28; anything beyond becomes
-		// a one-line count.
+		// Two columns: left of the GE window, then right of it. Every mini
+		// keeps its chart as long as a column has room; a card that cannot
+		// fit charted flows to the next column before it gives its chart up.
 		final int budget = client.getCanvasHeight() - 8;
-		int y = anchor.y;
+		final List<Point> cols = columnAnchors();
+		if (cols.isEmpty())
+		{
+			return null;
+		}
+		int col = 0;
+		int y = cols.get(0).y;
 		int idx = 0;
 		int remainingItems = items.size();
 		for (final int geId : items.keySet())
 		{
+			final boolean wantFull = geId == expandedItem && !collapsed;
+			final int est = wantFull ? 335 : (collapsed ? 28 : 108);
+			// Move to the next column when this card will not fit here at its
+			// wanted size but would at a fresh column top.
+			while (col < cols.size() - 1 && budget - y < est && budget - cols.get(col + 1).y >= est)
+			{
+				col++;
+				y = cols.get(col).y;
+			}
 			final int left = budget - y;
-			final int othersMin = (remainingItems - 1) * 30;
 			if (left < 30)
 			{
-				final GeItemInfoPainter.Context more = new GeItemInfoPainter.Context();
-				more.itemName = "+" + remainingItems + " more";
-				paintAt(g, anchor.x, y, () -> GeItemInfoPainter.paintCompact(g, more));
+				if (left >= 0 && remainingItems > 0)
+				{
+					final GeItemInfoPainter.Context more = new GeItemInfoPainter.Context();
+					more.itemName = "+" + remainingItems + " more";
+					final int mx = cols.get(col).x;
+					final int my = y;
+					paintAt(g, mx, my, () -> GeItemInfoPainter.paintCompact(g, more));
+				}
 				break;
 			}
-			final boolean wantFull = geId == expandedItem && !collapsed;
-			final boolean canFull = wantFull && left - othersMin >= 335;
-			final boolean canChart = !collapsed && idx < MAX_CHARTED && left - othersMin >= 108;
+			final boolean canFull = wantFull && left >= 335;
+			final boolean canChart = !collapsed && left >= 108;
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, canFull || canChart);
 			final Dimension d;
 			final int yy = y;
+			final int xx = cols.get(col).x;
 			if (canFull)
 			{
 				final FlipData live = plugin.liveFor(geId);
@@ -239,7 +257,7 @@ class GeItemCardOverlay extends Overlay
 					c.outcomeText = "Board margin " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
 					c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
 				}
-				d = paintAt(g, anchor.x, yy, () -> GeItemInfoPainter.paint(g, c));
+				d = paintAt(g, xx, yy, () -> GeItemInfoPainter.paint(g, c));
 			}
 			else
 			{
@@ -247,21 +265,21 @@ class GeItemCardOverlay extends Overlay
 				{
 					c.series = null;
 				}
-				d = paintAt(g, anchor.x, yy, () -> GeItemInfoPainter.paintCompact(g, c));
+				d = paintAt(g, xx, yy, () -> GeItemInfoPainter.paintCompact(g, c));
 			}
 			if (shift)
 			{
 				// Per-card grow or shrink; the top card also carries the
 				// stack-wide bars toggle to its left.
 				final int bx = d.width - BTN - 4;
-				paintButton(g, anchor.x + bx, yy + 4, canFull);
-				hits.add(new Object[]{new Rectangle(anchor.x + bx, yy + 4, BTN, BTN), (Runnable) () ->
+				paintButton(g, xx + bx, yy + 4, canFull);
+				hits.add(new Object[]{new Rectangle(xx + bx, yy + 4, BTN, BTN), (Runnable) () ->
 					expandedItem = expandedItem == geId ? 0 : geId});
 				if (idx == 0)
 				{
 					final int bx2 = bx - BTN - 6;
-					paintBarsButton(g, anchor.x + bx2, yy + 4);
-					hits.add(new Object[]{new Rectangle(anchor.x + bx2, yy + 4, BTN, BTN), (Runnable) () ->
+					paintBarsButton(g, xx + bx2, yy + 4);
+					hits.add(new Object[]{new Rectangle(xx + bx2, yy + 4, BTN, BTN), (Runnable) () ->
 					{
 						collapsed = !collapsed;
 						configManager.setConfiguration(PriceCheckConfig.GROUP, COLLAPSED_KEY, collapsed);
@@ -273,6 +291,36 @@ class GeItemCardOverlay extends Overlay
 			remainingItems--;
 		}
 		return null;
+	}
+
+	/** Card columns beside the GE window: left of it when there is room,
+	 * then right of it. Falls back to a single left-edge column. */
+	private List<Point> columnAnchors()
+	{
+		final List<Point> cols = new ArrayList<>();
+		Widget w = client.getWidget(GE_GROUP, 2);
+		if (w == null || w.isHidden())
+		{
+			w = client.getWidget(GE_GROUP, 0);
+		}
+		if (w != null)
+		{
+			final Rectangle b = w.getBounds();
+			final int top = Math.max(4, b.y);
+			if (b.x - CARD_W - 8 >= 4)
+			{
+				cols.add(new Point(b.x - CARD_W - 8, top));
+			}
+			if (b.x + b.width + 8 + CARD_W <= client.getCanvasWidth() - 4)
+			{
+				cols.add(new Point(b.x + b.width + 8, top));
+			}
+		}
+		if (cols.isEmpty())
+		{
+			cols.add(new Point(10, 120));
+		}
+		return cols;
 	}
 
 	/** Everything both card sizes need for one item: series when asked, all

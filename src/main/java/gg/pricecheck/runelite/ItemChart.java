@@ -102,7 +102,7 @@ class ItemChart extends JComponent
 			g2.drawString(lbl, lx, h - 2);
 		}
 
-		ChartKit.paintPriceGrid(g2, d, fm, PAD_L, chartY, chartW, chartH, Palette.SUBTLE);
+		ChartKit.paintPriceGrid(g2, d, fm, PAD_L, chartY, chartW, chartH, Palette.LIGHT);
 		ChartKit.paintCorridor(g2, d, PAD_L, chartY, chartW, chartH);
 		ChartKit.paintFillStrip(g2, d, PAD_L, chartY + chartH + 2, chartW, FILL_H - 2);
 

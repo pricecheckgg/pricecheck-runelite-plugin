@@ -41,6 +41,12 @@ final class ChartKit
 		long pMin;        // robust drawn price range
 		long pMax;
 		long volMax;
+		// The newest print on each side, straight from the raw windows: the
+		// live market edges a trader adjusts against.
+		long lastHigh;
+		long lastHighTs;
+		long lastLow;
+		long lastLowTs;
 	}
 
 	private ChartKit()
@@ -101,6 +107,23 @@ final class ChartKit
 			d.paid[b] = d.hi[b] > 0 && d.lo[b] > 0
 				&& GeTax.net((long) d.lo[b] + 1, (long) d.hi[b] - 1) > 0;
 			d.volMax = Math.max(d.volMax, d.vol[b]);
+		}
+		for (int i = len - 1; i >= 0; i--)
+		{
+			if (d.lastHigh == 0 && s.high[i] > 0)
+			{
+				d.lastHigh = s.high[i];
+				d.lastHighTs = s.ts[i];
+			}
+			if (d.lastLow == 0 && s.low[i] > 0)
+			{
+				d.lastLow = s.low[i];
+				d.lastLowTs = s.ts[i];
+			}
+			if (d.lastHigh != 0 && d.lastLow != 0)
+			{
+				break;
+			}
 		}
 
 		// Robust scale: 2nd..98th percentile of drawn values, then widened to
