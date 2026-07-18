@@ -88,9 +88,10 @@ final class GeItemInfoPainter
 	private static final Color NAME = new Color(0xde, 0xd8, 0xc8);
 	private static final Color YOURS = new Color(255, 255, 255, 220);
 
-	private static final int W = 284;
+	static final int W = 284;          // compact cards and the grid column module
+	static final int W_FULL = 344;     // the expanded evidence card
 	private static final int PAD = 10;
-	private static final int CHART_H = 108;
+	private static final int CHART_H = 148;
 	private static final int PRICE_GUTTER = 66;
 
 	private GeItemInfoPainter()
@@ -98,6 +99,11 @@ final class GeItemInfoPainter
 	}
 
 	static Dimension paint(Graphics2D g, Context c)
+	{
+		return paint(g, c, W_FULL);
+	}
+
+	static Dimension paint(Graphics2D g, Context c, int w)
 	{
 		final Font small = net.runelite.client.ui.FontManager.getRunescapeSmallFont();
 		g.setFont(small);
@@ -112,22 +118,22 @@ final class GeItemInfoPainter
 			+ (holding ? lineH : 0) + 2 * lineH + PAD + 2;
 
 		g.setColor(Palette.INK);
-		g.fillRoundRect(0, 0, W - 1, h - 1, 8, 8);
+		g.fillRoundRect(0, 0, w - 1, h - 1, 8, 8);
 		g.setColor(FRAME);
-		g.drawRoundRect(0, 0, W - 1, h - 1, 8, 8);
+		g.drawRoundRect(0, 0, w - 1, h - 1, 8, 8);
 
 		// Header: verdicts right-aligned first, then the name clipped to the
 		// space that remains so the two can never overprint.
 		int y = PAD + fm.getAscent() - 2;
-		final int nameEnd = paintVerdicts(g, c, fm, W, y);
+		final int nameEnd = paintVerdicts(g, c, fm, w, y);
 		shadowed(g, clip(c.itemName, fm, nameEnd - 6 - PAD), PAD, y, NAME);
 		y += 6;
 		g.setColor(RULE);
-		g.drawLine(PAD - 2, y, W - PAD + 2, y);
+		g.drawLine(PAD - 2, y, w - PAD + 2, y);
 		y += 4;
 
 		// Chart: corridor + your offer line.
-		paintChart(g, c, PAD, y, W - 2 * PAD, CHART_H, fm, false);
+		paintChart(g, c, PAD, y, w - 2 * PAD, CHART_H, fm, false);
 		y += CHART_H + 4;
 
 		// Tape: the prints this client has watched arrive, newest first.
@@ -183,9 +189,9 @@ final class GeItemInfoPainter
 						? (p.price >= ref ? "+" : "-") + Fmt.compact(Math.abs(p.price - ref)) + " vs you"
 						: "";
 				}
-				shadowed(g, delta, W / 2 - 10, ty, deltaCol);
+				shadowed(g, delta, w / 2 - 10, ty, deltaCol);
 				final int aw = fm.stringWidth(age);
-				shadowed(g, age, W - PAD - aw, ty, Palette.SUBTLE);
+				shadowed(g, age, w - PAD - aw, ty, Palette.SUBTLE);
 			}
 			y += tapeRows * 13 + 2;
 		}
@@ -212,7 +218,7 @@ final class GeItemInfoPainter
 			// Fitting ladder: the real lots are the point, so the itemised form
 			// wins even at the cost of the longer profit tail. The blended
 			// average is the last resort, and says it is one.
-			final int maxW = W - 2 * PAD;
+			final int maxW = w - 2 * PAD;
 			String hold = null;
 			String tail = tailFull;
 			final java.util.List<long[]> merged = mergedLots(c.lotEntries);
@@ -271,7 +277,7 @@ final class GeItemInfoPainter
 			shadowed(g, c.outcomeText, PAD, y + fm.getAscent(), c.outcomeColor != null ? c.outcomeColor : Palette.SUBTLE);
 		}
 
-		return new Dimension(W, h);
+		return new Dimension(w, h);
 	}
 
 	/** Paints the verdicts right-aligned and returns the leftmost x they

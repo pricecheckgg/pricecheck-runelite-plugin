@@ -84,8 +84,8 @@ public final class GeItemInfoPreview
 			{1, 1_037_900, (t0 + 61 * 300L) * 1000L},
 		};
 
-		final int w = 300;
-		final int h = 320;
+		final int w = 380;
+		final int h = 460;
 		final BufferedImage img = new BufferedImage(w * 2, h * 2, BufferedImage.TYPE_INT_RGB);
 		final Graphics2D g = img.createGraphics();
 		g.scale(2, 2);

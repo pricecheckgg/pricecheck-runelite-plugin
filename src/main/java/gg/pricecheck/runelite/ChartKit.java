@@ -183,39 +183,52 @@ final class ChartKit
 		return (float) (y0 + h - Math.max(0, Math.min(1, f)) * h);
 	}
 
-	/** The corridor, wick envelope, and edge lines. */
+	/** The corridor, wick envelope, and edge lines. Quiet buckets BRIDGE: the
+	 * shape carries across them from traded bucket to traded bucket instead of
+	 * shattering into a picket fence on sparse items. The volume strip is what
+	 * says where trading actually paused. */
 	static void paintCorridor(Graphics2D g2, Display d, int x0, int y0, int w, int h)
 	{
-		// Wick envelope first, faintest layer.
-		for (int b = 0; b < d.n - 1; b++)
+		// The traded buckets, in order; every segment joins two of them.
+		final int[] tb = new int[d.n];
+		int nt = 0;
+		for (int b = 0; b < d.n; b++)
 		{
-			if (!traded(d, b) || !traded(d, b + 1))
+			if (traded(d, b))
 			{
-				continue;
+				tb[nt++] = b;
 			}
+		}
+		if (nt < 2)
+		{
+			return;
+		}
+		// Wick envelope first, faintest layer.
+		for (int i = 0; i < nt - 1; i++)
+		{
+			final int a = tb[i];
+			final int b = tb[i + 1];
 			final Path2D env = new Path2D.Float();
-			env.moveTo(x(d, d.ts[b], x0, w), y(d, d.hiMax[b], y0, h));
-			env.lineTo(x(d, d.ts[b + 1], x0, w), y(d, d.hiMax[b + 1], y0, h));
-			env.lineTo(x(d, d.ts[b + 1], x0, w), y(d, d.loMin[b + 1], y0, h));
+			env.moveTo(x(d, d.ts[a], x0, w), y(d, d.hiMax[a], y0, h));
+			env.lineTo(x(d, d.ts[b], x0, w), y(d, d.hiMax[b], y0, h));
 			env.lineTo(x(d, d.ts[b], x0, w), y(d, d.loMin[b], y0, h));
+			env.lineTo(x(d, d.ts[a], x0, w), y(d, d.loMin[a], y0, h));
 			env.closePath();
 			g2.setColor(ENVELOPE);
 			g2.fill(env);
 		}
 		// The corridor between the weighted averages, gold where it paid.
-		for (int b = 0; b < d.n - 1; b++)
+		for (int i = 0; i < nt - 1; i++)
 		{
-			if (!traded(d, b) || !traded(d, b + 1))
-			{
-				continue;
-			}
+			final int a = tb[i];
+			final int b = tb[i + 1];
 			final Path2D p = new Path2D.Float();
-			p.moveTo(x(d, d.ts[b], x0, w), y(d, d.hi[b], y0, h));
-			p.lineTo(x(d, d.ts[b + 1], x0, w), y(d, d.hi[b + 1], y0, h));
-			p.lineTo(x(d, d.ts[b + 1], x0, w), y(d, d.lo[b + 1], y0, h));
+			p.moveTo(x(d, d.ts[a], x0, w), y(d, d.hi[a], y0, h));
+			p.lineTo(x(d, d.ts[b], x0, w), y(d, d.hi[b], y0, h));
 			p.lineTo(x(d, d.ts[b], x0, w), y(d, d.lo[b], y0, h));
+			p.lineTo(x(d, d.ts[a], x0, w), y(d, d.lo[a], y0, h));
 			p.closePath();
-			g2.setColor(d.paid[b] && d.paid[b + 1] ? CORRIDOR_PAID : CORRIDOR);
+			g2.setColor(d.paid[a] && d.paid[b] ? CORRIDOR_PAID : CORRIDOR);
 			g2.fill(p);
 		}
 		g2.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
@@ -230,6 +243,8 @@ final class ChartKit
 
 	private static void paintEdge(Graphics2D g2, Display d, boolean high, Color c, int x0, int y0, int w, int h)
 	{
+		// One continuous line through every traded bucket; quiet buckets are
+		// bridged, not broken, matching the corridor fill.
 		g2.setColor(c);
 		Path2D p = null;
 		for (int b = 0; b < d.n; b++)
@@ -237,7 +252,6 @@ final class ChartKit
 			final double v = high ? d.hi[b] : d.lo[b];
 			if (v <= 0)
 			{
-				if (p != null) { g2.draw(p); p = null; }
 				continue;
 			}
 			final float px = x(d, d.ts[b], x0, w);

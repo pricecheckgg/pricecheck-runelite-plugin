@@ -115,7 +115,7 @@ class GeItemCardOverlay extends Overlay
 			}
 		}
 
-		final Point anchor = anchorPoint();
+		final int[] anchor = anchorFor(GeItemInfoPainter.W_FULL);
 		if (slotIdx >= 0)
 		{
 			final int geId = offers[slotIdx].getItemId();
@@ -126,7 +126,7 @@ class GeItemCardOverlay extends Overlay
 			}
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
 			addViewOutcome(c, offers[slotIdx]);
-			paintAt(g, anchor.x, anchor.y, () -> GeItemInfoPainter.paint(g, c));
+			paintAt(g, anchor[0], anchor[1], () -> GeItemInfoPainter.paint(g, c, anchor[2]));
 			return null;
 		}
 		if (setupPanel != null && plugin.setupItem() > 0)
@@ -183,7 +183,7 @@ class GeItemCardOverlay extends Overlay
 					}
 				}
 			}
-			paintAt(g, anchor.x, anchor.y, () -> GeItemInfoPainter.paint(g, c));
+			paintAt(g, anchor[0], anchor[1], () -> GeItemInfoPainter.paint(g, c, anchor[2]));
 			return null;
 		}
 
@@ -223,8 +223,8 @@ class GeItemCardOverlay extends Overlay
 		for (final int geId : items.keySet())
 		{
 			final boolean wantFull = geId == expandedItem && !collapsed;
-			// Full estimate covers a ten-row tape (the painter's cap).
-			final int est = wantFull ? 400 : (collapsed ? 28 : 108);
+			// Full estimate covers a ten-row tape and the taller chart.
+			final int est = wantFull ? 440 : (collapsed ? 28 : 108);
 			// Move to the next column when this card will not fit here at its
 			// wanted size but would at a fresh column top.
 			while (col < cols.size() - 1 && budget - y < est && budget - cols.get(col + 1).y >= est)
@@ -245,12 +245,13 @@ class GeItemCardOverlay extends Overlay
 				}
 				break;
 			}
-			final boolean canFull = wantFull && left >= 400;
+			final boolean canFull = wantFull && left >= 440;
 			final boolean canChart = !collapsed && left >= 108;
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, canFull || canChart);
 			final Dimension d;
 			final int yy = y;
 			final int xx = cols.get(col).x;
+			final int paintedX;
 			if (canFull)
 			{
 				final FlipData live = plugin.liveFor(geId);
@@ -260,7 +261,25 @@ class GeItemCardOverlay extends Overlay
 					c.outcomeText = "Board margin " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
 					c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
 				}
-				d = paintAt(g, xx, yy, () -> GeItemInfoPainter.paint(g, c));
+				// The expanded card widens toward free space: a left-column card
+				// grows leftward (its right edge stays put), a right-column one
+				// grows toward the canvas edge. Neither may touch the GE.
+				final Rectangle geB = geBounds();
+				int fw = GeItemInfoPainter.W;
+				int fx = xx;
+				if (geB != null && xx < geB.x && geB.x - 8 - GeItemInfoPainter.W_FULL >= 4)
+				{
+					fw = GeItemInfoPainter.W_FULL;
+					fx = geB.x - 8 - fw;
+				}
+				else if (geB != null && xx > geB.x
+					&& xx + GeItemInfoPainter.W_FULL <= client.getCanvasWidth() - 4)
+				{
+					fw = GeItemInfoPainter.W_FULL;
+				}
+				final int fwF = fw;
+				paintedX = fx;
+				d = paintAt(g, fx, yy, () -> GeItemInfoPainter.paint(g, c, fwF));
 			}
 			else
 			{
@@ -268,6 +287,7 @@ class GeItemCardOverlay extends Overlay
 				{
 					c.series = null;
 				}
+				paintedX = xx;
 				d = paintAt(g, xx, yy, () -> GeItemInfoPainter.paintCompact(g, c));
 			}
 			if (shift)
@@ -275,14 +295,14 @@ class GeItemCardOverlay extends Overlay
 				// Per-card grow or shrink; the top card also carries the
 				// stack-wide bars toggle to its left.
 				final int bx = d.width - BTN - 4;
-				paintButton(g, xx + bx, yy + 4, canFull);
-				hits.add(new Object[]{new Rectangle(xx + bx, yy + 4, BTN, BTN), (Runnable) () ->
+				paintButton(g, paintedX + bx, yy + 4, canFull);
+				hits.add(new Object[]{new Rectangle(paintedX + bx, yy + 4, BTN, BTN), (Runnable) () ->
 					expandedItem = expandedItem == geId ? 0 : geId});
 				if (idx == 0)
 				{
 					final int bx2 = bx - BTN - 6;
-					paintBarsButton(g, xx + bx2, yy + 4);
-					hits.add(new Object[]{new Rectangle(xx + bx2, yy + 4, BTN, BTN), (Runnable) () ->
+					paintBarsButton(g, paintedX + bx2, yy + 4);
+					hits.add(new Object[]{new Rectangle(paintedX + bx2, yy + 4, BTN, BTN), (Runnable) () ->
 					{
 						collapsed = !collapsed;
 						configManager.setConfiguration(PriceCheckConfig.GROUP, COLLAPSED_KEY, collapsed);
@@ -512,23 +532,40 @@ class GeItemCardOverlay extends Overlay
 			|| st == GrandExchangeOfferState.CANCELLED_BUY;
 	}
 
-	private Point anchorPoint()
+	private Rectangle geBounds()
 	{
 		Widget w = client.getWidget(GE_GROUP, 2);
 		if (w == null || w.isHidden())
 		{
 			w = client.getWidget(GE_GROUP, 0);
 		}
-		if (w != null)
+		return w != null ? w.getBounds() : null;
+	}
+
+	/** {x, y, width}: the card takes wantW where the chosen side has room and
+	 *  steps down to the compact width otherwise, never covering the GE. */
+	private int[] anchorFor(int wantW)
+	{
+		final Rectangle b = geBounds();
+		if (b == null)
 		{
-			final Rectangle b = w.getBounds();
-			int x = b.x - CARD_W - 8;
-			if (x < 4)
-			{
-				x = b.x + b.width + 8;
-			}
-			return new Point(x, Math.max(4, b.y));
+			return new int[]{10, 120, wantW};
 		}
-		return new Point(10, 120);
+		final int y = Math.max(4, b.y);
+		final int narrow = GeItemInfoPainter.W;
+		if (b.x - wantW - 8 >= 4)
+		{
+			return new int[]{b.x - wantW - 8, y, wantW};
+		}
+		final int rightX = b.x + b.width + 8;
+		if (rightX + wantW <= client.getCanvasWidth() - 4)
+		{
+			return new int[]{rightX, y, wantW};
+		}
+		if (b.x - narrow - 8 >= 4)
+		{
+			return new int[]{b.x - narrow - 8, y, narrow};
+		}
+		return new int[]{rightX, y, narrow};
 	}
 }
