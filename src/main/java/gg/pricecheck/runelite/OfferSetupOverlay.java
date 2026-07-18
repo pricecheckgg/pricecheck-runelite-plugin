@@ -142,7 +142,7 @@ class OfferSetupOverlay extends Overlay
 		// (all good) or the correction (typed price is off market), and the ring
 		// colour repeats the state so it reads without the text.
 		Color state = Palette.GOLD;
-		Seg tail = seg("  +" + Fmt.compact(live.getProfit()), small(g), Palette.GREEN);
+		Seg tail = seg("+" + Fmt.compact(live.getProfit()), small(g), Palette.GREEN);
 		final long tol = Math.max(target / 100, 1);
 		if (entered > 0 && Math.abs(entered - target) > tol)
 		{
@@ -152,12 +152,12 @@ class OfferSetupOverlay extends Overlay
 				if (entered > target)
 				{
 					state = Palette.RED;
-					tail = seg("  drop " + Fmt.compact(d) + " to fill", small(g), Palette.RED);
+					tail = seg("drop " + Fmt.compact(d) + " to fill", small(g), Palette.RED);
 				}
 				else
 				{
 					state = Palette.AMBER;
-					tail = seg("  under market by " + Fmt.compact(d), small(g), Palette.AMBER);
+					tail = seg("under market by " + Fmt.compact(d), small(g), Palette.AMBER);
 				}
 			}
 			else
@@ -165,12 +165,12 @@ class OfferSetupOverlay extends Overlay
 				if (entered < target)
 				{
 					state = Palette.RED;
-					tail = seg("  raise " + Fmt.compact(d) + " to fill", small(g), Palette.RED);
+					tail = seg("raise " + Fmt.compact(d) + " to fill", small(g), Palette.RED);
 				}
 				else
 				{
 					state = Palette.AMBER;   // overpay fills, just worse
-					tail = seg("  overpaying by " + Fmt.compact(d), small(g), Palette.AMBER);
+					tail = seg("overpaying by " + Fmt.compact(d), small(g), Palette.AMBER);
 				}
 			}
 		}
@@ -178,7 +178,8 @@ class OfferSetupOverlay extends Overlay
 		drawRing(g, b, state);
 		drawChip(g, b, state, line(
 			seg("Type ", small(g), Palette.SUBTLE_CANVAS),
-			seg(Fmt.full(target), bold(g), Palette.GOLD),
+			seg(Fmt.full(target), bold(g), Color.WHITE),
+			seg(" · ", small(g), Palette.SUBTLE_CANVAS),
 			tail));
 		return null;
 	}
@@ -214,7 +215,8 @@ class OfferSetupOverlay extends Overlay
 			x = 2;
 		}
 		int y = field.y - h + 4;
-		if (y < 2)
+		final boolean above = y >= 2;
+		if (!above)
 		{
 			y = field.y + field.height - 4;   // no room above: straddle the bottom edge
 		}
@@ -228,6 +230,27 @@ class OfferSetupOverlay extends Overlay
 		g.setStroke(new BasicStroke(1f));
 		g.setColor(new Color(border.getRed(), border.getGreen(), border.getBlue(), 200));
 		g.drawRoundRect(x, y, w, h, 8, 8);
+
+		// Caret tying the chip to the field it talks about, like the chart
+		// tags: accent triangle at the field-facing edge, at the field's
+		// centre when it sits inside the chip's span.
+		final int fx = Math.max(x + 10, Math.min(field.x + field.width / 2, x + w - 10));
+		final java.awt.geom.Path2D caret = new java.awt.geom.Path2D.Float();
+		if (above)
+		{
+			caret.moveTo(fx - 4, y + h);
+			caret.lineTo(fx + 4, y + h);
+			caret.lineTo(fx, y + h + 5);
+		}
+		else
+		{
+			caret.moveTo(fx - 4, y);
+			caret.lineTo(fx + 4, y);
+			caret.lineTo(fx, y - 5);
+		}
+		caret.closePath();
+		g.setColor(new Color(border.getRed(), border.getGreen(), border.getBlue(), 220));
+		g.fill(caret);
 
 		int tx = x + PAD;
 		final int ascent = ln.ascent();
