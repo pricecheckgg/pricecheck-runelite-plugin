@@ -89,13 +89,16 @@ public final class HeaderPreview
 		lots.add(lot);
 		s.openLots = "fresh".equals(variant) ? Collections.emptyList() : lots;
 		final java.util.List<FlipLogEngine.Flip> flips = new java.util.ArrayList<>();
-		final String[] nm = {"Bloodbark legs", "Heavy ballista", "Dragon claws", "Zulrah's scales", "Twisted bow"};
-		final long[] pf = {9_528, 19_806, 142_500, -3_240, 512_000};
+		final String[] nm = {"Bloodbark legs", "Tonalztics of ralos (uncharged)", "Dragon claws", "Zulrah's scales", "Twisted bow"};
+		final long[] pf = {9_528, -40_010, 142_500, -3_240, 512_000};
+		final int[] qty = {1, 1, 3, 10_000, 1};
+		final long[] bg = {352_000, 40_010_000L, 180_600_000L, 2_250_000L, 1_524_036_000L};
+		final long[] hold = {21, 107, 34, 260, 73};   // minutes, exercises the h/m formats
 		for (int i = 0; i < nm.length; i++) {
 			final FlipLogEngine.Flip f = new FlipLogEngine.Flip();
-			f.itemId = 100 + i; f.name = nm[i]; f.qty = 1 + i; f.profit = pf[i];
+			f.itemId = 100 + i; f.name = nm[i]; f.qty = qty[i]; f.profit = pf[i]; f.buyGross = bg[i];
 			f.closedAt = System.currentTimeMillis() - (i + 1) * 900_000L;
-			f.openedAt = f.closedAt - 1_200_000L;
+			f.openedAt = f.closedAt - hold[i] * 60_000L;
 			f.check = i == 3;
 			flips.add(f);
 		}

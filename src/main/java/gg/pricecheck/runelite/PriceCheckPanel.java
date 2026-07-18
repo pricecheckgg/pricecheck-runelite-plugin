@@ -8,7 +8,10 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.GridLayout;
+import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.Rectangle;
 import java.awt.event.MouseAdapter;
@@ -453,6 +456,10 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel body = new JPanel();
 		logBody = body;
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+		// Explicit panel background: the gaps between cards are part of the
+		// design, and the headless preview harness has no dark L&F to inherit.
+		body.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		logList.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		head.setAlignmentX(Component.LEFT_ALIGNMENT);
 		logList.setAlignmentX(Component.LEFT_ALIGNMENT);
 		body.add(head);
@@ -519,14 +526,17 @@ class PriceCheckPanel extends PluginPanel
 				: null);
 			syncOpensWeb = hasKey && s.pendingSync == 0;
 			logSyncDot.setColor(hasKey ? (s.pendingSync > 0 ? Palette.AMBER : Palette.GREEN) : Palette.SUBTLE);
+			// Two-tone: state stays quiet, the clickable action reads as a link.
 			logSync.setText(hasKey
-				? (s.pendingSync > 0 ? "Backing up " + s.pendingSync + " fills…" : "Backed up · open web portfolio")
-				: "Local only · back up in Setup");
+				? (s.pendingSync > 0
+					? "Backing up " + s.pendingSync + " fills…"
+					: "<html><span style='color:#9a917c'>Backed up · </span><span style='color:#e6c667'>open web portfolio</span></html>")
+				: "<html><span style='color:#9a917c'>Local only · </span><span style='color:#e6c667'>back up in Setup</span></html>");
 
 			logList.removeAll();
 			if (!s.openLots.isEmpty())
 			{
-				logList.add(sectionHeader("Open positions (" + s.openLots.size() + ")"));
+				logList.add(sectionHeader("Open positions · " + s.openLots.size()));
 				for (final FlipLogEngine.Lot l : s.openLots)
 				{
 					logList.add(lotRow(l));
@@ -534,7 +544,9 @@ class PriceCheckPanel extends PluginPanel
 				}
 				logList.add(gap(4));
 			}
-			logList.add(sectionHeader("Completed flips"));
+			logList.add(sectionHeader(s.recent.size() < s.allFlips
+				? "Completed flips · last " + s.recent.size()
+				: "Completed flips"));
 			if (s.recent.isEmpty())
 			{
 				logList.add(note("Buy and sell on the GE and flips appear here. No key needed.", Palette.SUBTLE));
@@ -566,7 +578,7 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel line1 = row();
 		line1.add(name, BorderLayout.CENTER);
 		final JLabel amt = mono(Fmt.full(l.qty) + " @ " + Fmt.compact(l.qty > 0 ? l.cost / l.qty : l.cost), Palette.SUBTLE);
-		final JLabel age = mono(dur(System.currentTimeMillis() - l.openedAt) + " held", Palette.SUBTLE);
+		final JLabel age = mono("held " + dur(System.currentTimeMillis() - l.openedAt), Palette.SUBTLE);
 		age.setHorizontalAlignment(SwingConstants.RIGHT);
 		final JPanel line2 = row();
 		line2.add(amt, BorderLayout.CENTER);
@@ -604,6 +616,26 @@ class PriceCheckPanel extends PluginPanel
 		rowP.setComponentPopupMenu(menu);
 	}
 
+	/** "1 @ 40.0m · -0.1%" — qty at unit buy price, then signed return. Falls
+	 * back to bare qty when the buy side is unknown (shouldn't happen for real
+	 * flips, but a zero denominator must not render garbage). */
+	private static String flipDetail(FlipLogEngine.Flip f)
+	{
+		if (f.qty <= 0 || f.buyGross <= 0)
+		{
+			return Fmt.full(Math.max(0, f.qty)) + " ×";
+		}
+		// One decimal normally; two when that would show a flat 0.0 for a real
+		// gain or loss (big-ticket flips live in the hundredths).
+		final double raw = 100.0 * f.profit / f.buyGross;
+		final double roi = Math.round(raw * 10) / 10.0;
+		final boolean fine = roi == 0 && f.profit != 0;
+		final double shown = fine ? Math.round(raw * 100) / 100.0 : roi;
+		final String roiStr = (shown > 0 ? "+" : "")
+			+ String.format(java.util.Locale.ROOT, fine ? "%.2f" : "%.1f", shown) + "%";
+		return Fmt.full(f.qty) + " @ " + Fmt.compact(f.buyGross / f.qty) + " · " + roiStr;
+	}
+
 	private JPanel logFlipRow(FlipLogEngine.Flip f)
 	{
 		final JPanel rowP = new JPanel(new BorderLayout(6, 0));
@@ -616,16 +648,15 @@ class PriceCheckPanel extends PluginPanel
 		if (itemManager != null) { itemManager.getImage(f.itemId).addTo(icon); }
 		final JLabel name = new JLabel("<html><body style='width:110px'><b>"
 			+ escHtml(f.name != null ? f.name : ("#" + f.itemId)) + "</b>"
-			+ (f.check ? " <span style='color:#9a917c'>check</span>" : "") + "</body></html>");
+			+ (f.check ? " <span style='color:#e6c667'>check</span>" : "") + "</body></html>");
 		name.setForeground(Color.WHITE);
 		final JLabel profit = mono(gpSign(f.profit), f.profit >= 0 ? Palette.GREEN : Palette.RED);
 		profit.setHorizontalAlignment(SwingConstants.RIGHT);
 		final JPanel line1 = row();
 		line1.add(name, BorderLayout.CENTER);
 		line1.add(profit, BorderLayout.EAST);
-		final double roi = f.buyGross > 0 ? 100.0 * f.profit / f.buyGross : 0;
-		final JLabel det = mono(Fmt.full(f.qty) + " × · " + String.format(java.util.Locale.ROOT, "%.1f", roi) + "%", Palette.SUBTLE);
-		final JLabel when = mono(dur(Math.max(0, f.closedAt - f.openedAt)), Palette.SUBTLE);
+		final JLabel det = mono(flipDetail(f), Palette.SUBTLE);
+		final JLabel when = mono("in " + dur(Math.max(0, f.closedAt - f.openedAt)), Palette.SUBTLE);
 		when.setHorizontalAlignment(SwingConstants.RIGHT);
 		final JPanel line2 = row();
 		line2.add(det, BorderLayout.CENTER);
@@ -1598,15 +1629,31 @@ class PriceCheckPanel extends PluginPanel
 		return p;
 	}
 
-	private JLabel sectionHeader(String text)
+	private JComponent sectionHeader(String text)
 	{
 		final JLabel h = new JLabel(text.toUpperCase(Locale.ROOT));
 		h.setFont(FontManager.getRunescapeSmallFont());
 		h.setForeground(Palette.GOLD);
-		h.setBorder(BorderFactory.createEmptyBorder(2, 1, 6, 0));
-		h.setAlignmentX(Component.LEFT_ALIGNMENT);
-		h.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
-		return h;
+		h.setBorder(BorderFactory.createEmptyBorder(2, 1, 6, 8));
+		// A hairline rule fills the rest of the header line; raised a little
+		// so it tracks the text's optical middle, not the padded label's.
+		final JPanel rule = new JPanel();
+		rule.setBackground(HAIRLINE);
+		rule.setPreferredSize(new Dimension(1, 1));
+		final JPanel ruleWrap = new JPanel(new GridBagLayout());
+		ruleWrap.setOpaque(false);
+		final GridBagConstraints rc = new GridBagConstraints();
+		rc.weightx = 1;
+		rc.fill = GridBagConstraints.HORIZONTAL;
+		rc.insets = new Insets(0, 0, 4, 0);
+		ruleWrap.add(rule, rc);
+		final JPanel p = new JPanel(new BorderLayout());
+		p.setOpaque(false);
+		p.add(h, BorderLayout.WEST);
+		p.add(ruleWrap, BorderLayout.CENTER);
+		p.setAlignmentX(Component.LEFT_ALIGNMENT);
+		p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+		return p;
 	}
 
 	private JPanel kv(String k, String v)
@@ -1644,11 +1691,13 @@ class PriceCheckPanel extends PluginPanel
 
 	private JLabel note(String text, Color col)
 	{
-		final JLabel l = new JLabel(text);
+		// HTML with a fixed body width wraps; a plain label clips mid-sentence
+		// at the panel's 226px.
+		final JLabel l = new JLabel("<html><body style='width:176px'>" + escHtml(text) + "</body></html>");
+		l.setFont(FontManager.getRunescapeSmallFont());
 		l.setForeground(col);
 		l.setBorder(BorderFactory.createEmptyBorder(6, 2, 6, 2));
 		l.setAlignmentX(Component.LEFT_ALIGNMENT);
-		l.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
 		return l;
 	}
 
