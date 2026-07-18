@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import net.runelite.api.Client;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
@@ -47,7 +46,8 @@ class GeItemCardOverlay extends Overlay
 	private final ConfigManager configManager;
 
 	private boolean collapsed;
-	private final Set<Integer> expandedItems = new java.util.HashSet<>();
+	// At most ONE card rides big at a time; opening another swaps it. 0 = none.
+	private int expandedItem;
 	// Canvas-space buttons drawn this frame, valid only while Shift is held.
 	private volatile List<Object[]> buttons = java.util.Collections.emptyList();
 
@@ -206,15 +206,31 @@ class GeItemCardOverlay extends Overlay
 		}
 
 		final boolean shift = client.isKeyPressed(KeyCode.KC_SHIFT);
+		// Height budget: the stack degrades before it can leave the screen.
+		// Full needs ~330px, a mini ~105, a bar ~28; anything beyond becomes
+		// a one-line count.
+		final int budget = client.getCanvasHeight() - 8;
 		int y = anchor.y;
 		int idx = 0;
+		int remainingItems = items.size();
 		for (final int geId : items.keySet())
 		{
-			final boolean expanded = expandedItems.contains(geId);
-			final GeItemInfoPainter.Context c = buildContext(geId, offers, expanded);
+			final int left = budget - y;
+			final int othersMin = (remainingItems - 1) * 30;
+			if (left < 30)
+			{
+				final GeItemInfoPainter.Context more = new GeItemInfoPainter.Context();
+				more.itemName = "+" + remainingItems + " more";
+				paintAt(g, anchor.x, y, () -> GeItemInfoPainter.paintCompact(g, more));
+				break;
+			}
+			final boolean wantFull = geId == expandedItem && !collapsed;
+			final boolean canFull = wantFull && left - othersMin >= 335;
+			final boolean canChart = !collapsed && idx < MAX_CHARTED && left - othersMin >= 108;
+			final GeItemInfoPainter.Context c = buildContext(geId, offers, canFull || canChart);
 			final Dimension d;
 			final int yy = y;
-			if (expanded && !collapsed)
+			if (canFull)
 			{
 				final FlipData live = plugin.liveFor(geId);
 				if (c.outcomeText == null && live != null)
@@ -227,7 +243,7 @@ class GeItemCardOverlay extends Overlay
 			}
 			else
 			{
-				if (collapsed || idx >= MAX_CHARTED)
+				if (!canChart)
 				{
 					c.series = null;
 				}
@@ -238,18 +254,9 @@ class GeItemCardOverlay extends Overlay
 				// Per-card grow or shrink; the top card also carries the
 				// stack-wide bars toggle to its left.
 				final int bx = d.width - BTN - 4;
-				paintButton(g, anchor.x + bx, yy + 4, expanded);
+				paintButton(g, anchor.x + bx, yy + 4, canFull);
 				hits.add(new Object[]{new Rectangle(anchor.x + bx, yy + 4, BTN, BTN), (Runnable) () ->
-				{
-					if (expandedItems.contains(geId))
-					{
-						expandedItems.remove(geId);
-					}
-					else
-					{
-						expandedItems.add(geId);
-					}
-				}});
+					expandedItem = expandedItem == geId ? 0 : geId});
 				if (idx == 0)
 				{
 					final int bx2 = bx - BTN - 6;
@@ -263,6 +270,7 @@ class GeItemCardOverlay extends Overlay
 			}
 			y += d.height + 6;
 			idx++;
+			remainingItems--;
 		}
 		return null;
 	}
