@@ -44,7 +44,10 @@ public class FlipData
 			case "qty": return "Slow Fills";
 			case "ev": return "Low EV";
 			case "profit": return "Small Margin";
-			default: return risk.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + risk.substring(1);
+			// Unknown code from a newer server: show it capitalized. An empty
+			// string means no usable label at all, same as null.
+			default: return risk.isEmpty() ? null
+				: risk.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + risk.substring(1);
 		}
 	}
 }

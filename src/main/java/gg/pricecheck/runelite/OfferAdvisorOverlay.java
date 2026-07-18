@@ -50,7 +50,8 @@ class OfferAdvisorOverlay extends Overlay
 	private final PriceCheckConfig config;
 	private final ConfigManager configManager;
 
-	private boolean collapsed;
+	// Written on the mouse thread, read on the render thread, like toggleBounds.
+	private volatile boolean collapsed;
 	// Canvas-space hit box for the [-]/[+] button, valid only while Shift is
 	// held (button visible). Volatile: written on the render thread, read on
 	// the mouse thread.
