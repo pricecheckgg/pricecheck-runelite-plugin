@@ -39,6 +39,7 @@ public final class HeaderPreview
 			public void onBuildPlan(long capital, int slots, int accounts, int hours) { }
 			public void onDeleteFlip(String flipId) { }
 			public void onDeleteLot(int itemId, int qty, long cost, long openedAt) { }
+			public void onOpenPluginConfig() { }
 		};
 
 		final PriceCheckPanel[] holder = new PriceCheckPanel[1];

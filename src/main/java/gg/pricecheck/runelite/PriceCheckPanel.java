@@ -72,6 +72,7 @@ class PriceCheckPanel extends PluginPanel
 		void onBuildPlan(long capital, int slots, int accounts, int hours);
 		void onDeleteFlip(String flipId);
 		void onDeleteLot(int itemId, int qty, long cost, long openedAt);
+		void onOpenPluginConfig();   // jump to the RuneLite config panel for this plugin
 	}
 
 	private final Listener listener;
@@ -1340,6 +1341,21 @@ class PriceCheckPanel extends PluginPanel
 		evRow.add(evLbl, BorderLayout.WEST);
 		evRow.add(spinWrap, BorderLayout.EAST);
 		v.add(evRow);
+		v.add(gap(8));
+
+		// The panel shows the everyday options; the full set (overlays, GE
+		// helpers, data sharing) lives in RuneLite's own config panel, which
+		// users rarely think to open. This jumps straight to it.
+		final JLabel allOpts = new JLabel("<html><span style='color:#9a917c'>All options · </span><span style='color:#e6c667'>RuneLite plugin settings</span></html>");
+		allOpts.setFont(FontManager.getRunescapeSmallFont());
+		allOpts.setAlignmentX(Component.LEFT_ALIGNMENT);
+		allOpts.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		allOpts.setToolTipText("Every PriceCheck toggle, including overlay and GE options");
+		allOpts.addMouseListener(new MouseAdapter()
+		{
+			public void mousePressed(MouseEvent e) { listener.onOpenPluginConfig(); }
+		});
+		v.add(allOpts);
 
 		v.add(gap(10));
 		v.add(discordCard());

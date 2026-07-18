@@ -30,6 +30,7 @@ public final class CardPreview
 			public void onBuildPlan(long c, int s, int a, int h) { }
 			public void onDeleteFlip(String id) { }
 			public void onDeleteLot(int i, int q, long c, long o) { }
+			public void onOpenPluginConfig() { }
 		};
 		final javax.swing.JComponent[] card = new javax.swing.JComponent[1];
 		EventQueue.invokeAndWait(() ->

@@ -37,6 +37,7 @@ public final class FlipsPreview
 			public void onBuildPlan(long capital, int slots, int accounts, int hours) { }
 			public void onDeleteFlip(String flipId) { }
 			public void onDeleteLot(int itemId, int qty, long cost, long openedAt) { }
+			public void onOpenPluginConfig() { }
 		};
 
 		final JPanel[] holder = new JPanel[1];

@@ -69,6 +69,9 @@ public class PriceCheckPlugin extends Plugin
 	private net.runelite.client.game.ItemManager itemManager;
 
 	@Inject
+	private net.runelite.client.eventbus.EventBus eventBus;
+
+	@Inject
 	private PriceCheckConfig config;
 
 	@Inject
@@ -218,6 +221,12 @@ public class PriceCheckPlugin extends Plugin
 			public void onDeleteLot(int itemId, int qty, long cost, long openedAt)
 			{
 				deleteLot(itemId, qty, cost, openedAt);
+			}
+
+			@Override
+			public void onOpenPluginConfig()
+			{
+				openPluginConfig();
 			}
 		}, itemManager, configManager, config);
 		navButton = NavigationButton.builder()
@@ -427,6 +436,22 @@ public class PriceCheckPlugin extends Plugin
 		{
 			p.setDetectedCapital((bankCoins + invCoins) + (bankPlat + invPlat) * 1000L);
 		}
+	}
+
+	/** Opens RuneLite's own config panel at this plugin, the same way the
+	 * overlay right-click "Configure" entry does: ConfigPlugin listens for
+	 * this event and needs only an overlay that knows its owning plugin. */
+	void openPluginConfig()
+	{
+		final OfferAdvisorOverlay target = advisorOverlay;
+		if (target == null)
+		{
+			return;
+		}
+		eventBus.post(new net.runelite.client.events.OverlayMenuClicked(
+			new net.runelite.client.ui.overlay.OverlayMenuEntry(
+				net.runelite.api.MenuAction.RUNELITE_OVERLAY_CONFIG, "Configure", "PriceCheck"),
+			target));
 	}
 
 	@Override

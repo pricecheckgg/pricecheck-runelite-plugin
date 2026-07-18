@@ -58,6 +58,9 @@ class OfferAdvisorOverlay extends Overlay
 
 	OfferAdvisorOverlay(Client client, PriceCheckPlugin plugin, PriceCheckConfig config, ConfigManager configManager)
 	{
+		// The base class must know its owning plugin: the synthetic
+		// open-config event resolves the target plugin through the overlay.
+		super(plugin);
 		this.client = client;
 		this.plugin = plugin;
 		this.config = config;
