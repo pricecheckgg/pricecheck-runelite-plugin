@@ -161,6 +161,32 @@ public class PriceCheckApiClient
 		int fillPct;
 	}
 
+	/** Bind the current game account to an active trial. The server no-ops
+	 * for non-trial users, so this is safe to send on every login. */
+	void bindTrialAccount(String key, long accountHash)
+	{
+		if (key == null || key.trim().isEmpty() || accountHash == 0 || accountHash == -1)
+		{
+			return;
+		}
+		final java.util.Map<String, Object> body = new java.util.HashMap<>();
+		body.put("accountHash", String.valueOf(accountHash));
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("trial").addPathSegment("account").build())
+			.header("Authorization", "Bearer " + key.trim())
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			// Outcome is server-side; a revoked trial surfaces naturally as
+			// the next market poll losing access.
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck trial bind failed", e);
+		}
+	}
+
 	/** Fetch the evidence-chart series for one item. Null on any failure. */
 	SeriesData fetchSeries(String key, int geId)
 	{

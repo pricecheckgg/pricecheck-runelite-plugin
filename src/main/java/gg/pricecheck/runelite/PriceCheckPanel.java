@@ -1619,10 +1619,24 @@ class PriceCheckPanel extends PluginPanel
 			}
 			else
 			{
-				final long days = Math.max(0, (acct.getExpiresAt() - System.currentTimeMillis() + 86_399_999L) / 86_400_000L);
+				final long msLeft = acct.getExpiresAt() - System.currentTimeMillis();
+				final long days = Math.max(0, (msLeft + 86_399_999L) / 86_400_000L);
 				final boolean renews = "stripe".equals(acct.getSource());
-				lic = days <= 0 ? "License expired"
-					: (renews ? "Renews in " : "") + days + (renews ? (days == 1 ? " day" : " days") : (days == 1 ? " day left" : " days left"));
+				if (msLeft <= 0)
+				{
+					lic = "License expired";
+				}
+				else if (msLeft < 48 * 3_600_000L)
+				{
+					// Short windows (trials) read in hours, not "1 day".
+					final long hours = Math.max(1, msLeft / 3_600_000L);
+					lic = (renews ? "Renews in " : "") + hours + (hours == 1 ? " hour" : " hours")
+						+ (renews ? "" : " left");
+				}
+				else
+				{
+					lic = (renews ? "Renews in " : "") + days + (renews ? (days == 1 ? " day" : " days") : (days == 1 ? " day left" : " days left"));
+				}
 			}
 			final int n = acct.getTrackedCount();
 			acctSub.setText(lic + " · watching " + n + (n == 1 ? " item" : " items"));

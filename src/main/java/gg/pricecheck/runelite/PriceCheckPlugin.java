@@ -672,6 +672,14 @@ public class PriceCheckPlugin extends Plugin
 		else if (gs == net.runelite.api.GameState.LOGGED_IN && flipLog != null)
 		{
 			flipLog.setAccount(client.getAccountHash());
+			// Trial binding: ties this game account to an active trial. The
+			// server no-ops for everyone else, so one call per login is fine.
+			final long acctHash = client.getAccountHash();
+			if (acctHash != 0 && acctHash != -1 && acctHash != trialBoundHash)
+			{
+				trialBoundHash = acctHash;
+				poller.execute(() -> api.bindTrialAccount(config.apiKey(), acctHash));
+			}
 			final FlipLogEngine engine = flipLog;
 			if (syncs)
 			{
@@ -933,6 +941,8 @@ public class PriceCheckPlugin extends Plugin
 	// The last flips poll's verdict on market-data access. Premium surfaces
 	// (the GE cards) stay dark for free keys instead of rendering shells.
 	private volatile boolean marketDataOk;
+	// Last game account offered to the trial-bind endpoint this session.
+	private volatile long trialBoundHash;
 
 	boolean marketDataOk()
 	{
