@@ -285,6 +285,18 @@ class PriceCheckPanel extends PluginPanel
 	private final JLabel cellFlips = new JLabel(" ");
 	private final JLabel cellWon = new JLabel(" ");
 	private final JLabel cellRoi = new JLabel(" ");
+
+	// ── inline evidence chart on the Flips tab ──
+	// Click a board row and its day chart expands underneath, with your own
+	// logged fills painted on it. The plugin supplies cached series data.
+	private int expandedChartId = 0;
+	private java.util.function.IntFunction<PriceCheckApiClient.SeriesData> seriesSupplier;
+	private volatile FlipLogEngine.Summary lastLogSummary;
+
+	void setSeriesSupplier(java.util.function.IntFunction<PriceCheckApiClient.SeriesData> s)
+	{
+		seriesSupplier = s;
+	}
 	private final Dot logSyncDot = new Dot();
 	private final JLabel logSync = new JLabel(" ");
 	private final JPanel logList = new JPanel();
@@ -647,6 +659,7 @@ class PriceCheckPanel extends PluginPanel
 			{
 				return;
 			}
+			lastLogSummary = s;   // the expanded chart paints your fills from it
 			heroValue.setText(s.sessionProfit == 0 ? "0 gp" : statGp(s.sessionProfit));
 			heroValue.setForeground(s.sessionProfit > 0 ? Palette.GREEN : (s.sessionProfit < 0 ? Palette.RED : Palette.SUBTLE));
 			heroSub.setText(s.sessionProfit == 0 && s.sessionGpHr <= 0
@@ -1618,12 +1631,84 @@ class PriceCheckPanel extends PluginPanel
 		}
 		else
 		{
-			for (FlipData f : shown) { list.add(flipRow(f, trackedIds.contains(f.getGeId()))); list.add(gap(5)); }
+			for (FlipData f : shown)
+			{
+				list.add(flipRow(f, trackedIds.contains(f.getGeId())));
+				if (f.getGeId() == expandedChartId)
+				{
+					list.add(gap(2));
+					list.add(chartCard(f));
+				}
+				list.add(gap(5));
+			}
 		}
 
 		list.add(Box.createVerticalGlue());
 		list.revalidate();
 		list.repaint();
+	}
+
+	/** The expanded evidence chart under a clicked board row. */
+	private JPanel chartCard(FlipData f)
+	{
+		final JPanel card = new JPanel(new BorderLayout());
+		card.setBackground(CARD);
+		card.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+		card.setAlignmentX(Component.LEFT_ALIGNMENT);
+		final PriceCheckApiClient.SeriesData sd = seriesSupplier != null ? seriesSupplier.apply(f.getGeId()) : null;
+		if (sd == null || sd.ts == null || sd.ts.length < 2)
+		{
+			final JLabel wait = new JLabel("Loading day chart…");
+			wait.setFont(FontManager.getRunescapeSmallFont());
+			wait.setForeground(Palette.SUBTLE);
+			card.add(wait, BorderLayout.CENTER);
+			card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
+			// The supplier schedules the fetch; repaint shortly to pick it up.
+			final javax.swing.Timer t = new javax.swing.Timer(1200, e -> render());
+			t.setRepeats(false);
+			t.start();
+			return card;
+		}
+		final ItemChart.Series s = new ItemChart.Series();
+		s.ts = sd.ts;
+		s.high = sd.ah;
+		s.low = sd.al;
+		s.hvol = sd.hv;
+		s.lvol = sd.lv;
+		s.quoteBuy = f.getBuy();
+		s.quoteSell = f.getSell();
+		s.fillPct = sd.fillPct;
+		// Your own logged fills on this item, exact prices from the flip log.
+		final FlipLogEngine.Summary log = lastLogSummary;
+		if (log != null && log.recent != null)
+		{
+			final java.util.List<long[]> marks = new ArrayList<>();
+			for (final FlipLogEngine.Flip fl : log.recent)
+			{
+				if (fl.itemId != f.getGeId() || fl.qty <= 0)
+				{
+					continue;
+				}
+				marks.add(new long[]{fl.openedAt / 1000L, fl.buyGross / fl.qty, 1});
+				marks.add(new long[]{fl.closedAt / 1000L, fl.sellGross / fl.qty, 0});
+			}
+			if (!marks.isEmpty())
+			{
+				s.markTs = new long[marks.size()];
+				s.markPrice = new long[marks.size()];
+				s.markBuy = new boolean[marks.size()];
+				for (int i = 0; i < marks.size(); i++)
+				{
+					s.markTs[i] = marks.get(i)[0];
+					s.markPrice[i] = marks.get(i)[1];
+					s.markBuy[i] = marks.get(i)[2] == 1;
+				}
+			}
+		}
+		final ItemChart chart = new ItemChart(s, 206, 150);
+		card.add(chart, BorderLayout.CENTER);
+		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 168));
+		return card;
 	}
 
 	// ── flip row: icon | name (wraps) / buy>sell+profit / EV | track toggle ──
@@ -1713,10 +1798,19 @@ class PriceCheckPanel extends PluginPanel
 				if (tracked) { listener.onUntrack(f.getGeId()); } else { listener.onTrack(f); }
 			}
 		});
+		rowP.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		rowP.addMouseListener(new MouseAdapter()
 		{
 			public void mouseEntered(MouseEvent e) { rowP.setBackground(CARD_HOVER); }
 			public void mouseExited(MouseEvent e) { rowP.setBackground(CARD); }
+
+			public void mousePressed(MouseEvent e)
+			{
+				// The row toggles its evidence chart; the track mark on the
+				// right has its own listener and consumes its own clicks.
+				expandedChartId = expandedChartId == f.getGeId() ? 0 : f.getGeId();
+				render();
+			}
 		});
 
 		rowP.add(icon, BorderLayout.WEST);

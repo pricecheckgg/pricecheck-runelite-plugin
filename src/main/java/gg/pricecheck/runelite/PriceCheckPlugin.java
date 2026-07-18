@@ -230,6 +230,7 @@ public class PriceCheckPlugin extends Plugin
 				openPluginConfig();
 			}
 		}, itemManager, configManager, config);
+		panel.setSeriesSupplier(this::cardSeriesFor);
 		navButton = NavigationButton.builder()
 			.tooltip("PriceCheck")
 			.icon(loadIcon())
@@ -748,9 +749,28 @@ public class PriceCheckPlugin extends Plugin
 	// its cached series, and the prints this client has watched arrive: every
 	// advisor poll where the item's insta price moved is one observed trade.
 	private volatile int viewedItemId = 0;
-	private volatile PriceCheckApiClient.SeriesData cardSeries;
-	private volatile int cardSeriesItem = 0;
-	private volatile long cardSeriesAtMs = 0;
+	// Small shared series cache: the GE card and the panel's expanded charts
+	// both read through it. LRU by access order, tiny cap, 60s freshness.
+	private static final class CachedSeries
+	{
+		final PriceCheckApiClient.SeriesData data;
+		final long atMs;
+
+		CachedSeries(PriceCheckApiClient.SeriesData data, long atMs)
+		{
+			this.data = data;
+			this.atMs = atMs;
+		}
+	}
+	private final Map<Integer, CachedSeries> seriesCache = new java.util.LinkedHashMap<Integer, CachedSeries>(8, 0.75f, true)
+	{
+		@Override
+		protected boolean removeEldestEntry(java.util.Map.Entry<Integer, CachedSeries> e)
+		{
+			return size() > 8;
+		}
+	};
+	private final Set<Integer> seriesFetching = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 	private final java.util.ArrayDeque<GeItemInfoPainter.Print> cardPrints = new java.util.ArrayDeque<>();
 	private int printsItemId = 0;
 	private long printsLastHigh = 0;
@@ -774,32 +794,57 @@ public class PriceCheckPlugin extends Plugin
 
 	private void refreshCardSeries()
 	{
-		final int geId = viewedItemId;
-		if (geId <= 0)
+		refreshSeries(viewedItemId);
+	}
+
+	private void refreshSeries(int geId)
+	{
+		if (geId <= 0 || !seriesFetching.add(geId))
 		{
 			return;
 		}
-		if (geId == cardSeriesItem && System.currentTimeMillis() - cardSeriesAtMs < 60_000L)
+		try
 		{
-			return;
+			synchronized (seriesCache)
+			{
+				final CachedSeries c = seriesCache.get(geId);
+				if (c != null && System.currentTimeMillis() - c.atMs < 60_000L)
+				{
+					return;
+				}
+			}
+			final PriceCheckApiClient.SeriesData d = api.fetchSeries(config.apiKey(), geId);
+			if (d != null)
+			{
+				synchronized (seriesCache)
+				{
+					seriesCache.put(geId, new CachedSeries(d, System.currentTimeMillis()));
+				}
+			}
 		}
-		final PriceCheckApiClient.SeriesData d = api.fetchSeries(config.apiKey(), geId);
-		if (d != null)
+		finally
 		{
-			cardSeries = d;
-			cardSeriesItem = geId;
-			cardSeriesAtMs = System.currentTimeMillis();
+			seriesFetching.remove(geId);
 		}
 	}
 
+	/** Cached series for any surface; schedules a refresh when absent or stale. */
 	PriceCheckApiClient.SeriesData cardSeriesFor(int geId)
 	{
-		// Opportunistic refresh: the poller owns the fetch, render just reads.
-		if (geId > 0 && poller != null && (geId != cardSeriesItem || System.currentTimeMillis() - cardSeriesAtMs > 60_000L))
+		if (geId <= 0)
 		{
-			poller.execute(this::refreshCardSeries);
+			return null;
 		}
-		return geId == cardSeriesItem ? cardSeries : null;
+		CachedSeries c;
+		synchronized (seriesCache)
+		{
+			c = seriesCache.get(geId);
+		}
+		if (poller != null && (c == null || System.currentTimeMillis() - c.atMs > 60_000L))
+		{
+			poller.execute(() -> refreshSeries(geId));
+		}
+		return c != null ? c.data : null;
 	}
 
 	java.util.List<GeItemInfoPainter.Print> cardPrintsFor(int geId)

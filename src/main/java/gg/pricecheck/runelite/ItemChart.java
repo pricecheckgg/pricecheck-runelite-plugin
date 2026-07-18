@@ -38,6 +38,11 @@ class ItemChart extends JComponent
 		int fcFrom = -1;    // forecast band UTC hours, -1 = none
 		int fcTo = -1;
 		String fcNote;      // e.g. "held 14/18 days"
+		// Your own logged fills on this item, from the flip log: exact prices,
+		// not approximations. Painted as buy/sell triangles on the series.
+		long[] markTs;
+		long[] markPrice;
+		boolean[] markBuy;
 	}
 
 	private static final Color CORRIDOR = new Color(255, 255, 255, 22);
@@ -155,6 +160,41 @@ class ItemChart extends JComponent
 			{
 				final int x = PAD_L + Math.round(i * dx);
 				g2.fillRect(x - 1, chartY, 3, 3);
+			}
+		}
+
+		// Your logged fills: exact buy/sell prices from the flip log, painted
+		// where they happened. Triangle up = your buy, down = your sell.
+		if (d.markTs != null)
+		{
+			for (int i = 0; i < d.markTs.length; i++)
+			{
+				if (d.markTs[i] < tMin || d.markTs[i] > tMax || d.markPrice[i] <= 0)
+				{
+					continue;
+				}
+				final float mx = PAD_L + (d.markTs[i] - tMin) / (float) (tMax - tMin) * chartW;
+				final float my = y(d.markPrice[i], min, max, chartY, chartH);
+				final Path2D tri = new Path2D.Float();
+				if (d.markBuy[i])
+				{
+					tri.moveTo(mx - 4, my + 3);
+					tri.lineTo(mx + 4, my + 3);
+					tri.lineTo(mx, my - 4);
+				}
+				else
+				{
+					tri.moveTo(mx - 4, my - 3);
+					tri.lineTo(mx + 4, my - 3);
+					tri.lineTo(mx, my + 4);
+				}
+				tri.closePath();
+				g2.setColor(new Color(0, 0, 0, 170));
+				g2.translate(1, 1);
+				g2.fill(tri);
+				g2.translate(-1, -1);
+				g2.setColor(d.markBuy[i] ? Palette.GREEN : Palette.RED);
+				g2.fill(tri);
 			}
 		}
 
