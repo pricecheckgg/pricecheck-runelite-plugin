@@ -32,7 +32,7 @@ class TelemetryCollector
 
 	private final Object lock = new Object();
 	private final ArrayDeque<Map<String, Object>> queue = new ArrayDeque<>();
-	// Last queued fingerprint per slot — login replays and duplicate change
+	// Last queued fingerprint per slot: login replays and duplicate change
 	// events for the same offer state dedupe here.
 	private final String[] lastFp = new String[SLOTS];
 
@@ -85,7 +85,7 @@ class TelemetryCollector
 	}
 
 	/** Up to one batch of queued events, or an empty list. Drained events are
-	 *  gone — a failed send drops them (telemetry is best-effort by design). */
+	 *  gone: a failed send drops them (telemetry is best-effort by design). */
 	List<Map<String, Object>> drain()
 	{
 		synchronized (lock)

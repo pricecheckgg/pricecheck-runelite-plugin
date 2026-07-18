@@ -12,8 +12,8 @@ import javax.swing.BoxLayout;
 import javax.swing.JPanel;
 
 /**
- * Dev-only: renders Flips-tab board rows headlessly to a PNG — a confirmed
- * row, risk-tier rows (Stale Prints / Big), and a plain row — so the row
+ * Dev-only: renders Flips-tab board rows headlessly to a PNG: a confirmed
+ * row, risk-tier rows (Stale Prints / Big), and a plain row: so the row
  * design can be iterated without a live feed. Args: [outputPath]. Never
  * shipped (test source set).
  */

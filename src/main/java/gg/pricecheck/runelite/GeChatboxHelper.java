@@ -21,14 +21,14 @@ import net.runelite.client.callback.ClientThread;
 /**
  * The two Grand Exchange chatbox integrations:
  *
- * 1) PRICE FILL — when the "Set a price for each item:" input opens, inject
+ * 1) PRICE FILL: when the "Set a price for each item:" input opens, inject
  *    clickable lines with our engine's queue-jumping price for that side (and
  *    your break-even floor when selling a tracked position). A click pre-fills
- *    the input exactly as if typed — the user still presses Enter, so it stays
+ *    the input exactly as if typed: the user still presses Enter, so it stays
  *    one input action per click (the accepted pattern from approved Hub
  *    plugins: pre-fill via the mes-layer input varcstr, never submit).
  *
- * 2) SEARCH SUGGESTIONS — while the GE item search is EMPTY, feed our tracked
+ * 2) SEARCH SUGGESTIONS: while the GE item search is EMPTY, feed our tracked
  *    items + top live flips into the client's native search-result buffer
  *    (GrandExchangeSearched consume + setGeSearchResultIds). The game renders
  *    them as ordinary clickable result rows and selecting one is 100% vanilla
@@ -142,7 +142,7 @@ class GeChatboxHelper
 		final long price = live == null ? -1 : (isBuy ? live.getBuy() : live.getSell());
 		if (price <= 0)
 		{
-			return;   // no live data yet — stay silent rather than suggest something wrong
+			return;   // no live data yet: stay silent rather than suggest something wrong
 		}
 		// Big-lane items carry a measured resting quote (band levels when the
 		// series backs them): offer the snipe with its odds first, keep the
@@ -268,7 +268,7 @@ class GeChatboxHelper
 		final String cur = client.getVarcStrValue(VARC_INPUT_TEXT);
 		if (cur != null && !cur.isEmpty() && !cur.equals(SENTINEL))
 		{
-			// A real search is in the buffer — don't hijack it, and if we were
+			// A real search is in the buffer: don't hijack it, and if we were
 			// active a moment ago make sure nothing of ours lingers over it.
 			if (suggestActive || banner != null)
 			{
@@ -488,7 +488,7 @@ class GeChatboxHelper
 	}
 
 	// Tracked positions first (you manage those), then the board by EV. The
-	// result buffer takes shorts — ids above that range can't be suggested.
+	// result buffer takes shorts: ids above that range can't be suggested.
 	private short[] suggestionIds()
 	{
 		final Set<Integer> out = new LinkedHashSet<>();

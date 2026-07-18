@@ -21,7 +21,7 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 /**
  * The live advisor, floating fallback for when the GE grid isn't open. One
  * compact line per offer: status dot + item left, live instruction + margin
- * right. On-track rows drop the "OK" word — the green dot carries it — so the
+ * right. On-track rows drop the "OK" word: the green dot carries it: so the
  * box is quiet until something needs a hand. Hold Shift and a small [-]
  * appears in the header: click it to collapse the box to a title pill; Shift
  * again shows [+] to expand. The state persists across sessions. Draggable;

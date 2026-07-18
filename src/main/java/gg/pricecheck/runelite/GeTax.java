@@ -4,7 +4,7 @@ package gg.pricecheck.runelite;
  * Grand Exchange tax, mirroring the server exactly so client advice and server
  * margins never disagree: 2% of the sell price, floored, capped at 5,000,000 per
  * item; sells under 50gp are untaxed. (Bond/starter-tool exemptions are ignored
- * here — those items aren't flipped.)
+ * here: those items aren't flipped.)
  */
 final class GeTax
 {
@@ -34,7 +34,7 @@ final class GeTax
 	{
 		long s = (long) Math.ceil(buy / 0.98D);
 		// The estimate is within a couple gp of the true breakeven (tax is floored),
-		// so both nudges are tiny — bounded so a bad input can never spin.
+		// so both nudges are tiny: bounded so a bad input can never spin.
 		int guard = 0;
 		while (s > buy && net(buy, s - 1) >= 0 && guard++ < 128)
 		{

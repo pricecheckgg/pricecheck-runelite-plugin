@@ -331,7 +331,7 @@ class PriceCheckPanel extends PluginPanel
 		}
 	}
 
-	/** A small painted ">" between buy and sell — the RuneScape font has no arrow glyph. */
+	/** A small painted ">" between buy and sell: the RuneScape font has no arrow glyph. */
 	private static final class Chevron extends JComponent
 	{
 		private final Color color;
@@ -406,7 +406,7 @@ class PriceCheckPanel extends PluginPanel
 		box.setIconTextGap(8);
 	}
 
-	/** A painted check, plus, or cross — the RuneScape font has none of them. */
+	/** A painted check, plus, or cross: the RuneScape font has none of them. */
 	private static final class Mark extends JComponent
 	{
 		static final int CHECK = 0;
@@ -558,7 +558,7 @@ class PriceCheckPanel extends PluginPanel
 		head.add(Box.createVerticalStrut(6));
 
 		// Second strip: the ledger's shape rather than its gp. Checks and
-		// untracked sells live in the tooltips — detail, not headline.
+		// untracked sells live in the tooltips: detail, not headline.
 		final JPanel cols2 = new JPanel(new GridLayout(1, 3, 8, 0));
 		cols2.setBackground(CARD);
 		cols2.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -781,7 +781,7 @@ class PriceCheckPanel extends PluginPanel
 		rowP.setComponentPopupMenu(menu);
 	}
 
-	/** "1 @ 40.0m · -0.1%" — qty at unit buy price, then signed return. Falls
+	/** "1 @ 40.0m · -0.1%": qty at unit buy price, then signed return. Falls
 	 * back to bare qty when the buy side is unknown (shouldn't happen for real
 	 * flips, but a zero denominator must not render garbage). */
 	private static String flipDetail(FlipLogEngine.Flip f)
@@ -794,7 +794,7 @@ class PriceCheckPanel extends PluginPanel
 			+ " · " + pctSigned(100.0 * f.profit / f.buyGross);
 	}
 
-	/** Signed percent, one decimal — two when that would show a flat 0.0 for a
+	/** Signed percent, one decimal: two when that would show a flat 0.0 for a
 	 * real gain or loss (big-ticket flips live in the hundredths). */
 	private static String pctSigned(double raw)
 	{
@@ -1829,7 +1829,7 @@ class PriceCheckPanel extends PluginPanel
 		icon.setHorizontalAlignment(SwingConstants.CENTER);
 		if (itemManager != null) { itemManager.getImage(f.getGeId()).addTo(icon); }
 
-		// The name gets the whole first line and wraps instead of truncating —
+		// The name gets the whole first line and wraps instead of truncating -
 		// the fixed body width makes the HTML label report a real wrapped
 		// preferred height, which plain labels in a BorderLayout won't.
 		final JLabel name = new JLabel("<html><body style='width:126px'><b>" + escHtml(f.getName()) + "</b></body></html>");

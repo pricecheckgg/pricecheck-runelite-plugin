@@ -560,7 +560,7 @@ class FlipLogEngine
 			return;
 		}
 
-		// Desync: the slot was changed from another client — resync, no delta.
+		// Desync: the slot was changed from another client: resync, no delta.
 		if (snap != null && (snap.itemId != itemId || snap.price != price || snap.total != totalQty))
 		{
 			snap = null;

@@ -5,7 +5,7 @@ import lombok.Data;
 /**
  * One flip as served by GET /api/plugin/flips. Field names match the server's
  * trimmed plugin shape exactly, so Gson maps them directly. No scoring internals
- * are sent — this is all the client ever sees.
+ * are sent: this is all the client ever sees.
  */
 @Data
 public class FlipData

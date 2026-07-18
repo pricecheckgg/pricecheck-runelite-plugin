@@ -78,7 +78,7 @@ public class PriceCheckPlugin extends Plugin
 	private PriceCheckApiClient api;
 
 	// Our OWN single poller thread. Blocking HTTP must never run on RuneLite's
-	// shared ScheduledExecutorService — that would stall every other plugin.
+	// shared ScheduledExecutorService: that would stall every other plugin.
 	private ScheduledExecutorService poller;
 
 	private PriceCheckPanel panel;
@@ -127,7 +127,7 @@ public class PriceCheckPlugin extends Plugin
 
 	// Liquid capital (coins + platinum tokens) snapshotted from container events
 	// on the client thread; reported to the planner when it changes. The bank is
-	// only readable once opened, so nothing is sent before bankSeen — inventory
+	// only readable once opened, so nothing is sent before bankSeen: inventory
 	// pocket change alone would overwrite the real number on the server.
 	private static final int COINS_ID = 995;
 	private static final int PLAT_ID = 13204;
@@ -742,8 +742,8 @@ public class PriceCheckPlugin extends Plugin
 			// replays the real offers after login. Passing those EMPTYs through
 			// would wipe the collector's dedupe fingerprints and re-queue every
 			// live offer as a phantom event on each hop (the same narrow filter
-			// RuneLite's core GE plugin uses). A logged-in EMPTY — a genuinely
-			// cleared slot — still flows.
+			// RuneLite's core GE plugin uses). A logged-in EMPTY: a genuinely
+			// cleared slot: still flows.
 			final boolean hopBlank = event.getOffer() != null
 				&& event.getOffer().getState() == net.runelite.api.GrandExchangeOfferState.EMPTY
 				&& client.getGameState() != net.runelite.api.GameState.LOGGED_IN;
@@ -763,7 +763,7 @@ public class PriceCheckPlugin extends Plugin
 		return w != null && !w.isHidden();
 	}
 
-	// The item currently open in the GE "Set up offer" screen — the setup overlay
+	// The item currently open in the GE "Set up offer" screen: the setup overlay
 	// notes it here so the poller pulls its live price for the "type X" hint.
 	private volatile int setupItemId = 0;
 
@@ -1282,7 +1282,7 @@ public class PriceCheckPlugin extends Plugin
 		}
 		catch (RuntimeException ignored)
 		{
-			// icon.png not bundled yet — fall through to a blank placeholder.
+			// icon.png not bundled yet: fall through to a blank placeholder.
 		}
 		return new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
 	}

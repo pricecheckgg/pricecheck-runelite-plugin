@@ -4,7 +4,7 @@ import java.util.List;
 import lombok.Data;
 
 /**
- * A slot-planner result as served by GET /api/plugin/plan — the same engine the
+ * A slot-planner result as served by GET /api/plugin/plan: the same engine the
  * web dashboard uses. Field names match the server response exactly for Gson.
  */
 @Data

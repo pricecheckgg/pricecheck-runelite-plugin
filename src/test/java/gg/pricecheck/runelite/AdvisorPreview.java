@@ -9,7 +9,7 @@ import java.util.List;
 import javax.imageio.ImageIO;
 
 /**
- * Dev-only: renders the floating advisor overlay headlessly to a PNG —
+ * Dev-only: renders the floating advisor overlay headlessly to a PNG -
  * expanded, expanded+Shift, and collapsed+Shift, side by side over a flat
  * canvas-coloured ground. Args: [outputPath]. Never shipped (test source set).
  */

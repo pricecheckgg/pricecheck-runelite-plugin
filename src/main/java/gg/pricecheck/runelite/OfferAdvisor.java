@@ -4,8 +4,8 @@ import java.awt.Color;
 
 /**
  * The brain. Turns one active GE offer + the live market into an EXACT
- * instruction: keep it, or move it by a precise amount, or kill it. Pure logic —
- * no client or network calls — so it's deterministic and unit-testable.
+ * instruction: keep it, or move it by a precise amount, or kill it. Pure logic -
+ * no client or network calls: so it's deterministic and unit-testable.
  *
  * Market reference (matches the server): to BUY you place at FlipData.buy and to
  * SELL at FlipData.sell. The server's prices are already positioned so an offer
@@ -66,11 +66,11 @@ final class OfferAdvisor
 			final long yourMargin = GeTax.net(yourPrice, marketSell);
 			if (yourMargin <= 0)
 			{
-				// Bid so high it loses even sold at the market high — always report red.
+				// Bid so high it loses even sold at the market high: always report red.
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
 					"Bid too high - " + signed(yourMargin) + " if it fills, lower it", "BID TOO HIGH", RED);
 			}
-			// An offer that has already transacted is demonstrably filling — don't
+			// An offer that has already transacted is demonstrably filling: don't
 			// nag it over small ticks. getQuantitySold covers bought units too.
 			final boolean filling = offer.getSoldQty() > 0;
 			if (!filling && live.isFallingKnife())
@@ -94,7 +94,7 @@ final class OfferAdvisor
 		}
 
 		// SELLING: it fills at/under the current high. Only flag a drop when the ask
-		// is meaningfully (>1%) above market AND nothing has sold yet — an offer that
+		// is meaningfully (>1%) above market AND nothing has sold yet: an offer that
 		// is already selling is filling fine even a touch above the momentary high.
 		final boolean sellFilling = offer.getSoldQty() > 0;
 		final long sellTol = Math.max(marketSell / 100, 1);

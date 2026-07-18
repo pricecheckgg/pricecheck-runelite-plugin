@@ -21,7 +21,7 @@ import okhttp3.Response;
 /**
  * The only network surface. Calls the gated data API with the user's plugin key
  * as a Bearer token. The server re-checks the subscription LIVE on every request,
- * so a lapsed sub returns 403 here and the panel goes empty — there is no local
+ * so a lapsed sub returns 403 here and the panel goes empty: there is no local
  * gate to bypass.
  */
 @Slf4j
@@ -46,7 +46,7 @@ public class PriceCheckApiClient
 		OK, NO_KEY, INVALID_KEY, NO_SUBSCRIPTION, PLAN_REQUIRED, ERROR
 	}
 
-	// 403 means either a lapsed subscription or a plan below Trader Pro — the
+	// 403 means either a lapsed subscription or a plan below Trader Pro: the
 	// body's error code tells them apart so the panel can say the right thing.
 	private AuthState forbiddenState(Response res)
 	{
