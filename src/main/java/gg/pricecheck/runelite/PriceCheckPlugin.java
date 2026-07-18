@@ -974,7 +974,7 @@ public class PriceCheckPlugin extends Plugin
 		final long tol = 360;
 		for (final FlipLogEngine.Lot l : openLots)
 		{
-			if (l.itemId == geId && l.qty > 0 && l.cost / l.qty == price
+			if (l.itemId == geId && l.qty > 0 && sameFillPrice(l.cost / l.qty, price)
 				&& Math.abs(printTs - l.openedAt / 1000L) <= tol)
 			{
 				return 1;
@@ -986,16 +986,25 @@ public class PriceCheckPlugin extends Plugin
 			{
 				continue;
 			}
-			if (fl.buyGross / fl.qty == price && Math.abs(printTs - fl.openedAt / 1000L) <= tol)
+			if (sameFillPrice(fl.buyGross / fl.qty, price) && Math.abs(printTs - fl.openedAt / 1000L) <= tol)
 			{
 				return 1;
 			}
-			if (fl.sellGross / fl.qty == price && Math.abs(printTs - fl.closedAt / 1000L) <= tol)
+			if (sameFillPrice(fl.sellGross / fl.qty, price) && Math.abs(printTs - fl.closedAt / 1000L) <= tol)
 			{
 				return 0;
 			}
 		}
 		return -1;
+	}
+
+	/** The wiki can report a price-improved fill a few coins off the exact
+	 *  amount the log recorded (a 97m sell printed 1 gp under its true unit),
+	 *  so matching allows a whisker that scales with price: 1 gp under 10m,
+	 *  ~10 gp per 100m. Still coin-exact for all practical purposes. */
+	private static boolean sameFillPrice(long unit, long price)
+	{
+		return Math.abs(unit - price) <= Math.max(1, unit / 10_000_000L);
 	}
 
 	/** One advisor poll's worth of print detection across the fetched items. */
