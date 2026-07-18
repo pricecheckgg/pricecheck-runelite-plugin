@@ -308,7 +308,7 @@ final class GeItemInfoPainter
 		// Your open position: the cost basis as a quiet dotted line on the
 		// plot with a diamond at the entry, warm gold when the live edge
 		// covers your breakeven after tax, dim red when underwater. No
-		// gutter label; the plot placement IS the information.
+		// gutter label; position and colour carry it.
 		if (lotUnit > 0)
 		{
 			final boolean covered = d.lastHigh > 0 && d.lastHigh >= GeTax.breakevenSell(lotUnit);
@@ -454,7 +454,7 @@ final class GeItemInfoPainter
 	 * line, and an ink chip with a side letter and a caret at the level.
 	 * Seated offers (already competing at the live edge) wear a solid border
 	 * and a side-coloured caret; off-market ones go dashed with an amber
-	 * caret, the quiet "worth adjusting" cue. */
+	 * caret. */
 	private static void yourLine(Graphics2D g, long price, int lineY, int tagY, boolean sell, boolean seated, int x0, int plotW, FontMetrics fm, int chipH)
 	{
 		final Color accent = sell ? Palette.GREEN : Palette.RED;

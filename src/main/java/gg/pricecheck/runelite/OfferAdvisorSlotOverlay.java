@@ -159,8 +159,7 @@ class OfferAdvisorSlotOverlay extends Overlay
 		g.setColor(Palette.INK);
 		g.fillRoundRect(barX, barY, barW, BAR_H, 6, 6);
 		g.fillRect(barX, barY, barW, 6);
-		// Measured fill odds as a quiet wash from the left: a 96% offer
-		// looks alive across the room, a 39% one looks thin.
+		// Measured fill odds as a subtle wash from the left edge.
 		if (fillPct > 0)
 		{
 			g.setColor(new Color(col.getRed(), col.getGreen(), col.getBlue(), 26));
@@ -196,8 +195,8 @@ class OfferAdvisorSlotOverlay extends Overlay
 		g.setColor(col);
 		g.drawString(text, cx, ty);
 
-		// Right segment, only when it will not crowd the verdict: a sitting
-		// offer's quiet time (the adjust nudge) beats the odds number.
+		// Right segment, only when it will not crowd the verdict: quiet time
+		// once past ten minutes, else the odds number.
 		String side = null;
 		Color sideCol = Palette.SUBTLE_CANVAS;
 		if (quiet && quietMs >= 10 * 60_000L)
