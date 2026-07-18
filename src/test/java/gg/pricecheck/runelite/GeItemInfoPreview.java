@@ -51,14 +51,22 @@ public final class GeItemInfoPreview
 		}
 
 		final GeItemInfoPainter.Context c = new GeItemInfoPainter.Context();
-		c.itemName = "Heavy ballista";
+		c.itemName = "Tumeken's shadow (uncharged)";
 		c.youSells = new long[]{1_050_000};
-		c.stateText = "OK +26.2k";
-		c.stateColor = Palette.GREEN;
+		c.stateText = "B MARGIN DEAD";
+		c.stateColor = Palette.RED;
+		c.stateText2 = "S OK -396.37k";
+		c.stateColor2 = Palette.GREEN;
 		c.series = s;
 		c.nowTs = t0 + n * 300L;
 		final List<GeItemInfoPainter.Print> prints = new ArrayList<>();
 		prints.add(new GeItemInfoPainter.Print(c.nowTs - 9200, 1_041_000, false));
+		prints.add(new GeItemInfoPainter.Print(c.nowTs - 7100, 1_043_500, true));
+		prints.add(new GeItemInfoPainter.Print(c.nowTs - 5400, 1_039_800, false));
+		prints.add(new GeItemInfoPainter.Print(c.nowTs - 3300, 1_047_200, true));
+		prints.add(new GeItemInfoPainter.Print(c.nowTs - 2500, 1_044_100, false));
+		prints.add(new GeItemInfoPainter.Print(c.nowTs - 1600, 1_050_600, true));
+		prints.add(new GeItemInfoPainter.Print(c.nowTs - 900, 1_045_400, false));
 		prints.add(new GeItemInfoPainter.Print(c.nowTs - 430, 1_048_200, true, true, false));
 		prints.add(new GeItemInfoPainter.Print(c.nowTs - 150, 1_046_500, false, true, true));
 		prints.add(new GeItemInfoPainter.Print(c.nowTs - 40, 1_049_900, true));

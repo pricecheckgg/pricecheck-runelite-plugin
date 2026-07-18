@@ -112,10 +112,11 @@ final class GeItemInfoPainter
 		g.setColor(FRAME);
 		g.drawRoundRect(0, 0, W - 1, h - 1, 8, 8);
 
-		// Header: item + live verdicts from the advisor.
+		// Header: verdicts right-aligned first, then the name clipped to the
+		// space that remains so the two can never overprint.
 		int y = PAD + fm.getAscent() - 2;
-		shadowed(g, c.itemName, PAD, y, NAME);
-		paintVerdicts(g, c, fm, W, y);
+		final int nameEnd = paintVerdicts(g, c, fm, W, y);
+		shadowed(g, clip(c.itemName, fm, nameEnd - 6 - PAD), PAD, y, NAME);
 		y += 6;
 		g.setColor(RULE);
 		g.drawLine(PAD - 2, y, W - PAD + 2, y);
@@ -216,7 +217,9 @@ final class GeItemInfoPainter
 		return new Dimension(W, h);
 	}
 
-	private static void paintVerdicts(Graphics2D g, Context c, FontMetrics fm, int width, int y)
+	/** Paints the verdicts right-aligned and returns the leftmost x they
+	 *  reached, so the caller can clip the item name against it. */
+	private static int paintVerdicts(Graphics2D g, Context c, FontMetrics fm, int width, int y)
 	{
 		int right = width - PAD;
 		if (c.stateText2 != null)
@@ -231,6 +234,26 @@ final class GeItemInfoPainter
 			right -= fm.stringWidth(c.stateText);
 			shadowed(g, c.stateText, right, y, c.stateColor != null ? c.stateColor : Palette.SUBTLE);
 		}
+		return right;
+	}
+
+	/** Trim to fit, with a plain two-dot tail (the client font has no ellipsis glyph). */
+	private static String clip(String s, FontMetrics fm, int maxW)
+	{
+		if (s == null)
+		{
+			return "";
+		}
+		if (fm.stringWidth(s) <= maxW)
+		{
+			return s;
+		}
+		String t = s;
+		while (t.length() > 1 && fm.stringWidth(t + "..") > maxW)
+		{
+			t = t.substring(0, t.length() - 1);
+		}
+		return t + "..";
 	}
 
 	/** The compact stack card for the GE grid view: header + chart, nothing
@@ -254,8 +277,8 @@ final class GeItemInfoPainter
 		g.drawRoundRect(0, 0, W - 1, h - 1, 8, 8);
 
 		final int y = 7 + fm.getAscent() - 2;
-		shadowed(g, c.itemName, PAD, y, NAME);
-		paintVerdicts(g, c, fm, W, y);
+		final int nameEnd = paintVerdicts(g, c, fm, W, y);
+		shadowed(g, clip(c.itemName, fm, nameEnd - 6 - PAD), PAD, y, NAME);
 		if (!chartless)
 		{
 			paintChart(g, c, PAD, 7 + lineH + 2, W - 2 * PAD, chartH + 6, fm, true);
@@ -357,6 +380,51 @@ final class GeItemInfoPainter
 			g.translate(-1, -1);
 			g.setColor(basis);
 			g.fill(diamond);
+		}
+
+		// The last trades from the tape, placed on the chart where they
+		// happened: up = someone insta-bought, down = someone insta-sold,
+		// gold = your own fill. The tape says what and when; these show WHERE
+		// each trade landed against your lines.
+		if (!compact && c.prints != null && !c.prints.isEmpty())
+		{
+			final int from = Math.max(0, c.prints.size() - 10);
+			for (int i = from; i < c.prints.size(); i++)
+			{
+				final Print p = c.prints.get(i);
+				if (p.price <= 0)
+				{
+					continue;
+				}
+				final int py = Math.round(ChartKit.y(d, p.price, y0, plotH));
+				if (py < y0 + 2 || py > y0 + plotH - 2)
+				{
+					continue;   // outside the robust scale: an outlier print
+				}
+				final long ts = Math.max(d.tMin, Math.min(p.ts, d.tMax));
+				final int px = Math.max(x0 + 3, Math.min(Math.round(ChartKit.x(d, ts, x0, plotW)), x0 + plotW - 3));
+				final int r = p.yours ? 4 : 3;
+				final Path2D tri = new Path2D.Float();
+				if (p.buySide)
+				{
+					tri.moveTo(px - r, py + r - 1);
+					tri.lineTo(px + r, py + r - 1);
+					tri.lineTo(px, py - r);
+				}
+				else
+				{
+					tri.moveTo(px - r, py - r + 1);
+					tri.lineTo(px + r, py - r + 1);
+					tri.lineTo(px, py + r);
+				}
+				tri.closePath();
+				g.setColor(SHADOW);
+				g.translate(1, 1);
+				g.fill(tri);
+				g.translate(-1, -1);
+				g.setColor(p.yours ? Palette.GOLD : (p.buySide ? Palette.GREEN : Palette.RED));
+				g.fill(tri);
+			}
 		}
 
 		paintLastPrint(g, d, true, x0, y0, plotW, plotH, fm2, occupied);
