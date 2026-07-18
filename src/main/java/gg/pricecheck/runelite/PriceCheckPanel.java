@@ -1,5 +1,6 @@
 package gg.pricecheck.runelite;
 
+import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -99,8 +100,8 @@ class PriceCheckPanel extends PluginPanel
 	private final JLabel acctName = new JLabel("Loading account…");
 	private final JLabel acctPlan = pill("PREMIUM", Palette.GOLD);
 	private final JLabel acctSub = new JLabel(" ");
-	private final JLabel keyPrefixLabel = new JLabel("—");
-	private final JLabel keyDot = new JLabel("●");
+	private final JLabel keyPrefixLabel = new JLabel("-");
+	private final Dot keyDot = new Dot();
 	private final JPasswordField keyField = new JPasswordField();
 	private final JButton saveKeyBtn = new JButton("Save key");
 	private final JCheckBox syncToggle = new JCheckBox("Sync flip log");
@@ -340,6 +341,50 @@ class PriceCheckPanel extends PluginPanel
 			final int cy = getHeight() / 2;
 			g2.drawLine(1, cy - 3, 4, cy);
 			g2.drawLine(4, cy, 1, cy + 3);
+		}
+	}
+
+	/** A painted check or plus — the RuneScape font has no check glyph. */
+	private static final class Mark extends JComponent
+	{
+		private boolean check;
+		private Color color;
+
+		Mark(boolean check, Color color, int w, int h)
+		{
+			this.check = check;
+			this.color = color;
+			setPreferredSize(new Dimension(w, h));
+			setMinimumSize(getPreferredSize());
+			setMaximumSize(getPreferredSize());
+		}
+
+		void set(boolean check, Color color)
+		{
+			this.check = check;
+			this.color = color;
+			repaint();
+		}
+
+		@Override
+		protected void paintComponent(Graphics g)
+		{
+			final Graphics2D g2 = (Graphics2D) g;
+			g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+			g2.setColor(color);
+			final int cx = getWidth() / 2;
+			final int cy = getHeight() / 2;
+			if (check)
+			{
+				g2.drawLine(cx - 4, cy, cx - 1, cy + 3);
+				g2.drawLine(cx - 1, cy + 3, cx + 4, cy - 4);
+			}
+			else
+			{
+				g2.drawLine(cx - 4, cy, cx + 4, cy);
+				g2.drawLine(cx, cy - 4, cx, cy + 4);
+			}
 		}
 	}
 
@@ -1147,8 +1192,7 @@ class PriceCheckPanel extends PluginPanel
 		keyRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
 		keyPrefixLabel.setFont(FontManager.getRunescapeSmallFont());
 		keyPrefixLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		keyDot.setFont(keyDot.getFont().deriveFont(9f));
-		keyDot.setForeground(Palette.SUBTLE);
+		keyDot.setColor(Palette.SUBTLE);
 		keyRow.add(keyPrefixLabel, BorderLayout.CENTER);
 		keyRow.add(keyDot, BorderLayout.EAST);
 		v.add(keyRow);
@@ -1180,7 +1224,7 @@ class PriceCheckPanel extends PluginPanel
 			configManager.setConfiguration(PriceCheckConfig.GROUP, "apiKey", k);
 			keyField.setText("");
 			saveKeyBtn.setEnabled(false);
-			keyDot.setForeground(Palette.AMBER);
+			keyDot.setColor(Palette.AMBER);
 			keyDot.setToolTipText("Checking…");
 			listener.onFetchAccount();
 		});
@@ -1390,7 +1434,7 @@ class PriceCheckPanel extends PluginPanel
 
 	private void setDot(Color c, String tip)
 	{
-		keyDot.setForeground(c);
+		keyDot.setColor(c);
 		keyDot.setToolTipText(tip);
 	}
 
@@ -1526,10 +1570,9 @@ class PriceCheckPanel extends PluginPanel
 		}
 		else if (f.isConfirmed())
 		{
-			final JLabel dot = new JLabel("✓ ");
-			dot.setForeground(Palette.GREEN);
-			dot.setToolTipText("Margin confirmed across the 5m + 1h books");
-			line1.add(dot, BorderLayout.WEST);
+			final Mark ok = new Mark(true, Palette.GREEN, 13, 16);
+			ok.setToolTipText("Margin confirmed across the 5m + 1h books");
+			line1.add(ok, BorderLayout.WEST);
 		}
 
 		final JPanel center = new JPanel(new BorderLayout());
@@ -1541,10 +1584,7 @@ class PriceCheckPanel extends PluginPanel
 		lower.add(line3, BorderLayout.SOUTH);
 		center.add(lower, BorderLayout.SOUTH);
 
-		final JLabel trk = new JLabel(tracked ? "✓" : "+", SwingConstants.CENTER);
-		trk.setPreferredSize(new Dimension(18, 34));
-		trk.setForeground(tracked ? Palette.GREEN : Palette.SUBTLE);
-		trk.setFont(trk.getFont().deriveFont(Font.BOLD, 15f));
+		final Mark trk = new Mark(tracked, tracked ? Palette.GREEN : Palette.SUBTLE, 18, 34);
 		trk.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		trk.setToolTipText(tracked ? "Tracking, click to stop" : "Track this position");
 		final boolean[] fired = { false };
@@ -1554,8 +1594,7 @@ class PriceCheckPanel extends PluginPanel
 			{
 				if (fired[0]) { return; }   // guard against double-fire before the next poll
 				fired[0] = true;
-				trk.setText(tracked ? "+" : "✓");
-				trk.setForeground(tracked ? Palette.SUBTLE : Palette.GREEN);
+				trk.set(!tracked, tracked ? Palette.SUBTLE : Palette.GREEN);
 				if (tracked) { listener.onUntrack(f.getGeId()); } else { listener.onTrack(f); }
 			}
 		});
