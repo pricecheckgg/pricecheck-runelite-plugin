@@ -445,6 +445,10 @@ final class GeItemInfoPainter
 		else
 		{
 			ChartKit.paintVolumeBars(g, d, x0, y0 + plotH + 3, plotW, volH);
+			// Name the pane in the gutter, same quiet register as the tape's
+			// "Last trades seen" header.
+			shadowed(g, "24h volume", x0 + plotW + 5,
+				y0 + plotH + 3 + volH / 2 + fm.getAscent() / 2 - 2, Palette.SUBTLE);
 		}
 
 		// Your offers: labeled with the exact numbers. When both sides ride
