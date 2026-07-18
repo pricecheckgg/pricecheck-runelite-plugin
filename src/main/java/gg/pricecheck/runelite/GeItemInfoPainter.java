@@ -300,6 +300,50 @@ final class GeItemInfoPainter
 		return right;
 	}
 
+	/** The day's traded units by side, next to the volume pane: an up triangle
+	 *  with the insta-buy total, a down triangle with the insta-sell total,
+	 *  same visual language as the tape rows. */
+	private static void paintVolumeTotals(Graphics2D g, ChartKit.Display d, int x, int y)
+	{
+		long buys = 0;
+		long sells = 0;
+		for (int b = 0; b < d.n; b++)
+		{
+			buys += d.volHi[b];
+			sells += d.volLo[b];
+		}
+		if (buys + sells <= 0)
+		{
+			return;
+		}
+		for (int row = 0; row < 2; row++)
+		{
+			final boolean up = row == 0;
+			final int ty = y + row * 11 + 8;
+			final Path2D tri = new Path2D.Float();
+			if (up)
+			{
+				tri.moveTo(x, ty);
+				tri.lineTo(x + 7, ty);
+				tri.lineTo(x + 3.5, ty - 6);
+			}
+			else
+			{
+				tri.moveTo(x, ty - 6);
+				tri.lineTo(x + 7, ty - 6);
+				tri.lineTo(x + 3.5, ty);
+			}
+			tri.closePath();
+			g.setColor(SHADOW);
+			g.translate(1, 1);
+			g.fill(tri);
+			g.translate(-1, -1);
+			g.setColor(up ? Palette.GREEN : Palette.RED);
+			g.fill(tri);
+			shadowed(g, Fmt.compact(up ? buys : sells), x + 11, ty, Palette.SUBTLE);
+		}
+	}
+
 	/** Lots sorted by unit price, with lots that read identically at compact
 	 *  display precision merged into one {qty, unit} row. */
 	private static java.util.List<long[]> mergedLots(long[][] lots)
@@ -402,13 +446,8 @@ final class GeItemInfoPainter
 		}
 		else
 		{
-			final long volCap = ChartKit.paintVolumeBars(g, d, x0, y0 + plotH + 3, plotW, volH);
-			if (volCap > 0)
-			{
-				// A quiet scale note in the gutter: what a full-height bar means.
-				shadowed(g, Fmt.compact(volCap) + " vol", x0 + plotW + 4,
-					y0 + plotH + 3 + fm.getAscent() - 2, Palette.SUBTLE);
-			}
+			ChartKit.paintVolumeBars(g, d, x0, y0 + plotH + 3, plotW, volH);
+			paintVolumeTotals(g, d, x0 + plotW + 5, y0 + plotH + 3);
 		}
 
 		// Your offers: labeled with the exact numbers. When both sides ride
