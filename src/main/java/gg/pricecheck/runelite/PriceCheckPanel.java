@@ -344,24 +344,28 @@ class PriceCheckPanel extends PluginPanel
 		}
 	}
 
-	/** A painted check or plus — the RuneScape font has no check glyph. */
+	/** A painted check, plus, or cross — the RuneScape font has none of them. */
 	private static final class Mark extends JComponent
 	{
-		private boolean check;
+		static final int CHECK = 0;
+		static final int PLUS = 1;
+		static final int CROSS = 2;
+
+		private int type;
 		private Color color;
 
-		Mark(boolean check, Color color, int w, int h)
+		Mark(int type, Color color, int w, int h)
 		{
-			this.check = check;
+			this.type = type;
 			this.color = color;
 			setPreferredSize(new Dimension(w, h));
 			setMinimumSize(getPreferredSize());
 			setMaximumSize(getPreferredSize());
 		}
 
-		void set(boolean check, Color color)
+		void set(int type, Color color)
 		{
-			this.check = check;
+			this.type = type;
 			this.color = color;
 			repaint();
 		}
@@ -375,15 +379,20 @@ class PriceCheckPanel extends PluginPanel
 			g2.setColor(color);
 			final int cx = getWidth() / 2;
 			final int cy = getHeight() / 2;
-			if (check)
+			if (type == CHECK)
 			{
 				g2.drawLine(cx - 4, cy, cx - 1, cy + 3);
 				g2.drawLine(cx - 1, cy + 3, cx + 4, cy - 4);
 			}
-			else
+			else if (type == PLUS)
 			{
 				g2.drawLine(cx - 4, cy, cx + 4, cy);
 				g2.drawLine(cx, cy - 4, cx, cy + 4);
+			}
+			else
+			{
+				g2.drawLine(cx - 3, cy - 3, cx + 3, cy + 3);
+				g2.drawLine(cx + 3, cy - 3, cx - 3, cy + 3);
 			}
 		}
 	}
@@ -1570,7 +1579,7 @@ class PriceCheckPanel extends PluginPanel
 		}
 		else if (f.isConfirmed())
 		{
-			final Mark ok = new Mark(true, Palette.GREEN, 13, 16);
+			final Mark ok = new Mark(Mark.CHECK, Palette.GREEN, 13, 16);
 			ok.setToolTipText("Margin confirmed across the 5m + 1h books");
 			line1.add(ok, BorderLayout.WEST);
 		}
@@ -1584,7 +1593,7 @@ class PriceCheckPanel extends PluginPanel
 		lower.add(line3, BorderLayout.SOUTH);
 		center.add(lower, BorderLayout.SOUTH);
 
-		final Mark trk = new Mark(tracked, tracked ? Palette.GREEN : Palette.SUBTLE, 18, 34);
+		final Mark trk = new Mark(tracked ? Mark.CHECK : Mark.PLUS, tracked ? Palette.GREEN : Palette.SUBTLE, 18, 34);
 		trk.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		trk.setToolTipText(tracked ? "Tracking, click to stop" : "Track this position");
 		final boolean[] fired = { false };
@@ -1594,7 +1603,7 @@ class PriceCheckPanel extends PluginPanel
 			{
 				if (fired[0]) { return; }   // guard against double-fire before the next poll
 				fired[0] = true;
-				trk.set(!tracked, tracked ? Palette.SUBTLE : Palette.GREEN);
+				trk.set(tracked ? Mark.PLUS : Mark.CHECK, tracked ? Palette.SUBTLE : Palette.GREEN);
 				if (tracked) { listener.onUntrack(f.getGeId()); } else { listener.onTrack(f); }
 			}
 		});
@@ -1619,33 +1628,32 @@ class PriceCheckPanel extends PluginPanel
 	}
 
 	// ── tracking card ──
-	private JPanel trackingCard(TrackedItem t)
+	// Package-visible for the headless preview harness.
+	JPanel trackingCard(TrackedItem t)
 	{
 		final JPanel card = new JPanel();
 		card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
 		card.setBackground(CARD);
 		card.setBorder(BorderFactory.createEmptyBorder(8, 9, 8, 9));
 		card.setAlignmentX(Component.LEFT_ALIGNMENT);
-		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 128));
+		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 140));
 
 		final JPanel head = row();
 		head.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
 		final JLabel icon = new JLabel();
 		icon.setPreferredSize(new Dimension(24, 20));
-		itemManager.getImage(t.getGeId()).addTo(icon);
+		if (itemManager != null) { itemManager.getImage(t.getGeId()).addTo(icon); }
 		final JLabel name = new JLabel(t.getName());
 		name.setFont(name.getFont().deriveFont(Font.BOLD));
 		name.setForeground(Color.WHITE);
-		final JLabel rm = new JLabel("✕");
-		rm.setForeground(Palette.SUBTLE);
+		final Mark rm = new Mark(Mark.CROSS, Palette.SUBTLE, 18, 20);
 		rm.setToolTipText("Stop tracking");
 		rm.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		rm.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 2));
 		rm.addMouseListener(new MouseAdapter()
 		{
 			public void mousePressed(MouseEvent e) { listener.onUntrack(t.getGeId()); }
-			public void mouseEntered(MouseEvent e) { rm.setForeground(Palette.RED); }
-			public void mouseExited(MouseEvent e) { rm.setForeground(Palette.SUBTLE); }
+			public void mouseEntered(MouseEvent e) { rm.set(Mark.CROSS, Palette.RED); }
+			public void mouseExited(MouseEvent e) { rm.set(Mark.CROSS, Palette.SUBTLE); }
 		});
 		final JPanel nameWrap = new JPanel(new BorderLayout(6, 0));
 		nameWrap.setOpaque(false);
@@ -1656,13 +1664,16 @@ class PriceCheckPanel extends PluginPanel
 		card.add(head);
 
 		card.add(kv("Bought", Fmt.full(t.getEntryBuy())));
-		card.add(kv("Sell now", t.getSellNow() != null ? Fmt.full(t.getSellNow()) : "—"));
+		card.add(kv("Sell now", t.getSellNow() != null ? Fmt.full(t.getSellNow()) : "-"));
+		card.add(Box.createVerticalStrut(5));
+		card.add(hairline());
+		card.add(Box.createVerticalStrut(2));
 
 		final boolean nodata = "nodata".equals(t.getStatus());
 		final boolean thin = "thin".equals(t.getStatus());
 		final Color pnlCol = t.getPnl() > 0 ? Palette.GREEN : (t.getPnl() < 0 ? Palette.RED : Palette.SUBTLE);
 		final JLabel pnl = new JLabel((t.getPnl() > 0 ? "+" : "") + Fmt.compact(t.getPnl())
-			+ "  ·  " + String.format(Locale.ROOT, "%.1f%%", t.getRoi()) + " if sold now");
+			+ " · " + pctSigned(t.getRoi()) + " if sold now");
 		pnl.setForeground(pnlCol);
 		pnl.setFont(pnl.getFont().deriveFont(Font.BOLD, 13f));
 		pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -1670,17 +1681,23 @@ class PriceCheckPanel extends PluginPanel
 		pnl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
 		card.add(pnl);
 
+		// Verdict cluster: the pill and its plain-language reading sit together.
 		final JPanel st = row();
 		st.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
-		st.add(pill(nodata ? "no data" : (thin ? "thin" : "healthy"),
-			nodata ? Palette.SUBTLE : (thin ? Palette.RED : Palette.GREEN)), BorderLayout.WEST);
-		final JLabel hint = new JLabel(nodata ? "not trading" : (thin ? "margin closing" : "good to hold"));
-		hint.setForeground(Palette.SUBTLE);
-		hint.setHorizontalAlignment(SwingConstants.RIGHT);
-		st.add(hint, BorderLayout.EAST);
+		final JPanel verdict = new JPanel();
+		verdict.setLayout(new BoxLayout(verdict, BoxLayout.X_AXIS));
+		verdict.setOpaque(false);
+		verdict.add(pill(nodata ? "no data" : (thin ? "thin" : "healthy"),
+			nodata ? Palette.SUBTLE : (thin ? Palette.RED : Palette.GREEN)));
+		verdict.add(Box.createRigidArea(new Dimension(7, 0)));
+		final JLabel hint = new JLabel(nodata ? "not trading right now" : (thin ? "margin closing" : "good to hold"));
+		hint.setForeground(Palette.LIGHT);
+		hint.setFont(FontManager.getRunescapeSmallFont());
+		verdict.add(hint);
+		st.add(verdict, BorderLayout.WEST);
 		card.add(st);
 
-		final JLabel floor = new JLabel("floor " + Fmt.full(t.getFloor()) + " · don't sell below");
+		final JLabel floor = new JLabel("Floor " + Fmt.full(t.getFloor()) + " · don't sell below");
 		floor.setForeground(Palette.SUBTLE);
 		floor.setFont(FontManager.getRunescapeSmallFont());
 		floor.setAlignmentX(Component.LEFT_ALIGNMENT);

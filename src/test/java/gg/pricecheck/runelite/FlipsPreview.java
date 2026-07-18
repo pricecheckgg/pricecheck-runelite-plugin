@@ -46,6 +46,17 @@ public final class FlipsPreview
 			final JPanel list = new JPanel();
 			list.setLayout(new BoxLayout(list, BoxLayout.Y_AXIS));
 			list.setBackground(new Color(30, 30, 30));
+			final TrackedItem trackedItem = new TrackedItem();
+			trackedItem.setGeId(24579);
+			trackedItem.setName("Bloodbark legs");
+			trackedItem.setEntryBuy(193_139);
+			trackedItem.setSellNow(202_403L);
+			trackedItem.setPnl(5_220);
+			trackedItem.setRoi(2.7);
+			trackedItem.setFloor(197_080);
+			trackedItem.setStatus("healthy");
+			list.add(panel.trackingCard(trackedItem));
+			list.add(gap(list));
 			list.add(panel.flipRow(flip("Uncharged toxic trident", 1_410_000, 1_495_000, 86_100, 1_240_000, true, null), false));
 			list.add(gap(list));
 			list.add(panel.flipRow(flip("Ranger boots", 32_850_000, 33_600_000, 385_240, 890_000, true, null), true));
