@@ -972,6 +972,20 @@ public class PriceCheckPlugin extends Plugin
 			return -1;
 		}
 		final long tol = 360;
+		// Live fill events first: they carry the true per-fill timestamp, so a
+		// buy offer filling piece by piece tags every piece as it prints.
+		final FlipLogEngine engine = flipLog;
+		if (engine != null)
+		{
+			for (final long[] ev : engine.recentFillEvents())
+			{
+				if (ev[0] == geId && sameFillPrice(ev[1], price)
+					&& Math.abs(printTs - ev[2] / 1000L) <= tol)
+				{
+					return ev[3];
+				}
+			}
+		}
 		for (final FlipLogEngine.Lot l : openLots)
 		{
 			if (l.itemId == geId && l.qty > 0 && sameFillPrice(l.cost / l.qty, price)

@@ -624,8 +624,27 @@ class FlipLogEngine
 		return GeTax.tax(gross / qty) * qty;
 	}
 
+	// Live fill events, in memory only: {itemId, unit price, ts ms, buy 1/0}.
+	// The card's tape matches wiki prints against THESE, because lot and flip
+	// aggregates anchor to their first fill and a progressing offer's later
+	// fills drift out of any window anchored there.
+	private final java.util.ArrayDeque<long[]> fillEvents = new java.util.ArrayDeque<>();
+
+	synchronized List<long[]> recentFillEvents()
+	{
+		return new ArrayList<>(fillEvents);
+	}
+
 	private void ingest(Fill f)
 	{
+		if (f.qty > 0)
+		{
+			fillEvents.addLast(new long[]{f.itemId, f.gross / f.qty, f.ts, f.buy ? 1 : 0});
+			while (fillEvents.size() > 48)
+			{
+				fillEvents.removeFirst();
+			}
+		}
 		final long now = f.ts;
 		// Login aggregates are real coins but not live activity: keep them out
 		// of the session clock and session profit so gp/hr stays honest.
