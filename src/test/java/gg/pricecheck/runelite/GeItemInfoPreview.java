@@ -58,9 +58,9 @@ public final class GeItemInfoPreview
 		c.series = s;
 		c.nowTs = t0 + n * 300L;
 		final List<GeItemInfoPainter.Print> prints = new ArrayList<>();
-		prints.add(new GeItemInfoPainter.Print(c.nowTs - 660, 1_042_800, false));
-		prints.add(new GeItemInfoPainter.Print(c.nowTs - 430, 1_048_200, true));
-		prints.add(new GeItemInfoPainter.Print(c.nowTs - 150, 1_046_500, false));
+		prints.add(new GeItemInfoPainter.Print(c.nowTs - 9200, 1_041_000, false));
+		prints.add(new GeItemInfoPainter.Print(c.nowTs - 430, 1_048_200, true, true, false));
+		prints.add(new GeItemInfoPainter.Print(c.nowTs - 150, 1_046_500, false, true, true));
 		prints.add(new GeItemInfoPainter.Print(c.nowTs - 40, 1_049_900, true));
 		c.prints = prints;
 		c.fillPct = 71;

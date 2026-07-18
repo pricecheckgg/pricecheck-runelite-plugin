@@ -626,6 +626,7 @@ public class PriceCheckPlugin extends Plugin
 			final FlipLogEngine.Summary logSummary = engine.summary();
 			p.setFlipLog(logSummary, syncEnabled());
 			openLots = logSummary.openLots != null ? logSummary.openLots : Collections.emptyList();
+			recentFlips = logSummary.recent != null ? logSummary.recent : Collections.emptyList();
 		}
 		final GeChatboxHelper g = geHelper;
 		if (g != null)
@@ -800,6 +801,7 @@ public class PriceCheckPlugin extends Plugin
 	// one observed trade. Tracks all items the poll fetches (your offers plus
 	// the viewed item), bounded per item, pruned when an item leaves the set.
 	private final Map<Integer, java.util.ArrayDeque<GeItemInfoPainter.Print>> cardPrints = new java.util.HashMap<>();
+	private final java.util.Set<Integer> printsSeeded = java.util.concurrent.ConcurrentHashMap.newKeySet();
 	private final Map<Integer, long[]> printsLast = new java.util.HashMap<>();
 
 	/** Called from the card overlay's render with whatever item the open GE
@@ -882,11 +884,118 @@ public class PriceCheckPlugin extends Plugin
 
 	java.util.List<GeItemInfoPainter.Print> cardPrintsFor(int geId)
 	{
+		maybeSeedPrints(geId);
 		synchronized (cardPrints)
 		{
 			final java.util.ArrayDeque<GeItemInfoPainter.Print> q = cardPrints.get(geId);
 			return q == null ? Collections.emptyList() : new ArrayList<>(q);
 		}
+	}
+
+	/**
+	 * A fresh card should never open on an empty tape: when no live prints have
+	 * been watched for this item yet, backfill from the cached day series so
+	 * "Last trades seen" is there the moment the item page opens. Live prints
+	 * then stack on top. Runs once per item per session.
+	 */
+	private void maybeSeedPrints(int geId)
+	{
+		final CachedSeries c;
+		synchronized (seriesCache)
+		{
+			c = seriesCache.get(geId);
+		}
+		// Short-circuit order matters: the seeded flag is only consumed once a
+		// series actually exists, so an item keeps retrying until one is cached.
+		if (c == null || c.data == null || c.data.ts == null || !printsSeeded.add(geId))
+		{
+			return;
+		}
+		final PriceCheckApiClient.SeriesData d = c.data;
+		final long cutoff = System.currentTimeMillis() / 1000L - 12 * 3600;
+		final java.util.List<GeItemInfoPainter.Print> seeds = new ArrayList<>();
+		for (int i = d.ts.length - 1; i >= 0 && seeds.size() < 8; i--)
+		{
+			if (d.ts[i] < cutoff)
+			{
+				break;
+			}
+			// The window's averages stand in for its trades; one entry per
+			// traded side, stamped near the window's end.
+			final long ts = d.ts[i] + 240;
+			if (d.hv != null && d.hv[i] > 0 && d.ah[i] > 0)
+			{
+				seeds.add(ownMarked(geId, ts, d.ah[i], true));
+			}
+			if (seeds.size() < 8 && d.lv != null && d.lv[i] > 0 && d.al[i] > 0)
+			{
+				seeds.add(ownMarked(geId, ts, d.al[i], false));
+			}
+		}
+		if (seeds.isEmpty())
+		{
+			return;
+		}
+		synchronized (cardPrints)
+		{
+			final java.util.ArrayDeque<GeItemInfoPainter.Print> q =
+				cardPrints.computeIfAbsent(geId, k -> new java.util.ArrayDeque<>());
+			if (!q.isEmpty())
+			{
+				return;   // live prints beat backfill
+			}
+			// seeds run newest-first; addFirst restores ascending order
+			for (final GeItemInfoPainter.Print p : seeds)
+			{
+				q.addFirst(p);
+			}
+		}
+	}
+
+	/** A print stamped with whether it matches one of your own logged fills. */
+	private GeItemInfoPainter.Print ownMarked(int geId, long ts, long price, boolean buySide)
+	{
+		final long side = ownFillSide(geId, ts, price);
+		return new GeItemInfoPainter.Print(ts, price, buySide, side >= 0, side == 1);
+	}
+
+	/**
+	 * Matches a print against your own recent fills: open lots (your buys) and
+	 * recent flips (both legs), exact unit price, within a few minutes. The
+	 * wiki reports your trade like anyone else's; this is how the tape knows
+	 * which prints are you. Returns 1 = your buy, 0 = your sell, -1 = not yours.
+	 */
+	private long ownFillSide(int geId, long printTs, long price)
+	{
+		if (price <= 0)
+		{
+			return -1;
+		}
+		final long tol = 360;
+		for (final FlipLogEngine.Lot l : openLots)
+		{
+			if (l.itemId == geId && l.qty > 0 && l.cost / l.qty == price
+				&& Math.abs(printTs - l.openedAt / 1000L) <= tol)
+			{
+				return 1;
+			}
+		}
+		for (final FlipLogEngine.Flip fl : recentFlips)
+		{
+			if (fl.itemId != geId || fl.qty <= 0)
+			{
+				continue;
+			}
+			if (fl.buyGross / fl.qty == price && Math.abs(printTs - fl.openedAt / 1000L) <= tol)
+			{
+				return 1;
+			}
+			if (fl.sellGross / fl.qty == price && Math.abs(printTs - fl.closedAt / 1000L) <= tol)
+			{
+				return 0;
+			}
+		}
+		return -1;
 	}
 
 	/** One advisor poll's worth of print detection across the fetched items. */
@@ -895,8 +1004,15 @@ public class PriceCheckPlugin extends Plugin
 		final long now = System.currentTimeMillis() / 1000L;
 		synchronized (cardPrints)
 		{
-			cardPrints.keySet().retainAll(live.keySet());
-			printsLast.keySet().retainAll(live.keySet());
+			// Tapes survive an item leaving the live set (offer collected, board
+			// rotation) so reopening its page keeps the history; only bound the
+			// map when it grows past a sane ceiling.
+			if (cardPrints.size() > 64)
+			{
+				cardPrints.keySet().removeIf(k -> !live.containsKey(k));
+				printsLast.keySet().removeIf(k -> !live.containsKey(k));
+				printsSeeded.removeIf(k -> !live.containsKey(k));
+			}
 			for (final Map.Entry<Integer, FlipData> e : live.entrySet())
 			{
 				final FlipData f = e.getValue();
@@ -916,12 +1032,12 @@ public class PriceCheckPlugin extends Plugin
 				// low moving = someone insta-sold into the new low.
 				if (f.getSell() > 0 && f.getSell() != last[0])
 				{
-					q.addLast(new GeItemInfoPainter.Print(now, f.getSell(), true));
+					q.addLast(ownMarked(e.getKey(), now, f.getSell(), true));
 					last[0] = f.getSell();
 				}
 				if (f.getBuy() > 0 && f.getBuy() != last[1])
 				{
-					q.addLast(new GeItemInfoPainter.Print(now, f.getBuy(), false));
+					q.addLast(ownMarked(e.getKey(), now, f.getBuy(), false));
 					last[1] = f.getBuy();
 				}
 				while (q.size() > 24)
@@ -982,6 +1098,7 @@ public class PriceCheckPlugin extends Plugin
 	// Open lots from the flip log, refreshed with the panel cycle: the GE
 	// cards draw your cost basis from them.
 	private volatile List<FlipLogEngine.Lot> openLots = Collections.emptyList();
+	private volatile List<FlipLogEngine.Flip> recentFlips = Collections.emptyList();
 
 	/** Aggregated holding for one item: {qty, totalCost, earliestOpenedAtMs},
 	 * or null when nothing is held. */

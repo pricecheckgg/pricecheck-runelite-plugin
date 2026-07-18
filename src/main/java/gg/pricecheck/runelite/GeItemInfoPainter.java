@@ -27,12 +27,22 @@ final class GeItemInfoPainter
 		long ts;          // epoch seconds
 		long price;
 		boolean buySide;  // true = insta-buy (high) moved, false = insta-sell (low)
+		boolean yours;    // matched to one of your own logged fills
+		boolean yoursBuy; // the matched fill's side (your sell offer being taken
+		                  // surfaces as an insta-buy, so this is not buySide)
 
 		Print(long ts, long price, boolean buySide)
+		{
+			this(ts, price, buySide, false, false);
+		}
+
+		Print(long ts, long price, boolean buySide, boolean yours, boolean yoursBuy)
 		{
 			this.ts = ts;
 			this.price = price;
 			this.buySide = buySide;
+			this.yours = yours;
+			this.yoursBuy = yoursBuy;
 		}
 	}
 
@@ -146,17 +156,29 @@ final class GeItemInfoPainter
 				g.translate(-1, -1);
 				g.setColor(p.buySide ? Palette.GREEN : Palette.RED);
 				g.fill(tri);
-				shadowed(g, Fmt.full(p.price), PAD + 14, ty, NAME);
+				shadowed(g, Fmt.full(p.price), PAD + 14, ty, p.yours ? Palette.GOLD : NAME);
 				final long ago = Math.max(0, c.nowTs - p.ts);
-				final String age = ago < 60 ? ago + "s ago" : (ago / 60) + "m ago";
-				// Deltas read against the side the print competes with: buys
-				// arriving compare to your sell, sells to your buy.
-				final long ref = p.buySide ? (c.refSell() > 0 ? c.refSell() : c.refBuy())
-					: (c.refBuy() > 0 ? c.refBuy() : c.refSell());
-				final String delta = ref > 0
-					? (p.price >= ref ? "+" : "-") + Fmt.compact(Math.abs(p.price - ref)) + " vs you"
-					: "";
-				shadowed(g, delta, W / 2 - 10, ty, Palette.SUBTLE);
+				final String age = ago < 60 ? ago + "s ago"
+					: ago < 5400 ? (ago / 60) + "m ago" : (ago / 3600) + "h ago";
+				// Your own fill gets named as such; everything else reads against
+				// the side it competes with: buys arriving compare to your sell,
+				// sells to your buy.
+				String delta;
+				Color deltaCol = Palette.SUBTLE;
+				if (p.yours)
+				{
+					delta = p.yoursBuy ? "your buy" : "your sell";
+					deltaCol = Palette.GOLD;
+				}
+				else
+				{
+					final long ref = p.buySide ? (c.refSell() > 0 ? c.refSell() : c.refBuy())
+						: (c.refBuy() > 0 ? c.refBuy() : c.refSell());
+					delta = ref > 0
+						? (p.price >= ref ? "+" : "-") + Fmt.compact(Math.abs(p.price - ref)) + " vs you"
+						: "";
+				}
+				shadowed(g, delta, W / 2 - 10, ty, deltaCol);
 				final int aw = fm.stringWidth(age);
 				shadowed(g, age, W - PAD - aw, ty, Palette.SUBTLE);
 			}
