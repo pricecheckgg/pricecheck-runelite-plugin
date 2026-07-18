@@ -114,7 +114,9 @@ final class GeItemInfoPainter
 		final int lineH = fm.getHeight();
 		final int tapeRows = Math.min(c.prints != null ? c.prints.size() : 0, 10);
 		final boolean holding = c.lotQty > 0;
-		final int h = PAD + lineH + 6 + CHART_H + 6 + (tapeRows > 0 ? tapeRows * 13 + 14 : 0)
+		final long[] pressure = pressureOf(c.series, c.nowTs);
+		final int h = PAD + lineH + 6 + CHART_H + 6 + (pressure != null ? lineH + 3 : 0)
+			+ (tapeRows > 0 ? tapeRows * 13 + 14 : 0)
 			+ (holding ? lineH : 0) + 2 * lineH + PAD + 2;
 
 		g.setColor(Palette.INK);
@@ -136,6 +138,51 @@ final class GeItemInfoPainter
 		paintChart(g, c, PAD, y, w - 2 * PAD, CHART_H, fm, false);
 		y += CHART_H + 4;
 
+		// Pressure: its own labeled row. A split meter with a centre notch so
+		// the lean reads before the words do, then the words anyway.
+		if (pressure != null)
+		{
+			final int ry = y + fm.getAscent();
+			shadowed(g, "Pressure", PAD, ry, Palette.SUBTLE);
+			final int sellPct = (int) pressure[0];
+			final String reading;
+			final Color col;
+			if (sellPct >= 58)
+			{
+				reading = sellPct + "% sell side · " + pressure[1] + "h";
+				col = Palette.RED;
+			}
+			else if (sellPct <= 42)
+			{
+				reading = (100 - sellPct) + "% buy side · " + pressure[1] + "h";
+				col = Palette.GREEN;
+			}
+			else
+			{
+				reading = "balanced · " + pressure[1] + "h";
+				col = Palette.SUBTLE;
+			}
+			final int tx = w - PAD - fm.stringWidth(reading);
+			shadowed(g, reading, tx, ry, col);
+			final int bx = PAD + fm.stringWidth("Pressure") + 10;
+			final int bw = tx - bx - 10;
+			if (bw >= 40)
+			{
+				final int by = ry - 7;
+				final int green = Math.round(bw * (100 - sellPct) / 100f);
+				g.setColor(SHADOW);
+				g.fillRect(bx + 1, by + 1, bw, 7);
+				g.setColor(Palette.GREEN);
+				g.fillRect(bx, by, green, 7);
+				g.setColor(Palette.RED);
+				g.fillRect(bx + green, by, bw - green, 7);
+				// Centre notch: the 50/50 line the split is judged against.
+				g.setColor(YOURS);
+				g.fillRect(bx + bw / 2, by - 1, 1, 9);
+			}
+			y += lineH + 3;
+		}
+
 		// Tape: the prints this client has watched arrive, newest first. The
 		// header carries the side split of exactly these rows, so the counts
 		// always reconcile with what is listed below them.
@@ -153,8 +200,7 @@ final class GeItemInfoPainter
 			int hx = PAD + fm.stringWidth("Last trades seen") + 10;
 			final int hy = y + fm.getAscent();
 			hx = headerSideCount(g, fm, hx, hy, true, nBuy);
-			hx = headerSideCount(g, fm, hx + 8, hy, false, tapeRows - nBuy);
-			paintPressure(g, c, fm, w, hx, hy);
+			headerSideCount(g, fm, hx + 8, hy, false, tapeRows - nBuy);
 			y += lineH + 1;
 			for (int i = 0; i < tapeRows; i++)
 			{
@@ -347,67 +393,6 @@ final class GeItemInfoPainter
 			}
 		}
 		return null;
-	}
-
-	/** The pressure read, right-aligned in the tape header: a split meter plus
-	 *  "selling 64% · 4h". Sheds the meter, then the window tag, when a narrow
-	 *  card leaves no room; never overprints the side counts. */
-	private static void paintPressure(Graphics2D g, Context c, FontMetrics fm, int w, int leftEdge, int hy)
-	{
-		final long[] pr = pressureOf(c.series, c.nowTs);
-		if (pr == null)
-		{
-			return;
-		}
-		final int sellPct = (int) pr[0];
-		final String verdict;
-		final Color col;
-		if (sellPct >= 58)
-		{
-			verdict = "selling " + sellPct + "%";
-			col = Palette.RED;
-		}
-		else if (sellPct <= 42)
-		{
-			verdict = "buying " + (100 - sellPct) + "%";
-			col = Palette.GREEN;
-		}
-		else
-		{
-			verdict = "balanced";
-			col = Palette.SUBTLE;
-		}
-		final int right = w - PAD;
-		final int avail = right - leftEdge - 10;
-		final int meterW = 30;
-		String text = verdict + " · " + pr[1] + "h";
-		boolean meter = true;
-		if (fm.stringWidth(text) + meterW + 5 > avail)
-		{
-			meter = false;
-			if (fm.stringWidth(text) > avail)
-			{
-				text = verdict;
-				if (fm.stringWidth(text) > avail)
-				{
-					return;
-				}
-			}
-		}
-		final int tx = right - fm.stringWidth(text);
-		shadowed(g, text, tx, hy, col);
-		if (meter)
-		{
-			final int mx = tx - meterW - 5;
-			final int my = hy - 6;
-			final int green = Math.round(meterW * (100 - sellPct) / 100f);
-			g.setColor(SHADOW);
-			g.fillRect(mx + 1, my + 1, meterW, 6);
-			g.setColor(Palette.GREEN);
-			g.fillRect(mx, my, green, 6);
-			g.setColor(Palette.RED);
-			g.fillRect(mx + green, my, meterW - green, 6);
-		}
 	}
 
 	/** One "triangle + count" chip in the tape header; returns the x after it. */
