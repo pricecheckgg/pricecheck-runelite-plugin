@@ -31,6 +31,7 @@ class GeItemCardOverlay extends Overlay
 	private static final int GE_GROUP = 465;
 	private static final int[] SETUP_PANELS = { 15, 26 };
 	private static final int GE_SELECTED_SLOT_VARBIT = 4439;
+	private static final java.util.regex.Pattern PRICE = java.util.regex.Pattern.compile("^[0-9,]+ coins$");
 	private static final int CARD_W = 284;
 	private static final int BTN = 14;
 	private static final int MAX_CHARTED = 4;
@@ -93,13 +94,13 @@ class GeItemCardOverlay extends Overlay
 				slotIdx = slotVal - 1;
 			}
 		}
-		boolean setupOpen = false;
+		Widget setupPanel = null;
 		for (final int child : SETUP_PANELS)
 		{
 			final Widget w = client.getWidget(GE_GROUP, child);
 			if (w != null && !w.isHidden())
 			{
-				setupOpen = true;
+				setupPanel = w;
 				break;
 			}
 		}
@@ -113,10 +114,10 @@ class GeItemCardOverlay extends Overlay
 			{
 				return null;
 			}
-			paintFull(g, anchor, geId, slotIdx, offers);
+			paintFull(g, anchor, geId, slotIdx, offers, 0, false);
 			return null;
 		}
-		if (setupOpen && plugin.setupItem() > 0)
+		if (setupPanel != null && plugin.setupItem() > 0)
 		{
 			final int geId = plugin.setupItem();
 			plugin.noteViewedItem(geId);
@@ -124,7 +125,32 @@ class GeItemCardOverlay extends Overlay
 			{
 				return null;
 			}
-			paintFull(g, anchor, geId, -1, offers);
+			// Read the price being typed right off the panel, every frame, so
+			// the tag tracks the user while they adjust.
+			long entered = 0;
+			boolean sellSide = false;
+			for (final Widget c : allChildren(setupPanel))
+			{
+				if (c == null)
+				{
+					continue;
+				}
+				final String txt = c.getText() == null ? "" : c.getText().replaceAll("<[^>]+>", "").trim();
+				if (txt.isEmpty())
+				{
+					continue;
+				}
+				if (txt.equals("Sell offer"))
+				{
+					sellSide = true;
+				}
+				else if (entered <= 0 && PRICE.matcher(txt).matches())
+				{
+					final String digits = txt.replaceAll("[^0-9]", "");
+					entered = digits.isEmpty() ? 0 : Long.parseLong(digits);
+				}
+			}
+			paintFull(g, anchor, geId, -1, offers, entered, sellSide);
 			return null;
 		}
 
@@ -190,7 +216,7 @@ class GeItemCardOverlay extends Overlay
 		return null;
 	}
 
-	private void paintFull(Graphics2D g, Point anchor, int geId, int slotIdx, GrandExchangeOffer[] offers)
+	private void paintFull(Graphics2D g, Point anchor, int geId, int slotIdx, GrandExchangeOffer[] offers, long setupPrice, boolean setupSell)
 	{
 		final PriceCheckApiClient.SeriesData sd = plugin.cardSeriesFor(geId);
 		final FlipData live = plugin.liveFor(geId);
@@ -239,6 +265,28 @@ class GeItemCardOverlay extends Overlay
 		}
 		fillVerdicts(c, buySlot, sellSlot);
 
+		// The price being typed on the setup screen tracks live and wins the
+		// tag for its side; the outcome line reads from it too.
+		if (setupPrice > 0)
+		{
+			if (setupSell)
+			{
+				c.youSell = setupPrice;
+				c.outcomeText = "Nets " + Fmt.full(GeTax.net(0, setupPrice)) + " after tax if it sells";
+				c.outcomeColor = Palette.LIGHT;
+			}
+			else
+			{
+				c.youBuy = setupPrice;
+				if (live != null && live.getSell() > 0)
+				{
+					final long m = GeTax.net(setupPrice, live.getSell());
+					c.outcomeText = "Resells at market for " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
+					c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
+				}
+			}
+		}
+
 		if (slotIdx >= 0 && viewPrice > 0)
 		{
 			if (viewBuying)
@@ -256,7 +304,7 @@ class GeItemCardOverlay extends Overlay
 				c.outcomeColor = Palette.LIGHT;
 			}
 		}
-		else if (live != null)
+		else if (c.outcomeText == null && live != null)
 		{
 			final long m = live.getProfit();
 			c.outcomeText = "Board margin " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
@@ -316,6 +364,24 @@ class GeItemCardOverlay extends Overlay
 			s.quoteSell = live.getSell();
 		}
 		return s;
+	}
+
+	private static Widget[] allChildren(Widget panel)
+	{
+		final Widget[] stat = panel.getStaticChildren();
+		final Widget[] dyn = panel.getDynamicChildren();
+		final int sl = stat == null ? 0 : stat.length;
+		final int dl = dyn == null ? 0 : dyn.length;
+		final Widget[] all = new Widget[sl + dl];
+		if (sl > 0)
+		{
+			System.arraycopy(stat, 0, all, 0, sl);
+		}
+		if (dl > 0)
+		{
+			System.arraycopy(dyn, 0, all, sl, dl);
+		}
+		return all;
 	}
 
 	private static boolean isBuySide(GrandExchangeOfferState st)

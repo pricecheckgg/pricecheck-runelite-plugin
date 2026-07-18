@@ -225,30 +225,69 @@ final class GeItemInfoPainter
 
 		// Your offers: labeled with the exact numbers. When both sides ride
 		// the same chart, the label says which is which.
-		// Label colors follow the corridor edge each side competes on: your
+		// Accent colors follow the corridor edge each side competes on: your
 		// sell fills against the green insta-buy edge, your buy against the
-		// red insta-sell edge. Spatial match beats color morality.
+		// red insta-sell edge. The tag carries just the number; the border
+		// color says which side. Tags nudge apart when the prices sit close.
 		final boolean both = c.youBuy > 0 && c.youSell > 0;
+		final FontMetrics fm2 = g.getFontMetrics();
+		final int chipH = fm2.getHeight() + 2;
+		int ySell = c.youSell > 0 ? Math.round(ChartKit.y(d, c.youSell, y0, plotH)) : Integer.MIN_VALUE;
+		int yBuy = c.youBuy > 0 ? Math.round(ChartKit.y(d, c.youBuy, y0, plotH)) : Integer.MIN_VALUE;
+		if (both && Math.abs(ySell - yBuy) < chipH + 2)
+		{
+			final int mid = (ySell + yBuy) / 2;
+			if (ySell <= yBuy)
+			{
+				ySell = mid - chipH / 2 - 1;
+				yBuy = ySell + chipH + 2;
+			}
+			else
+			{
+				yBuy = mid - chipH / 2 - 1;
+				ySell = yBuy + chipH + 2;
+			}
+		}
 		if (c.youSell > 0)
 		{
-			yourLine(g, d, c.youSell, (both ? "sell " : "you ") + Fmt.compact(c.youSell),
-				both ? Palette.GREEN : Color.WHITE, x0, y0, plotW, plotH);
+			yourLine(g, d, c.youSell, ySell, both ? Palette.GREEN : Color.WHITE, x0, y0, plotW, plotH, fm2, chipH);
 		}
 		if (c.youBuy > 0)
 		{
-			yourLine(g, d, c.youBuy, (both ? "buy " : "you ") + Fmt.compact(c.youBuy),
-				both ? Palette.RED : Color.WHITE, x0, y0, plotW, plotH);
+			yourLine(g, d, c.youBuy, yBuy, both ? Palette.RED : Color.WHITE, x0, y0, plotW, plotH, fm2, chipH);
 		}
 	}
 
-	private static void yourLine(Graphics2D g, ChartKit.Display d, long price, String label, Color labelColor, int x0, int y0, int plotW, int plotH)
+	/** Your price as a terminal-style axis tag: soft glow under a dashed
+	 * line, and an ink chip in the gutter with a caret pointing at it. */
+	private static void yourLine(Graphics2D g, ChartKit.Display d, long price, int tagY, Color accent, int x0, int y0, int plotW, int plotH, FontMetrics fm, int chipH)
 	{
 		final int yy = Math.round(ChartKit.y(d, price, y0, plotH));
+		g.setStroke(new BasicStroke(3f));
+		g.setColor(new Color(255, 255, 255, 34));
+		g.drawLine(x0, yy, x0 + plotW, yy);
 		g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10f, new float[]{3f, 3f}, 0f));
 		g.setColor(YOURS);
 		g.drawLine(x0, yy, x0 + plotW, yy);
 		g.setStroke(new BasicStroke(1f));
-		shadowed(g, label, x0 + plotW + 3, yy + 4, labelColor);
+
+		final String label = Fmt.compact(price);
+		final int tw = fm.stringWidth(label);
+		final int chipX = x0 + plotW + 6;
+		final int chipY = tagY - chipH / 2;
+		final Path2D caret = new Path2D.Float();
+		caret.moveTo(x0 + plotW + 1, yy);
+		caret.lineTo(chipX + 1, tagY - 4);
+		caret.lineTo(chipX + 1, tagY + 4);
+		caret.closePath();
+		g.setColor(accent);
+		g.fill(caret);
+		g.setColor(Palette.INK);
+		g.fillRoundRect(chipX, chipY, tw + 9, chipH, 6, 6);
+		g.setColor(accent);
+		g.drawRoundRect(chipX, chipY, tw + 9, chipH, 6, 6);
+		g.setColor(Color.WHITE);
+		g.drawString(label, chipX + 5, chipY + fm.getAscent());
 	}
 
 	private static void shadowed(Graphics2D g, String s, int x, int yy, Color c)
