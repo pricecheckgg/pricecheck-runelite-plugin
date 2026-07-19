@@ -54,6 +54,14 @@ slots, your flips inside the GE item search, and a bank-aware slot planner.
 When the GE asks for a price, one click types ours: cut to fill first in the
 queue. You still press Enter yourself.
 
+## The leaderboard
+
+[![The live flip leaderboard](https://flipping.pricecheck.gg/api/premium/leaderboard/og.png)](https://flipping.pricecheck.gg/leaderboard)
+
+Live standings from real logged fills, updating as members flip. Names show
+only for members who made their portfolio public; everyone else ranks
+anonymously. Sync your log and you are on the board.
+
 ## Data disclosure
 
 The plugin makes no network requests until you enter a plugin key. With a key,
