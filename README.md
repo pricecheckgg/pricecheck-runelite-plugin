@@ -1,6 +1,6 @@
 # PriceCheck Flipping
 
-[![Discord](https://img.shields.io/discord/1467949375392317480?logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/pricecheck)
+[![Discord](https://img.shields.io/endpoint?url=https%3A%2F%2Fflipping.pricecheck.gg%2Fapi%2Fbadge%2Fdiscord&logo=discord&logoColor=white)](https://discord.gg/pricecheck)
 [![Reddit](https://img.shields.io/badge/Reddit-u%2Fpricecheckgg-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/user/pricecheckgg/)
 [![Website](https://img.shields.io/badge/Web-flipping.pricecheck.gg-d4af37)](https://flipping.pricecheck.gg)
 
