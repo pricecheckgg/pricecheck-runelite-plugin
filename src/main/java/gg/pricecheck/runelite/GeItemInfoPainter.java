@@ -208,6 +208,32 @@ final class GeItemInfoPainter
 			hx = headerSideCount(g, fm, hx, hy, true, nBuy);
 			headerSideCount(g, fm, hx + 8, hy, false, tapeRows - nBuy);
 			y += lineH + 1;
+			// The extremes of exactly these rows, badged so the traded range
+			// reads at a glance. Colours follow the corridor's edges: green is
+			// the high edge, red the low.
+			int hiIdx = -1;
+			int loIdx = -1;
+			for (int i = 0; i < tapeRows; i++)
+			{
+				final Print p = c.prints.get(c.prints.size() - 1 - i);
+				if (p.price <= 0)
+				{
+					continue;
+				}
+				if (hiIdx < 0 || p.price > c.prints.get(c.prints.size() - 1 - hiIdx).price)
+				{
+					hiIdx = i;
+				}
+				if (loIdx < 0 || p.price < c.prints.get(c.prints.size() - 1 - loIdx).price)
+				{
+					loIdx = i;
+				}
+			}
+			if (hiIdx == loIdx)
+			{
+				hiIdx = -1;
+				loIdx = -1;
+			}
 			for (int i = 0; i < tapeRows; i++)
 			{
 				final Print p = c.prints.get(c.prints.size() - 1 - i);
@@ -235,6 +261,11 @@ final class GeItemInfoPainter
 				g.setColor(p.buySide ? Palette.GREEN : Palette.RED);
 				g.fill(tri);
 				shadowed(g, Fmt.full(p.price), PAD + 14, ty, p.yours ? Palette.GOLD : NAME);
+				if (i == hiIdx || i == loIdx)
+				{
+					final int bx = PAD + 14 + fm.stringWidth(Fmt.full(p.price)) + 6;
+					badge(g, fm, bx, ty, w / 2 - 14, i == hiIdx);
+				}
 				final long ago = Math.max(0, c.nowTs - p.ts);
 				final String age = ago < 60 ? ago + "s ago"
 					: ago < 5400 ? (ago / 60) + "m ago" : (ago / 3600) + "h ago";
@@ -462,6 +493,32 @@ final class GeItemInfoPainter
 			}
 		}
 		return null;
+	}
+
+	/** A tiny bordered pill after a tape price marking the extreme of the
+	 *  listed rows; drops to a short label, then nothing, as space runs out. */
+	private static void badge(Graphics2D g, FontMetrics fm, int x, int ty, int limitX, boolean high)
+	{
+		String text = high ? "high" : "low";
+		int bw = fm.stringWidth(text) + 8;
+		if (x + bw > limitX)
+		{
+			text = high ? "hi" : "lo";
+			bw = fm.stringWidth(text) + 8;
+			if (x + bw > limitX)
+			{
+				return;
+			}
+		}
+		final Color col = high ? Palette.GREEN : Palette.RED;
+		final int by = ty - 9;
+		g.setColor(SHADOW);
+		g.fillRoundRect(x + 1, by + 1, bw, 11, 5, 5);
+		g.setColor(Palette.INK);
+		g.fillRoundRect(x, by, bw, 11, 5, 5);
+		g.setColor(new Color(col.getRed(), col.getGreen(), col.getBlue(), 190));
+		g.drawRoundRect(x, by, bw, 11, 5, 5);
+		shadowed(g, text, x + 4, ty - 1, col);
 	}
 
 	/** One "triangle + count" chip in the tape header; returns the x after it. */
