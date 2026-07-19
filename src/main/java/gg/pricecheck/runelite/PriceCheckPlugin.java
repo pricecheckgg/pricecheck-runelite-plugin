@@ -1075,6 +1075,35 @@ public class PriceCheckPlugin extends Plugin
 		}
 	}
 
+	/**
+	 * Your trade history for one item, newest first, straight from the flip
+	 * log: {tsMs, unit price, qty, buy 1/0, stillOpen 1/0, flip profit}.
+	 * Open lots are your live buys; closed flips contribute both legs, with
+	 * the flip's profit riding the sell leg.
+	 */
+	long[][] ownTradesFor(int geId, int max)
+	{
+		final List<long[]> out = new ArrayList<>();
+		for (final FlipLogEngine.Lot l : openLots)
+		{
+			if (l.itemId == geId && l.qty > 0)
+			{
+				out.add(new long[]{l.openedAt, l.cost / l.qty, l.qty, 1, 1, 0});
+			}
+		}
+		for (final FlipLogEngine.Flip fl : recentFlips)
+		{
+			if (fl.itemId != geId || fl.qty <= 0)
+			{
+				continue;
+			}
+			out.add(new long[]{fl.openedAt, fl.buyGross / fl.qty, fl.qty, 1, 0, 0});
+			out.add(new long[]{fl.closedAt, fl.sellGross / fl.qty, fl.qty, 0, 0, fl.profit});
+		}
+		out.sort((a, b) -> Long.compare(b[0], a[0]));
+		return out.subList(0, Math.min(max, out.size())).toArray(new long[0][]);
+	}
+
 	/** Adds a lot- or flip-derived fill unless a live event already covers the
 	 *  same trade (same side, same price to the whisker, within seconds). */
 	private static void addFillDeduped(List<long[]> fills, long unit, long tsSec, long buy)

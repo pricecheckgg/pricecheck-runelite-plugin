@@ -84,8 +84,17 @@ public final class GeItemInfoPreview
 			{1, 1_037_900, (t0 + 61 * 300L) * 1000L},
 		};
 
+		// Your trade history at the card's foot, mixed outcomes.
+		c.ownTrades = new long[][]{
+			{(c.nowTs - 150) * 1000L, 1_046_500, 1, 1, 1, 0},
+			{(c.nowTs - 430) * 1000L, 1_048_200, 1, 0, 0, 22_400},
+			{(c.nowTs - 2400) * 1000L, 1_025_100, 1, 1, 0, 0},
+			{(c.nowTs - 5200) * 1000L, 1_051_000, 2, 0, 0, -8_300},
+			{(c.nowTs - 7300) * 1000L, 1_030_900, 2, 1, 0, 0},
+		};
+
 		final int w = 380;
-		final int h = 460;
+		final int h = 560;
 		final BufferedImage img = new BufferedImage(w * 2, h * 2, BufferedImage.TYPE_INT_RGB);
 		final Graphics2D g = img.createGraphics();
 		g.scale(2, 2);

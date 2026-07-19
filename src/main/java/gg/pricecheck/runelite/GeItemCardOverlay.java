@@ -126,6 +126,7 @@ class GeItemCardOverlay extends Overlay
 			}
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
 			addViewOutcome(c, offers[slotIdx]);
+			attachOwnTrades(c, geId, client.getCanvasHeight() - anchor[1] - 6);
 			paintAt(g, anchor[0], anchor[1], () -> GeItemInfoPainter.paint(g, c, anchor[2]));
 			return null;
 		}
@@ -183,6 +184,7 @@ class GeItemCardOverlay extends Overlay
 					}
 				}
 			}
+			attachOwnTrades(c, geId, client.getCanvasHeight() - anchor[1] - 6);
 			paintAt(g, anchor[0], anchor[1], () -> GeItemInfoPainter.paint(g, c, anchor[2]));
 			return null;
 		}
@@ -277,6 +279,7 @@ class GeItemCardOverlay extends Overlay
 				{
 					fw = GeItemInfoPainter.W_FULL;
 				}
+				attachOwnTrades(c, geId, left - 4);
 				final int fwF = fw;
 				paintedX = fx;
 				d = paintAt(g, fx, yy, () -> GeItemInfoPainter.paint(g, c, fwF));
@@ -530,6 +533,18 @@ class GeItemCardOverlay extends Overlay
 		return st == GrandExchangeOfferState.BUYING
 			|| st == GrandExchangeOfferState.BOUGHT
 			|| st == GrandExchangeOfferState.CANCELLED_BUY;
+	}
+
+	/** Fills the context's own-trade section with as many rows as the space
+	 *  below can hold, up to ten; none when the card would overflow. */
+	private void attachOwnTrades(GeItemInfoPainter.Context c, int geId, int availPx)
+	{
+		final int rows = Math.max(0, Math.min(10, (availPx - 430) / 13));
+		if (rows > 0)
+		{
+			final long[][] t = plugin.ownTradesFor(geId, rows);
+			c.ownTrades = t.length > 0 ? t : null;
+		}
 	}
 
 	private Rectangle geBounds()

@@ -70,6 +70,10 @@ final class GeItemInfoPainter
 		// cost, openedAt ms}. When they differ in price the holding line
 		// itemises them instead of pretending one blended entry.
 		long[][] lotEntries;
+		// Your trade history for this item, newest first: {tsMs, unit, qty,
+		// buy 1/0, stillOpen 1/0, flip profit}. Rendered as its own section
+		// at the card's foot; the overlay sizes it to the screen space left.
+		long[][] ownTrades;
 
 		long refSell()
 		{
@@ -115,9 +119,11 @@ final class GeItemInfoPainter
 		final int tapeRows = Math.min(c.prints != null ? c.prints.size() : 0, 10);
 		final boolean holding = c.lotQty > 0;
 		final long[] pressure = pressureOf(c.series, c.nowTs);
+		final int ownRows = c.ownTrades != null ? c.ownTrades.length : 0;
 		final int h = PAD + lineH + 6 + CHART_H + 6 + (pressure != null ? lineH + 3 : 0)
 			+ (tapeRows > 0 ? tapeRows * 13 + 14 : 0)
-			+ (holding ? lineH : 0) + 2 * lineH + PAD + 2;
+			+ (holding ? lineH : 0) + 2 * lineH
+			+ (ownRows > 0 ? lineH + ownRows * 13 + 10 : 0) + PAD + 2;
 
 		g.setColor(Palette.INK);
 		g.fillRoundRect(0, 0, w - 1, h - 1, 8, 8);
@@ -336,6 +342,69 @@ final class GeItemInfoPainter
 		if (c.outcomeText != null)
 		{
 			shadowed(g, c.outcomeText, PAD, y + fm.getAscent(), c.outcomeColor != null ? c.outcomeColor : Palette.SUBTLE);
+		}
+		y += lineH;
+
+		// Your trades: the flip log's history for THIS item, at the card's
+		// foot. Buys are green entries, sells gold exits carrying that flip's
+		// profit; a buy still held says so.
+		if (ownRows > 0)
+		{
+			y += 3;
+			g.setColor(RULE);
+			g.drawLine(PAD - 2, y, w - PAD + 2, y);
+			y += 4;
+			shadowed(g, "Your trades", PAD, y + fm.getAscent(), Palette.SUBTLE);
+			y += lineH + 1;
+			for (int i = 0; i < ownRows; i++)
+			{
+				final long[] t = c.ownTrades[i];
+				final boolean buy = t[3] == 1;
+				final int ty = y + i * 13 + 9;
+				final Path2D tri = new Path2D.Float();
+				if (buy)
+				{
+					tri.moveTo(PAD + 1, ty);
+					tri.lineTo(PAD + 8, ty);
+					tri.lineTo(PAD + 4.5, ty - 6);
+				}
+				else
+				{
+					tri.moveTo(PAD + 1, ty - 6);
+					tri.lineTo(PAD + 8, ty - 6);
+					tri.lineTo(PAD + 4.5, ty);
+				}
+				tri.closePath();
+				g.setColor(SHADOW);
+				g.translate(1, 1);
+				g.fill(tri);
+				g.translate(-1, -1);
+				g.setColor(buy ? Palette.GREEN : Palette.GOLD);
+				g.fill(tri);
+				String label = Fmt.full(t[1]);
+				if (t[2] > 1)
+				{
+					label += " x" + Fmt.full(t[2]);
+				}
+				shadowed(g, label, PAD + 14, ty, NAME);
+				String mid;
+				Color midCol = Palette.SUBTLE;
+				if (buy)
+				{
+					mid = t[4] == 1 ? "holding" : "";
+				}
+				else
+				{
+					mid = (t[5] >= 0 ? "+" : "") + Fmt.compact(t[5]);
+					midCol = t[5] >= 0 ? Palette.GREEN : Palette.RED;
+				}
+				shadowed(g, mid, w / 2 + 14, ty, midCol);
+				final long ago = Math.max(0, c.nowTs - t[0] / 1000L);
+				final String age = ago < 60 ? ago + "s ago"
+					: ago < 5400 ? (ago / 60) + "m ago"
+					: ago < 172800 ? (ago / 3600) + "h ago" : (ago / 86400) + "d ago";
+				shadowed(g, age, w - PAD - fm.stringWidth(age), ty, Palette.SUBTLE);
+			}
 		}
 
 		return new Dimension(w, h);
