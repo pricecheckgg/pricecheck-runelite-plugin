@@ -120,17 +120,6 @@ public interface PriceCheckConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "geClerkStyle",
-		name = "GE: PriceCheck clerks",
-		description = "Dress the Grand Exchange clerks in PriceCheck gold. Purely cosmetic and only visible to you.",
-		position = 11
-	)
-	default boolean geClerkStyle()
-	{
-		return false;
-	}
-
-	@ConfigItem(
 		keyName = "geItemCard",
 		name = "GE: item evidence card",
 		description = "Beside the open offer screen: the day's traded corridor with your offer drawn on it, the trades arriving live, measured fill odds, and the after-tax outcome. Hold Shift to peek past the single-item card; on the offers grid, Shift shows each card's expand and collapse buttons.",
