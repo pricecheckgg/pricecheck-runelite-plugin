@@ -61,6 +61,8 @@ final class GeItemInfoPainter
 		int fillPct = -1;          // measured odds at the board's prices, -1 unknown
 		String outcomeText;        // bottom line, prebuilt by the caller
 		Color outcomeColor;
+		String outcomeText2;       // whole-offer line under it (qty math)
+		Color outcomeColor2;
 		long nowTs;
 		// Your open position from the flip log: what you hold and paid.
 		long lotQty;
@@ -123,6 +125,7 @@ final class GeItemInfoPainter
 		final int h = PAD + lineH + 6 + CHART_H + 6 + (pressure != null ? lineH + 3 : 0)
 			+ (tapeRows > 0 ? tapeRows * 13 + 14 : 0)
 			+ (holding ? lineH : 0) + 2 * lineH
+			+ (c.outcomeText2 != null ? lineH : 0)
 			+ (ownRows > 0 ? lineH + ownRows * 13 + 10 : 0) + PAD + 2;
 
 		g.setColor(Palette.INK);
@@ -383,9 +386,14 @@ final class GeItemInfoPainter
 		y += lineH;
 		if (c.outcomeText != null)
 		{
-			shadowed(g, c.outcomeText, PAD, y + fm.getAscent(), c.outcomeColor != null ? c.outcomeColor : Palette.SUBTLE);
+			shadowed(g, clip(c.outcomeText, fm, w - 2 * PAD), PAD, y + fm.getAscent(), c.outcomeColor != null ? c.outcomeColor : Palette.SUBTLE);
 		}
 		y += lineH;
+		if (c.outcomeText2 != null)
+		{
+			shadowed(g, clip(c.outcomeText2, fm, w - 2 * PAD), PAD, y + fm.getAscent(), c.outcomeColor2 != null ? c.outcomeColor2 : Palette.SUBTLE);
+			y += lineH;
+		}
 
 		// Your trades: the flip log's history for THIS item, at the card's
 		// foot. Buys are green entries, sells gold exits carrying that flip's

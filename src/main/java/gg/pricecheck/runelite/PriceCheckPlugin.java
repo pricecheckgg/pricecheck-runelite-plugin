@@ -1254,6 +1254,49 @@ public class PriceCheckPlugin extends Plugin
 		return qty > 0 ? new long[]{qty, cost, opened} : null;
 	}
 
+	/** Exact FIFO cost of {@code qty} units of an item, taken from the raw
+	 * lots so nothing is lost to per-unit rounding; a partial lot contributes
+	 * its proportional share. The first {@code skip} units are passed over:
+	 * that is how units already committed to another open sell offer are kept
+	 * from being costed twice. -1 when the lots cannot cover skip + qty. */
+	long fifoCostFor(int geId, long skip, long qty)
+	{
+		if (qty <= 0)
+		{
+			return -1;
+		}
+		final List<FlipLogEngine.Lot> lots = new ArrayList<>();
+		for (final FlipLogEngine.Lot l : openLots)
+		{
+			if (l.itemId == geId && l.qty > 0)
+			{
+				lots.add(l);
+			}
+		}
+		lots.sort((a, b) -> Long.compare(a.openedAt, b.openedAt));
+		long toSkip = Math.max(0, skip);
+		long need = qty;
+		long cost = 0;
+		for (final FlipLogEngine.Lot l : lots)
+		{
+			final long sk = Math.min(toSkip, l.qty);
+			toSkip -= sk;
+			final long avail = l.qty - sk;
+			if (avail <= 0)
+			{
+				continue;
+			}
+			final long take = Math.min(need, avail);
+			cost += take == l.qty ? l.cost : Math.round((double) l.cost * take / l.qty);
+			need -= take;
+			if (need == 0)
+			{
+				return cost;
+			}
+		}
+		return -1;
+	}
+
 	/** The individual open lots for an item, oldest first: {qty, unit cost,
 	 *  openedAt ms} per lot, so surfaces can show what was actually paid
 	 *  instead of a blended average. */

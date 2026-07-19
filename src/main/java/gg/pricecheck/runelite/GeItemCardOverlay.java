@@ -47,6 +47,10 @@ class GeItemCardOverlay extends Overlay
 	private boolean collapsed;
 	// At most ONE card rides big at a time; opening another swaps it. 0 = none.
 	private int expandedItem;
+	// Last coherent setup quantity, kept per item so one frame where the total
+	// widget lags the price field cannot flicker the whole-offer math.
+	private int setupQtyItem;
+	private long setupQty;
 	// Canvas-space buttons drawn this frame, valid only while Shift is held.
 	private volatile List<Object[]> buttons = java.util.Collections.emptyList();
 
@@ -114,6 +118,13 @@ class GeItemCardOverlay extends Overlay
 				break;
 			}
 		}
+		if (setupPanel == null)
+		{
+			// The cached quantity belongs to the panel session that set it;
+			// letting it outlive the panel could tag a later offer's math.
+			setupQtyItem = 0;
+			setupQty = 0;
+		}
 
 		final int[] anchor = anchorFor(GeItemInfoPainter.W_FULL);
 		if (slotIdx >= 0)
@@ -125,7 +136,7 @@ class GeItemCardOverlay extends Overlay
 				return null;
 			}
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
-			addViewOutcome(c, offers[slotIdx]);
+			addViewOutcome(c, offers, slotIdx);
 			attachOwnTrades(c, geId, client.getCanvasHeight() - anchor[1] - 6);
 			paintAt(g, anchor[0], anchor[1], () -> GeItemInfoPainter.paint(g, c, anchor[2]));
 			return null;
@@ -138,9 +149,13 @@ class GeItemCardOverlay extends Overlay
 			{
 				return null;
 			}
-			// Read the price being typed right off the panel, every frame, so
-			// the tag tracks the user while they adjust.
+			// Read the price and the offer total right off the panel, every
+			// frame, so the tag tracks the user while they adjust. The setup
+			// panel carries exactly two "N coins" texts, price first, then the
+			// total bar, and the game computes total = price x quantity, so
+			// the quantity comes out of the division exactly.
 			long entered = 0;
+			long offerTotal = -1;
 			boolean sellSide = false;
 			for (final Widget c : allChildren(setupPanel))
 			{
@@ -157,11 +172,34 @@ class GeItemCardOverlay extends Overlay
 				{
 					sellSide = true;
 				}
-				else if (entered <= 0 && PRICE.matcher(txt).matches())
+				else if (PRICE.matcher(txt).matches())
 				{
 					final String digits = txt.replaceAll("[^0-9]", "");
-					entered = digits.isEmpty() ? 0 : Long.parseLong(digits);
+					final long v = digits.isEmpty() ? 0 : Long.parseLong(digits);
+					if (entered <= 0)
+					{
+						entered = v;
+					}
+					else
+					{
+						offerTotal = v;
+					}
 				}
+			}
+			long qty = setupQtyItem == geId ? setupQty : 1;
+			if (entered > 0 && offerTotal == 0)
+			{
+				// Quantity is genuinely zero (mid-retype): whole-offer math for
+				// the old quantity would be a lie, so drop to per-item only.
+				qty = 1;
+				setupQtyItem = geId;
+				setupQty = 1;
+			}
+			else if (entered > 0 && offerTotal > 0 && offerTotal % entered == 0)
+			{
+				qty = offerTotal / entered;
+				setupQtyItem = geId;
+				setupQty = qty;
 			}
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
 			if (entered > 0)
@@ -169,20 +207,15 @@ class GeItemCardOverlay extends Overlay
 				if (sellSide)
 				{
 					c.youSells = append(c.youSells, entered);
-					c.outcomeText = "Nets " + Fmt.full(GeTax.net(0, entered)) + " after tax if it sells";
-					c.outcomeColor = Palette.LIGHT;
 				}
 				else
 				{
 					c.youBuys = append(c.youBuys, entered);
-					final FlipData live = plugin.liveFor(geId);
-					if (live != null && live.getSell() > 0)
-					{
-						final long m = GeTax.net(entered, live.getSell());
-						c.outcomeText = "Resells at market for " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
-						c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
-					}
 				}
+				// A new sell must be costed behind the lots your open sell
+				// offers have already spoken for.
+				final long skip = sellSide ? sellQtyCommitted(offers, geId, -1) : 0;
+				applyOutcome(c, sellSide, entered, qty, geId, "", skip);
 			}
 			attachOwnTrades(c, geId, client.getCanvasHeight() - anchor[1] - 6);
 			paintAt(g, anchor[0], anchor[1], () -> GeItemInfoPainter.paint(g, c, anchor[2]));
@@ -444,29 +477,119 @@ class GeItemCardOverlay extends Overlay
 		return c;
 	}
 
-	/** The outcome line for the offer whose status screen is open. */
-	private void addViewOutcome(GeItemInfoPainter.Context c, GrandExchangeOffer o)
+	/** The outcome lines for the offer whose status screen is open. Live buys
+	 * are judged over the full offer, cancelled buys over the units actually
+	 * bought (the rest will never exist). Live sells are judged over what is
+	 * still unsold, behind the lots other open sells have claimed; a
+	 * cancelled sell projects nothing, its sold part is booked in the log. */
+	private void addViewOutcome(GeItemInfoPainter.Context c, GrandExchangeOffer[] offers, int slotIdx)
 	{
+		final GrandExchangeOffer o = offers[slotIdx];
 		final long price = o.getPrice();
 		if (price <= 0)
 		{
 			return;
 		}
-		if (isBuySide(o.getState()))
+		final GrandExchangeOfferState st = o.getState();
+		if (isBuySide(st))
 		{
-			final FlipData live = plugin.liveFor(o.getItemId());
-			if (live != null && live.getSell() > 0)
+			final boolean cancelled = st == GrandExchangeOfferState.CANCELLED_BUY;
+			final long qty = cancelled ? o.getQuantitySold() : Math.max(1, o.getTotalQuantity());
+			if (qty <= 0)
 			{
-				final long m = GeTax.net(price, live.getSell());
-				c.outcomeText = "Resells at market for " + (m >= 0 ? "+" : "") + Fmt.compact(m) + " after tax";
-				c.outcomeColor = m >= 0 ? Palette.GREEN : Palette.RED;
+				return;   // cancelled before anything bought: nothing to resell
+			}
+			applyOutcome(c, false, price, qty, o.getItemId(), cancelled ? " bought" : "", 0);
+		}
+		else
+		{
+			if (st == GrandExchangeOfferState.CANCELLED_SELL)
+			{
+				return;   // dead offer: the sold part's profit is booked below
+			}
+			final long left = o.getTotalQuantity() - o.getQuantitySold();
+			if (left <= 0)
+			{
+				return;   // fully sold: the trades section below carries the booked profit
+			}
+			// Sells of the same item across slots claim disjoint lot spans
+			// (earlier slots take the older lots), so their profits sum true.
+			final long skip = sellQtyCommitted(offers, o.getItemId(), slotIdx);
+			applyOutcome(c, true, price, left, o.getItemId(), o.getQuantitySold() > 0 ? " left" : "", skip);
+		}
+	}
+
+	/** Unsold units of the item committed to LIVE sell offers in slots before
+	 * {@code beforeSlot} (-1 = all slots): the lot span already spoken for. */
+	private static long sellQtyCommitted(GrandExchangeOffer[] offers, int geId, int beforeSlot)
+	{
+		if (offers == null)
+		{
+			return 0;
+		}
+		long claimed = 0;
+		final int end = beforeSlot >= 0 ? Math.min(beforeSlot, offers.length) : offers.length;
+		for (int i = 0; i < end; i++)
+		{
+			final GrandExchangeOffer o = offers[i];
+			if (o != null && o.getItemId() == geId && o.getState() == GrandExchangeOfferState.SELLING)
+			{
+				claimed += Math.max(0, o.getTotalQuantity() - o.getQuantitySold());
+			}
+		}
+		return claimed;
+	}
+
+	/** The card's money math, quantity-aware and exact: line one is the
+	 * per-item after-tax outcome, line two the whole offer. Sells are judged
+	 * against the FIFO cost of your own tracked lots when they cover the
+	 * quantity; every figure is full digits, nothing hides in rounding. */
+	private void applyOutcome(GeItemInfoPainter.Context c, boolean sellSide, long price, long qty, int geId, String qtySuffix, long sellSkip)
+	{
+		final boolean many = qty > 1 || !qtySuffix.isEmpty();
+		final String qtyTag = "x" + Fmt.full(qty) + qtySuffix;
+		final String ea = many ? "/ea" : "";
+		if (sellSide)
+		{
+			final long taxEach = GeTax.tax(price);
+			final long netEach = price - taxEach;
+			c.outcomeText = "Nets " + Fmt.full(netEach) + ea + " after tax (tax " + Fmt.full(taxEach) + ea + ")";
+			c.outcomeColor = Palette.LIGHT;
+			final long fifoCost = plugin.fifoCostFor(geId, sellSkip, qty);
+			if (fifoCost >= 0)
+			{
+				final long profit = netEach * qty - fifoCost;
+				c.outcomeText2 = (many ? qtyTag + " " : "") + "vs your " + Fmt.compact(fifoCost) + " cost: " + signed(profit) + " profit";
+				c.outcomeColor2 = profit >= 0 ? Palette.GREEN : Palette.RED;
+			}
+			else if (many)
+			{
+				c.outcomeText2 = qtyTag + ": " + Fmt.full(netEach * qty) + " back if all sell";
+				c.outcomeColor2 = Palette.LIGHT;
 			}
 		}
 		else
 		{
-			c.outcomeText = "Nets " + Fmt.full(GeTax.net(0, price)) + " after tax if it sells";
-			c.outcomeColor = Palette.LIGHT;
+			final FlipData live = plugin.liveFor(geId);
+			if (live == null || live.getSell() <= 0)
+			{
+				return;
+			}
+			final long resell = live.getSell();
+			final long each = GeTax.net(price, resell);
+			c.outcomeText = "Resells at " + Fmt.compact(resell) + ": " + signed(each) + ea + " after tax";
+			c.outcomeColor = each >= 0 ? Palette.GREEN : Palette.RED;
+			if (many)
+			{
+				c.outcomeText2 = qtyTag + ": " + signed(each * qty) + " total (tax " + Fmt.full(GeTax.tax(resell) * qty) + ")";
+				c.outcomeColor2 = each >= 0 ? Palette.GREEN : Palette.RED;
+			}
 		}
+	}
+
+	private static String signed(long v)
+	{
+		return v >= 0 ? "+" + Fmt.full(v) : Fmt.full(v);
 	}
 
 	private static Dimension paintAt(Graphics2D g, int x, int y, java.util.function.Supplier<Dimension> painter)
