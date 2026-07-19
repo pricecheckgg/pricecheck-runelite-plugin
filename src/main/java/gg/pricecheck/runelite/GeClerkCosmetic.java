@@ -29,10 +29,18 @@ final class GeClerkCosmetic
 
 	private final Map<Model, int[][]> originals = new IdentityHashMap<>();
 
-	private static boolean isClerk(int id)
+	/** Ids are the fast path; the name match catches every clerk variant the
+	 *  id list misses (the booth staff wear several different NPC ids). */
+	static boolean isClerk(NPC npc)
 	{
-		return id == NpcID.GE_CLERK_1 || id == NpcID.GE_CLERK_2
-			|| id == NpcID.GE_CLERK_3 || id == NpcID.GE_CLERK_4;
+		final int id = npc.getId();
+		if (id == NpcID.GE_CLERK_1 || id == NpcID.GE_CLERK_2
+			|| id == NpcID.GE_CLERK_3 || id == NpcID.GE_CLERK_4)
+		{
+			return true;
+		}
+		final String name = npc.getName();
+		return name != null && name.startsWith("Grand Exchange") && name.contains("lerk");
 	}
 
 	void apply(Client client)
@@ -43,7 +51,7 @@ final class GeClerkCosmetic
 		}
 		for (final NPC npc : client.getTopLevelWorldView().npcs())
 		{
-			if (npc == null || !isClerk(npc.getId()))
+			if (npc == null || !isClerk(npc))
 			{
 				continue;
 			}
@@ -86,7 +94,10 @@ final class GeClerkCosmetic
 		{
 			return hsl;
 		}
-		return JagexColor.packHSL(GOLD_HUE, Math.max(GOLD_SAT, sat >= 6 ? 6 : GOLD_SAT), lum);
+		// Rich gold: full saturation with the luminance lifted onto a band
+		// that keeps the shading but never sinks into olive.
+		final int lifted = 34 + lum * 58 / 127;
+		return JagexColor.packHSL(GOLD_HUE, 7, lifted);
 	}
 
 	void restore()

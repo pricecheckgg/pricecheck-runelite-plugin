@@ -105,6 +105,7 @@ public class PriceCheckPlugin extends Plugin
 	private OfferAdvisorSlotOverlay slotOverlay;
 	private OfferSetupOverlay setupOverlay;
 	private GeItemCardOverlay geCardOverlay;
+	private ClerkTagOverlay clerkTagOverlay;
 	private ScheduledFuture<?> panelTask;
 	private ScheduledFuture<?> advisorTask;
 	private ScheduledFuture<?> telemetryTask;
@@ -263,6 +264,8 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(setupOverlay);
 		geCardOverlay = new GeItemCardOverlay(client, this, config, configManager);
 		overlayManager.add(geCardOverlay);
+		clerkTagOverlay = new ClerkTagOverlay(client, config);
+		overlayManager.add(clerkTagOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->
 		{
@@ -530,6 +533,12 @@ public class PriceCheckPlugin extends Plugin
 			overlayManager.remove(geCardOverlay);
 			geCardOverlay = null;
 		}
+		if (clerkTagOverlay != null)
+		{
+			overlayManager.remove(clerkTagOverlay);
+			clerkTagOverlay = null;
+		}
+		clerkStyle.restore();
 		for (int i = 0; i < SLOTS; i++)
 		{
 			tracked.set(i, null);
