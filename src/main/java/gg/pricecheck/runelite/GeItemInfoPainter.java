@@ -495,30 +495,34 @@ final class GeItemInfoPainter
 		return null;
 	}
 
-	/** A tiny bordered pill after a tape price marking the extreme of the
-	 *  listed rows; drops to a short label, then nothing, as space runs out. */
+	private static final Color BADGE_HIGH = new Color(0x49, 0xc9, 0x7f);
+	private static final Color BADGE_LOW = new Color(0xd9, 0x5c, 0x5e);
+	private static final Color BADGE_INK = new Color(0x12, 0x0e, 0x08);
+
+	/** A solid pill after a tape price marking the extreme of the listed rows,
+	 *  in the same register as the chart's S/B tags: filled colour, dark ink
+	 *  text. Drops to a short label, then nothing, as space runs out. */
 	private static void badge(Graphics2D g, FontMetrics fm, int x, int ty, int limitX, boolean high)
 	{
 		String text = high ? "high" : "low";
-		int bw = fm.stringWidth(text) + 8;
+		int bw = fm.stringWidth(text) + 10;
 		if (x + bw > limitX)
 		{
 			text = high ? "hi" : "lo";
-			bw = fm.stringWidth(text) + 8;
+			bw = fm.stringWidth(text) + 10;
 			if (x + bw > limitX)
 			{
 				return;
 			}
 		}
-		final Color col = high ? Palette.GREEN : Palette.RED;
+		final Color col = high ? BADGE_HIGH : BADGE_LOW;
 		final int by = ty - 9;
 		g.setColor(SHADOW);
-		g.fillRoundRect(x + 1, by + 1, bw, 11, 5, 5);
-		g.setColor(Palette.INK);
-		g.fillRoundRect(x, by, bw, 11, 5, 5);
-		g.setColor(new Color(col.getRed(), col.getGreen(), col.getBlue(), 190));
-		g.drawRoundRect(x, by, bw, 11, 5, 5);
-		shadowed(g, text, x + 4, ty - 1, col);
+		g.fillRoundRect(x + 1, by + 1, bw, 12, 6, 6);
+		g.setColor(col);
+		g.fillRoundRect(x, by, bw, 12, 6, 6);
+		g.setColor(BADGE_INK);
+		g.drawString(text, x + 5, ty + 1);
 	}
 
 	/** One "triangle + count" chip in the tape header; returns the x after it. */
