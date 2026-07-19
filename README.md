@@ -1,5 +1,9 @@
 # PriceCheck Flipping
 
+[![Discord](https://img.shields.io/badge/Discord-discord.gg%2Fpricecheck-5865F2?logo=discord&logoColor=white)](https://discord.gg/pricecheck)
+[![Reddit](https://img.shields.io/badge/Reddit-u%2Fpricecheckgg-FF4500?logo=reddit&logoColor=white)](https://www.reddit.com/user/pricecheckgg/)
+[![Website](https://img.shields.io/badge/Web-flipping.pricecheck.gg-d4af37)](https://flipping.pricecheck.gg)
+
 The OSRS flip terminal, inside RuneLite. The flip log is free for everyone
 and books every GE fill to the exact coin. Subscribers get the live board,
 an offer advisor, and a per-item evidence card drawn beside the exchange.
