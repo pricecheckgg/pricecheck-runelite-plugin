@@ -897,12 +897,7 @@ public class PriceCheckPlugin extends Plugin
 			// lists are populated, and a stamp-once tape would then call your
 			// own history someone else's forever. A couple dozen prints
 			// against a handful of lots and flips is nothing per frame.
-			for (final GeItemInfoPainter.Print p : q)
-			{
-				final long side = ownFillSide(geId, p.ts, p.price);
-				p.yours = side >= 0;
-				p.yoursBuy = side == 1;
-			}
+			restampPrints(geId, q);
 			return new ArrayList<>(q);
 		}
 	}
@@ -940,11 +935,11 @@ public class PriceCheckPlugin extends Plugin
 			final long ts = d.ts[i] + 240;
 			if (d.hv != null && d.hv[i] > 0 && d.ah[i] > 0)
 			{
-				seeds.add(ownMarked(geId, ts, d.ah[i], true));
+				seeds.add(new GeItemInfoPainter.Print(ts, d.ah[i], true));
 			}
 			if (seeds.size() < 8 && d.lv != null && d.lv[i] > 0 && d.al[i] > 0)
 			{
-				seeds.add(ownMarked(geId, ts, d.al[i], false));
+				seeds.add(new GeItemInfoPainter.Print(ts, d.al[i], false));
 			}
 		}
 		if (seeds.isEmpty())
@@ -967,46 +962,41 @@ public class PriceCheckPlugin extends Plugin
 		}
 	}
 
-	/** A print stamped with whether it matches one of your own logged fills. */
-	private GeItemInfoPainter.Print ownMarked(int geId, long ts, long price, boolean buySide)
-	{
-		final long side = ownFillSide(geId, ts, price);
-		return new GeItemInfoPainter.Print(ts, price, buySide, side >= 0, side == 1);
-	}
-
 	/**
-	 * Matches a print against your own recent fills: open lots (your buys) and
-	 * recent flips (both legs), exact unit price, within a few minutes. The
-	 * wiki reports your trade like anyone else's; this is how the tape knows
-	 * which prints are you. Returns 1 = your buy, 0 = your sell, -1 = not yours.
+	 * Own-trade matching as an assignment, not a lookup: each of your fills
+	 * claims AT MOST ONE print (its best by time, side plausibility as the
+	 * tiebreak), so four identical-price prints with one fill behind them tag
+	 * once, not four times. The claim window adapts to the tape's cadence: a
+	 * busy tape makes same-price coincidence cheap, so the window tightens to
+	 * roughly three median print gaps; a quiet big-ticket keeps the full six
+	 * minutes. Fill sources (live events, open lots, flip legs) are deduped
+	 * first so one trade recorded twice cannot claim two prints.
 	 */
-	private long ownFillSide(int geId, long printTs, long price)
+	private void restampPrints(int geId, java.util.ArrayDeque<GeItemInfoPainter.Print> q)
 	{
-		if (price <= 0)
+		for (final GeItemInfoPainter.Print p : q)
 		{
-			return -1;
+			p.yours = false;
+			p.yoursBuy = false;
 		}
-		final long tol = 360;
-		// Live fill events first: they carry the true per-fill timestamp, so a
-		// buy offer filling piece by piece tags every piece as it prints.
+		// Own fills for this item: {unit, tsSec, buy, resting}.
+		final List<long[]> fills = new ArrayList<>();
 		final FlipLogEngine engine = flipLog;
 		if (engine != null)
 		{
 			for (final long[] ev : engine.recentFillEvents())
 			{
-				if (ev[0] == geId && sameFillPrice(ev[1], price)
-					&& Math.abs(printTs - ev[2] / 1000L) <= tol)
+				if (ev[0] == geId && ev[1] > 0)
 				{
-					return ev[3];
+					fills.add(new long[]{ev[1], ev[2] / 1000L, ev[3], ev.length > 4 ? ev[4] : -1});
 				}
 			}
 		}
 		for (final FlipLogEngine.Lot l : openLots)
 		{
-			if (l.itemId == geId && l.qty > 0 && sameFillPrice(l.cost / l.qty, price)
-				&& Math.abs(printTs - l.openedAt / 1000L) <= tol)
+			if (l.itemId == geId && l.qty > 0)
 			{
-				return 1;
+				addFillDeduped(fills, l.cost / l.qty, l.openedAt / 1000L, 1);
 			}
 		}
 		for (final FlipLogEngine.Flip fl : recentFlips)
@@ -1015,16 +1005,92 @@ public class PriceCheckPlugin extends Plugin
 			{
 				continue;
 			}
-			if (sameFillPrice(fl.buyGross / fl.qty, price) && Math.abs(printTs - fl.openedAt / 1000L) <= tol)
+			addFillDeduped(fills, fl.buyGross / fl.qty, fl.openedAt / 1000L, 1);
+			addFillDeduped(fills, fl.sellGross / fl.qty, fl.closedAt / 1000L, 0);
+		}
+		if (fills.isEmpty())
+		{
+			return;
+		}
+
+		// Claim window from the tape's own cadence.
+		final GeItemInfoPainter.Print[] prints = q.toArray(new GeItemInfoPainter.Print[0]);
+		long window = 360;
+		if (prints.length >= 6)
+		{
+			final long[] gaps = new long[prints.length - 1];
+			for (int i = 1; i < prints.length; i++)
 			{
-				return 1;
+				gaps[i - 1] = Math.max(0, prints[i].ts - prints[i - 1].ts);
 			}
-			if (sameFillPrice(fl.sellGross / fl.qty, price) && Math.abs(printTs - fl.closedAt / 1000L) <= tol)
+			java.util.Arrays.sort(gaps);
+			window = Math.max(60, Math.min(360, 3 * gaps[gaps.length / 2]));
+		}
+
+		// All plausible (fill, print) pairs, best first. Side plausibility:
+		// a resting buy is consumed by an insta-sell (low print), a resting
+		// sell by an insta-buy (high print); a crossed offer prints on the
+		// side it crossed to. A matching expectation shaves the effective
+		// distance, an unknown changes nothing.
+		final List<long[]> cand = new ArrayList<>();
+		for (int fi = 0; fi < fills.size(); fi++)
+		{
+			final long[] f = fills.get(fi);
+			for (int pi = 0; pi < prints.length; pi++)
 			{
-				return 0;
+				final GeItemInfoPainter.Print p = prints[pi];
+				if (p.price <= 0 || !sameFillPrice(f[0], p.price))
+				{
+					continue;
+				}
+				final long dt = Math.abs(p.ts - f[1]);
+				if (dt > window)
+				{
+					continue;
+				}
+				long adj = dt;
+				if (f[3] >= 0)
+				{
+					final boolean expectHigh = f[3] == 1 ? f[2] == 0 : f[2] == 1;
+					adj = p.buySide == expectHigh ? Math.max(0, dt - 45) : dt + 45;
+				}
+				cand.add(new long[]{adj, fi, pi});
 			}
 		}
-		return -1;
+		cand.sort((a, b) -> Long.compare(a[0], b[0]));
+		final boolean[] fillUsed = new boolean[fills.size()];
+		final boolean[] printUsed = new boolean[prints.length];
+		for (final long[] c : cand)
+		{
+			final int fi = (int) c[1];
+			final int pi = (int) c[2];
+			if (fillUsed[fi] || printUsed[pi])
+			{
+				continue;
+			}
+			fillUsed[fi] = true;
+			printUsed[pi] = true;
+			prints[pi].yours = true;
+			prints[pi].yoursBuy = fills.get(fi)[2] == 1;
+		}
+	}
+
+	/** Adds a lot- or flip-derived fill unless a live event already covers the
+	 *  same trade (same side, same price to the whisker, within seconds). */
+	private static void addFillDeduped(List<long[]> fills, long unit, long tsSec, long buy)
+	{
+		if (unit <= 0)
+		{
+			return;
+		}
+		for (final long[] f : fills)
+		{
+			if (f[2] == buy && Math.abs(f[1] - tsSec) <= 5 && sameFillPrice(f[0], unit))
+			{
+				return;
+			}
+		}
+		fills.add(new long[]{unit, tsSec, buy, -1});
 	}
 
 	/** The wiki can report a price-improved fill a few coins off the exact
@@ -1070,12 +1136,12 @@ public class PriceCheckPlugin extends Plugin
 				// low moving = someone insta-sold into the new low.
 				if (f.getSell() > 0 && f.getSell() != last[0])
 				{
-					q.addLast(ownMarked(e.getKey(), now, f.getSell(), true));
+					q.addLast(new GeItemInfoPainter.Print(now, f.getSell(), true));
 					last[0] = f.getSell();
 				}
 				if (f.getBuy() > 0 && f.getBuy() != last[1])
 				{
-					q.addLast(ownMarked(e.getKey(), now, f.getBuy(), false));
+					q.addLast(new GeItemInfoPainter.Print(now, f.getBuy(), false));
 					last[1] = f.getBuy();
 				}
 				while (q.size() > 24)

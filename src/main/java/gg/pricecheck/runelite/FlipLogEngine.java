@@ -122,6 +122,10 @@ class FlipLogEngine
 		boolean agg;      // login-burst aggregate: real coins, unreliable timing
 		transient boolean check;
 		transient String name;
+		// Was the offer resting when this fill landed (1), crossed instantly
+		// (0), or unknown (-1)? Resting fills surface on the OPPOSITE wiki
+		// side, which the card's own-trade matcher scores on.
+		transient int resting = -1;
 	}
 
 	static class Lot
@@ -602,6 +606,7 @@ class FlipLogEngine
 				&& snap.placedMs > 0 && now - snap.placedMs >= 0 && now - snap.placedMs <= MARGIN_CHECK_MS
 				&& !f.agg;
 			f.name = itemName;
+			f.resting = snap.placedMs > 0 ? (now - snap.placedMs > 30_000 ? 1 : 0) : -1;
 			ingest(f);
 		}
 
@@ -624,10 +629,10 @@ class FlipLogEngine
 		return GeTax.tax(gross / qty) * qty;
 	}
 
-	// Live fill events, in memory only: {itemId, unit price, ts ms, buy 1/0}.
-	// The card's tape matches wiki prints against THESE, because lot and flip
-	// aggregates anchor to their first fill and a progressing offer's later
-	// fills drift out of any window anchored there.
+	// Live fill events, in memory only: {itemId, unit price, ts ms, buy 1/0,
+	// resting 1/0/-1}. The card's tape matches wiki prints against THESE,
+	// because lot and flip aggregates anchor to their first fill and a
+	// progressing offer's later fills drift out of any window anchored there.
 	private final java.util.ArrayDeque<long[]> fillEvents = new java.util.ArrayDeque<>();
 
 	synchronized List<long[]> recentFillEvents()
@@ -639,7 +644,7 @@ class FlipLogEngine
 	{
 		if (f.qty > 0)
 		{
-			fillEvents.addLast(new long[]{f.itemId, f.gross / f.qty, f.ts, f.buy ? 1 : 0});
+			fillEvents.addLast(new long[]{f.itemId, f.gross / f.qty, f.ts, f.buy ? 1 : 0, f.resting});
 			while (fillEvents.size() > 48)
 			{
 				fillEvents.removeFirst();
