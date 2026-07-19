@@ -9,6 +9,33 @@ public interface PriceCheckConfig extends Config
 {
 	String GROUP = "pricecheck";
 
+	/** How often the PriceCheck Discord bot may DM you about your open offers. */
+	enum AlertCadence
+	{
+		OFF("off"),
+		INSTANT("instant"),
+		EVERY_5_MIN("m5"),
+		EVERY_15_MIN("m15"),
+		HOURLY("hourly");
+
+		private final String wire;
+		AlertCadence(String wire) { this.wire = wire; }
+		String wire() { return wire; }
+
+		@Override
+		public String toString()
+		{
+			switch (this)
+			{
+				case INSTANT: return "Instant";
+				case EVERY_5_MIN: return "Every 5 min";
+				case EVERY_15_MIN: return "Every 15 min";
+				case HOURLY: return "Hourly digest";
+				default: return "Off";
+			}
+		}
+	}
+
 	@ConfigItem(
 		keyName = "apiKey",
 		name = "Plugin key",
@@ -117,6 +144,17 @@ public interface PriceCheckConfig extends Config
 	default boolean geSearchSuggestions()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+		keyName = "discordOfferAlerts",
+		name = "Discord offer alerts",
+		description = "Get a PriceCheck Discord DM when one of your open GE offers is undercut, outbid, or probably filled while you were offline. Trader Pro only. Pick how often you want to hear from the bot.",
+		position = 11
+	)
+	default AlertCadence discordOfferAlerts()
+	{
+		return AlertCadence.OFF;
 	}
 
 	@ConfigItem(

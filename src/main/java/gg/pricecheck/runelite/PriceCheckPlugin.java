@@ -314,6 +314,7 @@ public class PriceCheckPlugin extends Plugin
 		advisorTask = poller.scheduleWithFixedDelay(this::refreshAdvisor, 1, ADVISOR_REFRESH_SECONDS, TimeUnit.SECONDS);
 		telemetryTask = poller.scheduleWithFixedDelay(this::flushTelemetry, 30, 30, TimeUnit.SECONDS);
 		flipSyncTask = poller.scheduleWithFixedDelay(this::syncFlipLog, 20, 30, TimeUnit.SECONDS);
+		pushAlertMode();   // sync the chosen cadence for an already-set key
 	}
 
 	// The flip log only talks to the server with a key present AND the sync
@@ -1419,6 +1420,24 @@ public class PriceCheckPlugin extends Plugin
 				clientToolbar.removeNavigation(navButton);
 			}
 		}
+		else if ("discordOfferAlerts".equals(key) || "apiKey".equals(key))
+		{
+			pushAlertMode();
+		}
+	}
+
+	// Report the chosen Discord offer-alert cadence to the server. Fire on
+	// startup and whenever the dropdown or key changes; the server gates it to
+	// Trader Pro and ignores it otherwise.
+	private void pushAlertMode()
+	{
+		final String key = config.apiKey();
+		if (key == null || key.trim().isEmpty() || poller == null)
+		{
+			return;
+		}
+		final String mode = config.discordOfferAlerts().wire();
+		poller.execute(() -> api.postAlertMode(key, mode));
 	}
 
 	private BufferedImage loadIcon()

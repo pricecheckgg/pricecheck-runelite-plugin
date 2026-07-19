@@ -187,6 +187,31 @@ public class PriceCheckApiClient
 		}
 	}
 
+	/** Report the Discord offer-alert cadence the user chose. Fire-and-forget;
+	 *  the server 400s an unknown mode and 404s a non-Pro key, both harmless. */
+	void postAlertMode(String key, String mode)
+	{
+		if (key == null || key.trim().isEmpty() || mode == null)
+		{
+			return;
+		}
+		final java.util.Map<String, Object> body = new java.util.HashMap<>();
+		body.put("mode", mode);
+		final Request req = new Request.Builder()
+			.url(BASE.newBuilder().addPathSegment("alerts").build())
+			.header("Authorization", "Bearer " + key.trim())
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+		try (Response res = http.newCall(req).execute())
+		{
+			// Server owns the outcome; nothing to read back.
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.debug("PriceCheck alert-mode post failed", e);
+		}
+	}
+
 	/** Fetch the evidence-chart series for one item. Null on any failure. */
 	SeriesData fetchSeries(String key, int geId)
 	{
