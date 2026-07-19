@@ -888,7 +888,22 @@ public class PriceCheckPlugin extends Plugin
 		synchronized (cardPrints)
 		{
 			final java.util.ArrayDeque<GeItemInfoPainter.Print> q = cardPrints.get(geId);
-			return q == null ? Collections.emptyList() : new ArrayList<>(q);
+			if (q == null)
+			{
+				return Collections.emptyList();
+			}
+			// Re-stamp ownership on every read instead of freezing it at
+			// insert: after a restart the tape seeds before the flip log's
+			// lists are populated, and a stamp-once tape would then call your
+			// own history someone else's forever. A couple dozen prints
+			// against a handful of lots and flips is nothing per frame.
+			for (final GeItemInfoPainter.Print p : q)
+			{
+				final long side = ownFillSide(geId, p.ts, p.price);
+				p.yours = side >= 0;
+				p.yoursBuy = side == 1;
+			}
+			return new ArrayList<>(q);
 		}
 	}
 
