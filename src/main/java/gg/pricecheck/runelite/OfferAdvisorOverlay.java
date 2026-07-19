@@ -251,10 +251,10 @@ class OfferAdvisorOverlay extends Overlay
 			return s;
 		}
 		String t = s;
-		while (t.length() > 1 && fm.stringWidth(t + "…") > max)
+		while (t.length() > 1 && fm.stringWidth(t + "..") > max)
 		{
 			t = t.substring(0, t.length() - 1);
 		}
-		return t + "…";
+		return t + "..";
 	}
 }

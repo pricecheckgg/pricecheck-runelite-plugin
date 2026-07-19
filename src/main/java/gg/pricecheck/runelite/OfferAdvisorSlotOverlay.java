@@ -242,10 +242,10 @@ class OfferAdvisorSlotOverlay extends Overlay
 		{
 			return s;
 		}
-		while (s.length() > 1 && fm.stringWidth(s + "…") > maxW)
+		while (s.length() > 1 && fm.stringWidth(s + "..") > maxW)
 		{
 			s = s.substring(0, s.length() - 1);
 		}
-		return s + "…";
+		return s + "..";
 	}
 }
