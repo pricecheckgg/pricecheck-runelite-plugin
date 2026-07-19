@@ -713,6 +713,23 @@ public class PriceCheckPlugin extends Plugin
 		}
 	}
 
+	// The opt-in clerk cosmetic: applied every frame while on (animated
+	// models rebuild constantly), restored the frame it turns off.
+	private final GeClerkCosmetic clerkStyle = new GeClerkCosmetic();
+
+	@Subscribe
+	public void onClientTick(net.runelite.api.events.ClientTick event)
+	{
+		if (config.geClerkStyle())
+		{
+			clerkStyle.apply(client);
+		}
+		else
+		{
+			clerkStyle.restore();
+		}
+	}
+
 	@Subscribe
 	public void onGrandExchangeOfferChanged(GrandExchangeOfferChanged event)
 	{
