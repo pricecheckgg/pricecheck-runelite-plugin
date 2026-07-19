@@ -77,6 +77,7 @@ final class GeClerkCosmetic
 					f3[i] = golden(f3[i]);
 				}
 			}
+			carveBadge(m, f1, f2, f3);
 		}
 	}
 
@@ -98,6 +99,62 @@ final class GeClerkCosmetic
 		// that keeps the shading but never sinks into olive.
 		final int lifted = 34 + lum * 58 / 127;
 		return JagexColor.packHSL(GOLD_HUE, 7, lifted);
+	}
+
+	// The dark ink the badge is carved in, against the gold robe.
+	private static final int BADGE_INK_HSL = JagexColor.packHSL(9, 3, 14);
+
+	/**
+	 * The badge: a dark emblem cut into the chest-region faces of the robe.
+	 * Real model geometry, not an overlay. Faces are picked by centroid: the
+	 * vertical chest band a little below the shoulders, centred laterally.
+	 * Low-poly models make it a crest-shaped patch; text is not a thing
+	 * triangles can say at this face density.
+	 */
+	private static void carveBadge(Model m, int[] f1, int[] f2, int[] f3)
+	{
+		final float[] vx = m.getVerticesX();
+		final float[] vy = m.getVerticesY();
+		final int[] i1 = m.getFaceIndices1();
+		final int[] i2 = m.getFaceIndices2();
+		final int[] i3 = m.getFaceIndices3();
+		if (vx == null || i1 == null)
+		{
+			return;
+		}
+		float minY = Float.MAX_VALUE;
+		float maxY = -Float.MAX_VALUE;
+		float maxAbsX = 1;
+		for (int v = 0; v < vx.length; v++)
+		{
+			minY = Math.min(minY, vy[v]);
+			maxY = Math.max(maxY, vy[v]);
+			maxAbsX = Math.max(maxAbsX, Math.abs(vx[v]));
+		}
+		final float h = Math.max(1, maxY - minY);
+		// Model y grows downward, so the chest band hangs just below the top.
+		final float chestLo = minY + h * 0.26f;
+		final float chestHi = minY + h * 0.40f;
+		final float halfW = maxAbsX * 0.30f;
+		for (int i = 0; i < i1.length && i < f1.length; i++)
+		{
+			if (f3[i] == -2)
+			{
+				continue;
+			}
+			final float cy = (vy[i1[i]] + vy[i2[i]] + vy[i3[i]]) / 3f;
+			final float cx = (vx[i1[i]] + vx[i2[i]] + vx[i3[i]]) / 3f;
+			if (cy < chestLo || cy > chestHi || Math.abs(cx) > halfW)
+			{
+				continue;
+			}
+			f1[i] = BADGE_INK_HSL;
+			if (f3[i] != -1)
+			{
+				f2[i] = BADGE_INK_HSL;
+				f3[i] = BADGE_INK_HSL;
+			}
+		}
 	}
 
 	void restore()
