@@ -234,6 +234,14 @@ final class GeItemInfoPainter
 				hiIdx = -1;
 				loIdx = -1;
 			}
+			// One badge column for the whole tape: pills stack instead of
+			// trailing each price at its own ragged end.
+			int badgeX = 0;
+			for (int i = 0; i < tapeRows; i++)
+			{
+				badgeX = Math.max(badgeX, fm.stringWidth(Fmt.full(c.prints.get(c.prints.size() - 1 - i).price)));
+			}
+			badgeX += PAD + 14 + 8;
 			for (int i = 0; i < tapeRows; i++)
 			{
 				final Print p = c.prints.get(c.prints.size() - 1 - i);
@@ -260,11 +268,14 @@ final class GeItemInfoPainter
 				g.translate(-1, -1);
 				g.setColor(p.buySide ? Palette.GREEN : Palette.RED);
 				g.fill(tri);
-				shadowed(g, Fmt.full(p.price), PAD + 14, ty, p.yours ? Palette.GOLD : NAME);
+				// Ownership gold outranks the extreme tint on the price text;
+				// the badge still marks the extreme either way.
+				final Color priceCol = p.yours ? Palette.GOLD
+					: i == hiIdx ? Palette.GREEN : i == loIdx ? Palette.RED : NAME;
+				shadowed(g, Fmt.full(p.price), PAD + 14, ty, priceCol);
 				if (i == hiIdx || i == loIdx)
 				{
-					final int bx = PAD + 14 + fm.stringWidth(Fmt.full(p.price)) + 6;
-					badge(g, fm, bx, ty, w / 2 - 14, i == hiIdx);
+					badge(g, fm, badgeX, ty, w / 2 - 14, i == hiIdx);
 				}
 				final long ago = Math.max(0, c.nowTs - p.ts);
 				final String age = ago < 60 ? ago + "s ago"
@@ -516,13 +527,15 @@ final class GeItemInfoPainter
 			}
 		}
 		final Color col = high ? BADGE_HIGH : BADGE_LOW;
-		final int by = ty - 9;
+		// Box brackets the row's text: ascent above the shared baseline plus a
+		// whisker each side, text ON the baseline like its row.
+		final int by = ty - 10;
 		g.setColor(SHADOW);
-		g.fillRoundRect(x + 1, by + 1, bw, 12, 6, 6);
+		g.fillRoundRect(x + 1, by + 1, bw, 13, 6, 6);
 		g.setColor(col);
-		g.fillRoundRect(x, by, bw, 12, 6, 6);
+		g.fillRoundRect(x, by, bw, 13, 6, 6);
 		g.setColor(BADGE_INK);
-		g.drawString(text, x + 5, ty + 1);
+		g.drawString(text, x + 5, ty);
 	}
 
 	/** One "triangle + count" chip in the tape header; returns the x after it. */
