@@ -332,7 +332,9 @@ class GeItemCardOverlay extends Overlay
 		if (w != null)
 		{
 			final Rectangle b = w.getBounds();
-			final int top = Math.max(4, b.y);
+			// Columns start near the canvas top, not the GE's: the headroom
+			// above the interface is stack room the bottom edge needs.
+			final int top = 8;
 			if (b.x - CARD_W - 8 >= 4)
 			{
 				cols.add(new Point(b.x - CARD_W - 8, top));
@@ -566,7 +568,7 @@ class GeItemCardOverlay extends Overlay
 		{
 			return new int[]{10, 120, wantW};
 		}
-		final int y = Math.max(4, b.y);
+		final int y = 8;
 		final int narrow = GeItemInfoPainter.W;
 		if (b.x - wantW - 8 >= 4)
 		{
