@@ -110,25 +110,23 @@ class OfferAdvisorSlotOverlay extends Overlay
 			{
 				continue;
 			}
-			// The measured extras: fill odds from the cached series, and how
-			// long the offer has sat without movement.
-			int fillPct = -1;
+			// Proximity to a real fill: how far this offer's price sits from the
+			// last DETECTED trade on the side that would take it, in tenths of a
+			// percent. -1 == no real print to measure (never a fake 0).
+			int closeTenths = -1;
 			final TrackedOffer t = plugin.trackedAt(i);
-			if (t != null && t.isRelevant())
+			if (t != null && t.isActive() && a.getKind() != OfferAdvice.Kind.DEAD)
 			{
 				final PriceCheckApiClient.SeriesData sd = plugin.cardSeriesFor(t.getItemId());
-				if (sd != null)
-				{
-					fillPct = sd.fillPct;
-				}
+				closeTenths = closenessTenths(t, sd);
 			}
 			final long quietMs = plugin.slotQuietMs(i);
-			paintSlot(g, fm, b, a.getKind(), a.getColor(), label, fillPct, quietMs);
+			paintSlot(g, fm, b, a.getKind(), a.getColor(), label, closeTenths, quietMs);
 		}
 		return null;
 	}
 
-	private void paintSlot(Graphics2D g, FontMetrics fm, Rectangle b, OfferAdvice.Kind kind, Color col, String label, int fillPct, long quietMs)
+	private void paintSlot(Graphics2D g, FontMetrics fm, Rectangle b, OfferAdvice.Kind kind, Color col, String label, int closeTenths, long quietMs)
 	{
 		final boolean dead = kind == OfferAdvice.Kind.DEAD;
 		final boolean onTrack = kind == OfferAdvice.Kind.ON_TRACK;
@@ -161,12 +159,19 @@ class OfferAdvisorSlotOverlay extends Overlay
 		g.setColor(Palette.INK);
 		g.fillRoundRect(barX, barY, barW, BAR_H, 6, 6);
 		g.fillRect(barX, barY, barW, 6);
-		// Measured fill odds as a subtle wash from the left edge.
-		if (fillPct > 0)
+		// Closeness wash from the left edge: fuller the nearer the offer sits to
+		// a real fill (seated fills the bar), fading out as the gap widens. The
+		// same honest gap as the number, never a modelled probability.
+		if (!dead && closeTenths >= 0)
 		{
-			g.setColor(new Color(col.getRed(), col.getGreen(), col.getBlue(), 26));
-			final int washW = Math.max(4, barW * Math.min(fillPct, 100) / 100);
-			g.fillRoundRect(barX, barY, washW, BAR_H, 6, 6);
+			final int cap = 30;   // a 3.0% gap or worse leaves no wash
+			final int near = cap - Math.min(closeTenths, cap);
+			if (near > 0)
+			{
+				g.setColor(new Color(col.getRed(), col.getGreen(), col.getBlue(), 26));
+				final int washW = Math.max(4, barW * near / cap);
+				g.fillRoundRect(barX, barY, washW, BAR_H, 6, 6);
+			}
 		}
 		g.setColor(col);
 		g.fillRect(barX, barY, barW, 2);   // signature coloured top edge
@@ -197,19 +202,32 @@ class OfferAdvisorSlotOverlay extends Overlay
 		g.setColor(col);
 		g.drawString(text, cx, ty);
 
-		// Right segment, only when it will not crowd the verdict: quiet time
-		// once past ten minutes, else the odds number.
+		// Right segment: proximity to a real fill. Never contradicts the centre
+		// verdict - the seated "at mkt" shows only on non-action slots, and AMBER
+		// stays reserved for the quiet-time caution. Nothing at all when there is
+		// no real print to measure.
 		String side = null;
 		Color sideCol = Palette.SUBTLE_CANVAS;
-		if (quiet && quietMs >= 10 * 60_000L)
+		final boolean action = up || down;   // up/down are already computed above
+		final String quietStr = (quiet && quietMs >= 10 * 60_000L) ? quietLabel(quietMs) : null;
+		if (!dead && closeTenths > 0)
 		{
-			final long m = quietMs / 60_000L;
-			side = (m >= 60 ? (m / 60) + "h" + (m % 60 > 0 ? " " + (m % 60) + "m" : "") : m + "m");
-			sideCol = Palette.AMBER;
+			side = (closeTenths / 10) + "." + (closeTenths % 10) + "%";
+			// grey -> gold as it nears a fill; AMBER is the caution colour, not "close".
+			sideCol = closeTenths <= 10 ? Palette.GOLD : Palette.SUBTLE_CANVAS;
 		}
-		else if (fillPct > 0)
+		else if (!dead && closeTenths == 0 && !action)
 		{
-			side = fillPct + "%";
+			// Seated: fills now. Only on non-action slots so green never fights a
+			// RAISE/DROP/FALLING verdict. A seated-but-dry patient offer shows its wait.
+			side = quietStr != null ? quietStr : "at mkt";
+			sideCol = quietStr != null ? Palette.AMBER : Palette.GREEN;
+		}
+		else if (quietStr != null)
+		{
+			// No usable closeness (no print, DEAD, or a seated action slot): quiet time.
+			side = quietStr;
+			sideCol = Palette.AMBER;
 		}
 		if (side != null)
 		{
@@ -249,5 +267,83 @@ class OfferAdvisorSlotOverlay extends Overlay
 			s = s.substring(0, s.length() - 1);
 		}
 		return s + "..";
+	}
+
+	// A fill-side print older than this in REAL time is treated as no live
+	// reference. 24h keeps once-or-twice-a-day illiquid items readable (the card
+	// seeds prints back a week for them) while suppressing genuinely dead sides.
+	private static final long STALE_SECS = 24 * 3600L;
+
+	/**
+	 * How close an offer's price sits to the last DETECTED trade on the side that
+	 * would fill it, in tenths of a percent of that trade. A SELL fills as buyers
+	 * print UP at/through the ask -> measured against the last insta-buy print (ah
+	 * at the newest window with hv&gt;0); a BUY fills as sellers print DOWN at/through
+	 * the bid -> the last insta-sell print (al at the newest window with lv&gt;0).
+	 * Returns: -1 unknown (no series/volume, unpriced offer, or too stale); 0
+	 * seated (at/through the print, fills now); &gt;0 the gap in tenths of a percent
+	 * (21 == 2.1%). A plain gap to a real print, never an invented probability.
+	 */
+	private static int closenessTenths(TrackedOffer t, PriceCheckApiClient.SeriesData sd)
+	{
+		if (t == null || sd == null)
+		{
+			return -1;
+		}
+		final long yourPrice = t.getPrice();
+		if (yourPrice <= 0)
+		{
+			return -1;   // unpriced/returned offer deserializes to 0 - never a real gap
+		}
+		final boolean buying = t.isBuying();
+		final int idx = buying ? lastPrintIdx(sd.al, sd.lv) : lastPrintIdx(sd.ah, sd.hv);
+		if (idx < 0)
+		{
+			return -1;   // no observed trade on the side that would fill this offer
+		}
+		final long trade = buying ? sd.al[idx] : sd.ah[idx];
+		if (trade <= 0)
+		{
+			return -1;
+		}
+		// Age the print against the wall clock (not the newest cached window) so a
+		// globally stale cache cannot pass off an old print as live. If ts is
+		// missing or mis-sized, freshness is unverifiable -> report unknown.
+		if (sd.ts == null || idx >= sd.ts.length
+			|| System.currentTimeMillis() / 1000L - sd.ts[idx] > STALE_SECS)
+		{
+			return -1;
+		}
+		// Seated (gap <= 0): the market already prints at/through your price.
+		final long gap = buying ? (trade - yourPrice) : (yourPrice - trade);
+		if (gap <= 0)
+		{
+			return 0;
+		}
+		return (int) Math.round(gap * 1000.0D / trade);
+	}
+
+	/** Newest index carrying a real trade: positive volume AND a real price. -1 if none. */
+	private static int lastPrintIdx(long[] price, int[] vol)
+	{
+		if (price == null || vol == null)
+		{
+			return -1;
+		}
+		final int n = Math.min(price.length, vol.length);
+		for (int i = n - 1; i >= 0; i--)
+		{
+			if (vol[i] > 0 && price[i] > 0)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	private static String quietLabel(long quietMs)
+	{
+		final long m = quietMs / 60_000L;
+		return m >= 60 ? (m / 60) + "h" + (m % 60 > 0 ? " " + (m % 60) + "m" : "") : m + "m";
 	}
 }
