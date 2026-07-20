@@ -118,21 +118,29 @@ class OfferSetupOverlay extends Overlay
 
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
+		// Ring colour: gold when the typed price is on market (within 1%), red
+		// when it will not fill, amber when it fills but gives margin away.
 		final long target = live == null ? 0 : (sell ? live.getSell() : live.getBuy());
-		if (target <= 0)
-		{
-			drawRing(g, b, Palette.GOLD);
-			return null;
-		}
-
-		// Ring colour only: gold when the typed price is on market (within 1%),
-		// red when it will not fill, amber when it fills but gives margin away.
 		Color state = Palette.GOLD;
-		final long tol = Math.max(target / 100, 1);
-		if (entered > 0 && Math.abs(entered - target) > tol)
+		if (target > 0 && entered > 0)
 		{
-			final boolean noFill = sell ? entered > target : entered < target;
-			state = noFill ? Palette.RED : Palette.AMBER;
+			final long tol = Math.max(target / 100, 1);
+			if (Math.abs(entered - target) > tol)
+			{
+				final boolean noFill = sell ? entered > target : entered < target;
+				state = noFill ? Palette.RED : Palette.AMBER;
+			}
+		}
+		// Selling a HELD position below its break-even floor books a loss no
+		// matter how fast it fills, so it outranks every market state AND runs
+		// even when there is no live quote (target <= 0) to colour the ring.
+		if (sell && entered > 0)
+		{
+			final TrackedItem pos = plugin.trackedFor(geId);
+			if (pos != null && pos.isHeld() && pos.getFloor() > 0 && entered < pos.getFloor())
+			{
+				state = Palette.RED;
+			}
 		}
 
 		drawRing(g, b, state);

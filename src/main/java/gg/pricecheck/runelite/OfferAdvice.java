@@ -9,7 +9,7 @@ class OfferAdvice
 {
 	enum Kind
 	{
-		ON_TRACK, RAISE_BUY, DROP_SELL, DEAD, FALLING, COLLECT, NO_DATA
+		ON_TRACK, RAISE_BUY, DROP_SELL, DEAD, FALLING, HOLD, COLLECT, NO_DATA
 	}
 
 	int slot;

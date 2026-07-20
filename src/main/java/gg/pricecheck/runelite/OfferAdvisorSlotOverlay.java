@@ -133,7 +133,9 @@ class OfferAdvisorSlotOverlay extends Overlay
 		final boolean dead = kind == OfferAdvice.Kind.DEAD;
 		final boolean onTrack = kind == OfferAdvice.Kind.ON_TRACK;
 		final boolean collect = kind == OfferAdvice.Kind.COLLECT;
-		final boolean quiet = onTrack || collect;
+		// A patient HOLD needs no action, so it reads calm (dim frame) and, because
+		// it is neither RAISE nor DROP/FALLING, draws no direction arrow.
+		final boolean quiet = onTrack || collect || kind == OfferAdvice.Kind.HOLD;
 
 		// DEAD greys the whole slot so it reads from across the room.
 		if (dead)

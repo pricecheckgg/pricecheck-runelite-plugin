@@ -19,6 +19,7 @@ public final class AdvisorPreview
 	private static final Color AMBER = new Color(0xe6, 0xc6, 0x67);
 	private static final Color RED = new Color(0xf2, 0x6b, 0x6d);
 	private static final Color GREY = new Color(0x9a, 0x91, 0x7c);
+	private static final Color BLUE = new Color(0x7f, 0xb0, 0xff);
 
 	private AdvisorPreview()
 	{
@@ -34,12 +35,14 @@ public final class AdvisorPreview
 			new OfferAdvice(1, "Ranger boots", "SELL", OfferAdvice.Kind.ON_TRACK, "", "OK +385.24k", GREEN),
 			new OfferAdvice(2, "Tonalztics of ralos (uncharged)", "BUY", OfferAdvice.Kind.RAISE_BUY, "", "RAISE +23.8k", AMBER),
 			new OfferAdvice(3, "Zulrah's scales", "BUY", OfferAdvice.Kind.FALLING, "", "FALLING 1.8%", AMBER),
-			new OfferAdvice(4, "Dragon claws", "BUY", OfferAdvice.Kind.DEAD, "", "MARGIN DEAD", RED),
-			new OfferAdvice(5, "Armadyl chainskirt", "", OfferAdvice.Kind.COLLECT, "", "COLLECT", GREY)
+			new OfferAdvice(4, "Scythe of vitur (uncharged)", "BUY", OfferAdvice.Kind.HOLD, "", "HOLD", BLUE),
+			new OfferAdvice(5, "Harmonised orb", "SELL", OfferAdvice.Kind.HOLD, "", "HOLD", BLUE),
+			new OfferAdvice(6, "Dragon claws", "BUY", OfferAdvice.Kind.DEAD, "", "MARGIN DEAD", RED),
+			new OfferAdvice(7, "Armadyl chainskirt", "", OfferAdvice.Kind.COLLECT, "", "COLLECT", GREY)
 		);
 
 		final int w = 780;
-		final int h = 190;
+		final int h = 250;
 		final BufferedImage img = new BufferedImage(w * 2, h * 2, BufferedImage.TYPE_INT_RGB);
 		final Graphics2D g = img.createGraphics();
 		g.scale(2, 2);

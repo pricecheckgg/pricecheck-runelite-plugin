@@ -171,8 +171,11 @@ class GeChatboxHelper
 		}
 		if (isSell)
 		{
+			// Only a HELD position has a real break-even to protect. A watch
+			// row's floor is derived from a board quote, not your cost, so
+			// offering it as "your break-even" would contradict the panel.
 			final TrackedItem t = trackedFor(itemId);
-			if (t != null && t.getFloor() > 0)
+			if (t != null && t.isHeld() && t.getFloor() > 0)
 			{
 				addLine(parent, y, "set to your break-even floor: " + Fmt.full(t.getFloor()) + " gp", t.getFloor());
 			}

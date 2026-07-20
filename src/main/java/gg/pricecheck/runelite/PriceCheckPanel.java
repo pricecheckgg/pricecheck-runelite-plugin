@@ -1967,7 +1967,8 @@ class PriceCheckPanel extends PluginPanel
 		head.add(rm, BorderLayout.EAST);
 		card.add(head);
 
-		card.add(kv("Bought", Fmt.full(t.getEntryBuy())));
+		final boolean held = t.isHeld();
+		card.add(kv(held ? ("Held " + Fmt.full(t.getHeldQty()) + " · avg") : "Watching at", Fmt.full(t.getEntryBuy())));
 		card.add(kv("Sell now", t.getSellNow() != null ? Fmt.full(t.getSellNow()) : "-"));
 		card.add(Box.createVerticalStrut(5));
 		card.add(hairline());
@@ -1976,8 +1977,19 @@ class PriceCheckPanel extends PluginPanel
 		final boolean nodata = "nodata".equals(t.getStatus());
 		final boolean thin = "thin".equals(t.getStatus());
 		final Color pnlCol = t.getPnl() > 0 ? Palette.GREEN : (t.getPnl() < 0 ? Palette.RED : Palette.SUBTLE);
-		final JLabel pnl = new JLabel((t.getPnl() > 0 ? "+" : "") + Fmt.compact(t.getPnl())
-			+ " · " + pctSigned(t.getRoi()) + " if sold now");
+		// Held stacks show the whole position, not just the per-item number.
+		final String pnlText;
+		if (held && t.getPnlTotal() != null && t.getHeldQty() > 1)
+		{
+			pnlText = (t.getPnl() > 0 ? "+" : "") + Fmt.compact(t.getPnl()) + "/ea · "
+				+ (t.getPnlTotal() > 0 ? "+" : "") + Fmt.compact(t.getPnlTotal()) + " total if sold now";
+		}
+		else
+		{
+			pnlText = (t.getPnl() > 0 ? "+" : "") + Fmt.compact(t.getPnl())
+				+ " · " + pctSigned(t.getRoi()) + " if sold now";
+		}
+		final JLabel pnl = new JLabel(pnlText);
 		pnl.setForeground(pnlCol);
 		pnl.setFont(pnl.getFont().deriveFont(Font.BOLD, 13f));
 		pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -1986,22 +1998,27 @@ class PriceCheckPanel extends PluginPanel
 		card.add(pnl);
 
 		// Verdict cluster: the pill and its plain-language reading sit together.
+		// A watch row says so instead of pretending you hold the item.
 		final JPanel st = row();
 		st.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
 		final JPanel verdict = new JPanel();
 		verdict.setLayout(new BoxLayout(verdict, BoxLayout.X_AXIS));
 		verdict.setOpaque(false);
-		verdict.add(pill(nodata ? "no data" : (thin ? "thin" : "healthy"),
-			nodata ? Palette.SUBTLE : (thin ? Palette.RED : Palette.GREEN)));
+		verdict.add(pill(!held ? "watching" : (nodata ? "no data" : (thin ? "thin" : "healthy")),
+			!held ? Palette.GOLD : (nodata ? Palette.SUBTLE : (thin ? Palette.RED : Palette.GREEN))));
 		verdict.add(Box.createRigidArea(new Dimension(7, 0)));
-		final JLabel hint = new JLabel(nodata ? "not trading right now" : (thin ? "margin closing" : "good to hold"));
+		final JLabel hint = new JLabel(!held
+			? (nodata ? "not held · not trading" : "not held · vs your watch price")
+			: (nodata ? "not trading right now" : (thin ? "margin closing" : "good to hold")));
 		hint.setForeground(Palette.LIGHT);
 		hint.setFont(FontManager.getRunescapeSmallFont());
 		verdict.add(hint);
 		st.add(verdict, BorderLayout.WEST);
 		card.add(st);
 
-		final JLabel floor = new JLabel("Floor " + Fmt.full(t.getFloor()) + " · don't sell below");
+		final JLabel floor = new JLabel(held
+			? "Floor " + Fmt.full(t.getFloor()) + " · don't sell below"
+			: "Would break even at " + Fmt.full(t.getFloor()));
 		floor.setForeground(Palette.SUBTLE);
 		floor.setFont(FontManager.getRunescapeSmallFont());
 		floor.setAlignmentX(Component.LEFT_ALIGNMENT);

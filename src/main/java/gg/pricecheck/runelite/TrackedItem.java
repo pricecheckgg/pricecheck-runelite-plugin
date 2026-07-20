@@ -18,4 +18,11 @@ public class TrackedItem
 	private double roi;         // pnl as % of entryBuy
 	private long floor;         // don't sell below this: the break-even sell
 	private String status;      // "healthy" | "thin" | "nodata"
+	// Held truth from the synced flip log: when held, entryBuy above is the
+	// REAL average fill cost and pnlTotal is the whole position's outcome.
+	// Absent on older servers: Gson leaves held=false, the watch rendering.
+	private boolean held;
+	private long heldQty;
+	private Long pnlTotal;      // null when the market is not printing
+	private long watchBuy;      // the stored watch price (differs from entryBuy when held)
 }
