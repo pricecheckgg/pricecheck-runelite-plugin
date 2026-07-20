@@ -17,6 +17,7 @@ final class OfferAdvisor
 	private static final Color AMBER = new Color(0xe6, 0xc6, 0x67);
 	private static final Color RED = new Color(0xf2, 0x6b, 0x6d);
 	private static final Color GREY = new Color(0x9a, 0x91, 0x7c);
+	private static final Color BLUE = new Color(0x7f, 0xb0, 0xff);   // patient hold: no action, will fill
 
 	private OfferAdvisor()
 	{
@@ -55,32 +56,49 @@ final class OfferAdvisor
 		}
 		final long marketMargin = live.getProfit(); // net(marketBuy, marketSell), post-tax
 
+		// The ONE thing that turns a patient offer into a real problem: the item is
+		// dropping against its own 1h average, so the spread is closing and waiting
+		// only gets worse. A thin or briefly-inverted spread on a STABLE item is not
+		// this - it reopens, and the offer still fills - so we hold it rather than
+		// tell the user to cancel or to cut the price and lose value.
+		final boolean falling = live.isFallingKnife() || live.getTrendPct() <= -2.0D;
+
 		if (offer.isBuying())
 		{
-			// Loss states are RED and take precedence over the amber falling warning.
-			if (marketMargin <= 0)
-			{
-				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
-					"Margin gone (" + signed(marketMargin) + " at market) - cancel", "MARGIN DEAD", RED);
-			}
-			final long yourMargin = GeTax.net(yourPrice, marketSell);
-			if (yourMargin <= 0)
-			{
-				// Bid so high it loses even sold at the market high: always report red.
-				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
-					"Bid too high - " + signed(yourMargin) + " if it fills, lower it", "BID TOO HIGH", RED);
-			}
-			// An offer that has already transacted is demonstrably filling: don't
-			// nag it over small ticks. getQuantitySold covers bought units too.
+			// An offer that has already transacted is demonstrably filling.
 			final boolean filling = offer.getSoldQty() > 0;
-			if (!filling && live.isFallingKnife())
+			final long yourMargin = GeTax.net(yourPrice, marketSell);
+
+			// A real error, not a market wobble: bidding at or above the price you
+			// could sell into is a guaranteed loss whatever the trend. Lower it.
+			if (yourPrice >= marketSell)
+			{
+				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
+					"Bid at/above the sell price - " + signed(yourMargin) + " if it fills, lower it", "BID TOO HIGH", RED);
+			}
+			// Genuinely dead: the price is falling AND there is no margin left, so
+			// the spread will not reopen soon. This is the only cancel-a-buy state.
+			if (falling && marketMargin <= 0)
+			{
+				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
+					"Price falling and margin gone (" + signed(marketMargin) + ") - cancel", "MARGIN DEAD", RED);
+			}
+			// Falling but not yet filling: a heads-up, not a cancel.
+			if (!filling && falling)
 			{
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.FALLING,
 					"Price falling " + pct(Math.abs(live.getTrendPct())) + " - margin closing, watch it",
 					"FALLING " + pct(Math.abs(live.getTrendPct())), AMBER);
 			}
-			// Your bid must sit at (near) the current low or sellers won't hit it.
-			// Ignore sub-1% noise, and don't nag an offer that's already buying.
+			// Spread thin or briefly gone but the item is NOT falling: the buy still
+			// fills and the spread reopens. Hold it. Do not tell the user to cancel a
+			// buy that will fill.
+			if (marketMargin <= 0)
+			{
+				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.HOLD,
+					"Spread thin right now, not falling - the buy still fills, hold for it to reopen", "HOLD", BLUE);
+			}
+			// Sitting below the low and not yet buying: nudge the bid to head the queue.
 			final long buyTol = Math.max(marketBuy / 100, 1);
 			if (!filling && yourPrice < marketBuy - buyTol)
 			{
@@ -93,17 +111,23 @@ final class OfferAdvisor
 				"On track - " + signed(yourMargin) + " if sold at market", "OK " + signed(yourMargin), GREEN);
 		}
 
-		// SELLING: it fills at/under the current high. Only flag a drop when the ask
-		// is meaningfully (>1%) above market AND nothing has sold yet: an offer that
-		// is already selling is filling fine even a touch above the momentary high.
+		// SELLING: an ask above the current high is a PATIENT sell, not a mistake -
+		// it fills when a buyer prints up at your price. Only advise a drop when the
+		// item is actually falling, so waiting would cost you; otherwise hold and let
+		// it fill, rather than telling the user to cut the price and lose value.
 		final boolean sellFilling = offer.getSoldQty() > 0;
 		final long sellTol = Math.max(marketSell / 100, 1);
 		if (!sellFilling && yourPrice > marketSell + sellTol)
 		{
 			final long delta = yourPrice - marketSell;
-			return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DROP_SELL,
-				"Above market by " + gp(delta) + " - drop to " + full(marketSell) + " to fill",
-				"DROP -" + gp(delta), AMBER);
+			if (falling)
+			{
+				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DROP_SELL,
+					"Above market and price falling " + pct(Math.abs(live.getTrendPct())) + " - drop to " + full(marketSell) + " so it fills",
+					"DROP -" + gp(delta), AMBER);
+			}
+			return new OfferAdvice(slot, name, side, OfferAdvice.Kind.HOLD,
+				"Patient sell, " + gp(delta) + " above the current high - it fills when a buyer prints up here, holding", "HOLD", BLUE);
 		}
 		return new OfferAdvice(slot, name, side, OfferAdvice.Kind.ON_TRACK,
 			"On track - at/near market, filling (" + signed(marketMargin) + " live margin)", "OK " + signed(marketMargin), GREEN);

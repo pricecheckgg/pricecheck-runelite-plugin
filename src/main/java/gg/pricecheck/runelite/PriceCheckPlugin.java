@@ -140,6 +140,9 @@ public class PriceCheckPlugin extends Plugin
 	private final AtomicReferenceArray<TrackedOffer> tracked = new AtomicReferenceArray<>(SLOTS);
 	// Live market data for the items you have offers on. Replaced whole on refresh.
 	private volatile Map<Integer, FlipData> liveByItem = Collections.emptyMap();
+	// The tracked list keyed by item, refreshed with the panel, so overlays can
+	// look up a position's break-even floor without another request.
+	private volatile Map<Integer, TrackedItem> trackedById = Collections.emptyMap();
 	// The advice the overlay renders.
 	private volatile List<OfferAdvice> advice = Collections.emptyList();
 
@@ -620,6 +623,21 @@ public class PriceCheckPlugin extends Plugin
 		final PriceCheckApiClient.FlipsResult flips = api.getFlips(key, FLIP_LIMIT);
 		marketDataOk = flips.state == PriceCheckApiClient.AuthState.OK;
 		final PriceCheckApiClient.TrackedResult tracked = api.getTracked(key);
+		if (tracked != null && tracked.state == PriceCheckApiClient.AuthState.OK && tracked.tracked != null)
+		{
+			final java.util.Map<Integer, TrackedItem> byId = new java.util.HashMap<>();
+			for (final TrackedItem t : tracked.tracked)
+			{
+				byId.put(t.getGeId(), t);
+			}
+			trackedById = byId;
+		}
+		else
+		{
+			// Key lapsed / logged out / server error: drop the cache so a stale
+			// floor from the previous session can never colour the setup ring.
+			trackedById = Collections.emptyMap();
+		}
 		p.update(flips, tracked, config.minEvPerHrK());
 		final FlipLogEngine engine = flipLog;
 		if (engine != null)
@@ -924,9 +942,13 @@ public class PriceCheckPlugin extends Plugin
 			return;
 		}
 		final PriceCheckApiClient.SeriesData d = c.data;
-		final long cutoff = System.currentTimeMillis() / 1000L - 12 * 3600;
+		// Reach back a week, not 12h: a high-value item like a Harmonised orb only
+		// trades a few times a day, so a short window leaves the tape near-empty.
+		// The loop still runs newest-first, so a liquid item fills from the last
+		// hour; an illiquid one just keeps pulling back until it has ten prints.
+		final long cutoff = System.currentTimeMillis() / 1000L - 7 * 24 * 3600;
 		final java.util.List<GeItemInfoPainter.Print> seeds = new ArrayList<>();
-		for (int i = d.ts.length - 1; i >= 0 && seeds.size() < 8; i--)
+		for (int i = d.ts.length - 1; i >= 0 && seeds.size() < 10; i--)
 		{
 			if (d.ts[i] < cutoff)
 			{
@@ -939,7 +961,7 @@ public class PriceCheckPlugin extends Plugin
 			{
 				seeds.add(new GeItemInfoPainter.Print(ts, d.ah[i], true));
 			}
-			if (seeds.size() < 8 && d.lv != null && d.lv[i] > 0 && d.al[i] > 0)
+			if (seeds.size() < 10 && d.lv != null && d.lv[i] > 0 && d.al[i] > 0)
 			{
 				seeds.add(new GeItemInfoPainter.Print(ts, d.al[i], false));
 			}
@@ -1198,6 +1220,13 @@ public class PriceCheckPlugin extends Plugin
 	int setupItem()
 	{
 		return setupItemId;
+	}
+
+	/** The tracked position for an item, or null. Server-derived: when held,
+	 *  its entryBuy/floor are the trader's real average cost from the lots. */
+	TrackedItem trackedFor(int geId)
+	{
+		return trackedById.get(geId);
 	}
 
 	TrackedOffer trackedAt(int slot)
