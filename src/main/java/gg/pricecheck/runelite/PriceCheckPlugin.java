@@ -66,6 +66,9 @@ public class PriceCheckPlugin extends Plugin
 	private net.runelite.client.input.MouseManager mouseManager;
 
 	@Inject
+	private net.runelite.client.input.KeyManager keyManager;
+
+	@Inject
 	private net.runelite.client.game.ItemManager itemManager;
 
 	@Inject
@@ -102,6 +105,26 @@ public class PriceCheckPlugin extends Plugin
 			return e;
 		}
 	};
+	// Hotkey: pre-fill our recommended price into an open GE buy/sell price box
+	// (the player still presses Enter, exactly like clicking the price line).
+	// Unbound by default; reads config.geAutofillHotkey() live, so it stays
+	// inert until the user sets a key and does nothing off-context.
+	private final net.runelite.client.util.HotkeyListener autofillHotkey =
+		new net.runelite.client.util.HotkeyListener(() -> config.geAutofillHotkey())
+		{
+			@Override
+			public void hotkeyPressed()
+			{
+				final GeChatboxHelper g = geHelper;
+				if (g == null)
+				{
+					return;
+				}
+				// Block-body Runnable (not the BooleanSupplier overload): fire
+				// once, never retry-until-true when no price box is open.
+				clientThread.invoke(() -> { g.fillRecommendedPrice(); });
+			}
+		};
 	private OfferAdvisorSlotOverlay slotOverlay;
 	private OfferSetupOverlay setupOverlay;
 	private GeItemCardOverlay geCardOverlay;
@@ -260,6 +283,7 @@ public class PriceCheckPlugin extends Plugin
 		advisorOverlay = new OfferAdvisorOverlay(client, this, config, configManager);
 		overlayManager.add(advisorOverlay);
 		mouseManager.registerMouseListener(advisorMouse);
+		keyManager.registerKeyListener(autofillHotkey);
 		slotOverlay = new OfferAdvisorSlotOverlay(client, this, config);
 		overlayManager.add(slotOverlay);
 		setupOverlay = new OfferSetupOverlay(client, this, config);
@@ -517,6 +541,7 @@ public class PriceCheckPlugin extends Plugin
 		{
 			overlayManager.remove(advisorOverlay);
 			mouseManager.unregisterMouseListener(advisorMouse);
+			keyManager.unregisterKeyListener(autofillHotkey);
 			advisorOverlay = null;
 		}
 		if (slotOverlay != null)

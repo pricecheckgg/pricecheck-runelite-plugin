@@ -218,6 +218,48 @@ class GeChatboxHelper
 		client.setVarcStrValue(VARC_INPUT_TEXT, String.valueOf(price));
 	}
 
+	/**
+	 * Hotkey entry: if a GE buy/sell price box is open for an item we have a
+	 * live price for, pre-fill our recommended price for that side - the exact
+	 * same value and pre-fill-only behaviour as clicking the top price line, so
+	 * the player still presses Enter to place the offer. Client thread only.
+	 * Returns true when it filled something (the key did work), false otherwise.
+	 */
+	boolean fillRecommendedPrice()
+	{
+		if (client.getVarcIntValue(VARC_INPUT_TYPE) != INPUT_TYPE_NUMERIC)
+		{
+			return false;   // no numeric input open: not a price box
+		}
+		final Widget prompt = client.getWidget(InterfaceID.Chatbox.MES_TEXT);
+		final Widget setup = client.getWidget(InterfaceID.GeOffers.SETUP);
+		if (prompt == null || setup == null
+			|| !"Set a price for each item:".equals(prompt.getText()))
+		{
+			return false;
+		}
+		final Widget side = setup.getChild(SETUP_SIDE_CHILD);
+		final boolean isBuy = side != null && "Buy offer".equals(side.getText());
+		final boolean isSell = side != null && "Sell offer".equals(side.getText());
+		if (!isBuy && !isSell)
+		{
+			return false;
+		}
+		final int itemId = client.getVarpValue(VarPlayerID.TRADINGPOST_SEARCH);
+		if (itemId <= 0)
+		{
+			return false;
+		}
+		final FlipData live = plugin.liveFor(itemId);
+		final long price = live == null ? -1 : (isBuy ? live.getBuy() : live.getSell());
+		if (price <= 0)
+		{
+			return false;   // no live data yet: fill nothing rather than a wrong price
+		}
+		fillInput(price);
+		return true;
+	}
+
 	private TrackedItem trackedFor(int geId)
 	{
 		for (TrackedItem t : tracked)

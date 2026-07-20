@@ -3,6 +3,7 @@ package gg.pricecheck.runelite;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Keybind;
 
 @ConfigGroup(PriceCheckConfig.GROUP)
 public interface PriceCheckConfig extends Config
@@ -136,10 +137,21 @@ public interface PriceCheckConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "geAutofillHotkey",
+		name = "GE: autofill price hotkey",
+		description = "Press this while a GE buy or sell price box is open to fill PriceCheck's recommended price for that item. You still press Enter to place the offer. Unbound by default.",
+		position = 9
+	)
+	default Keybind geAutofillHotkey()
+	{
+		return Keybind.NOT_SET;
+	}
+
+	@ConfigItem(
 		keyName = "geSearchSuggestions",
 		name = "GE: suggest flips in search",
 		description = "While the GE item search is empty, show your tracked positions and the current best flips as clickable results. Start typing and normal search takes over.",
-		position = 9
+		position = 10
 	)
 	default boolean geSearchSuggestions()
 	{
@@ -150,7 +162,7 @@ public interface PriceCheckConfig extends Config
 		keyName = "discordOfferAlerts",
 		name = "Discord offer alerts",
 		description = "Get a PriceCheck Discord DM when one of your open GE offers is undercut, outbid, or probably filled while you were offline. Trader Pro only. Pick how often you want to hear from the bot.",
-		position = 11
+		position = 12
 	)
 	default AlertCadence discordOfferAlerts()
 	{
@@ -161,7 +173,7 @@ public interface PriceCheckConfig extends Config
 		keyName = "geItemCard",
 		name = "GE: item evidence card",
 		description = "Beside the open offer screen: the day's traded corridor with your offer drawn on it, the trades arriving live, measured fill odds, and the after-tax outcome. Hold Shift to peek past the single-item card; on the offers grid, Shift shows each card's expand and collapse buttons.",
-		position = 10
+		position = 11
 	)
 	default boolean geItemCard()
 	{
