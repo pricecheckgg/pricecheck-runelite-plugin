@@ -138,7 +138,7 @@ class GeOffersPanelOverlay extends Overlay
 
 		final PriceCheckApiClient.SeriesData sd = plugin.cardSeriesFor(itemId);
 		final int[] cl = closeness(t, sd, live);
-		r.closenessPct = cl[0];
+		r.closenessTenths = cl[0];
 		r.seated = cl[1] == 1;
 
 		r.lastTrade = lastTrade(itemId, sell, live, nowSec);
@@ -211,9 +211,15 @@ class GeOffersPanelOverlay extends Overlay
 			return new int[]{-1, 0};
 		}
 		final boolean seated = sell ? price <= edge : price >= edge;
-		final long dist = sell ? Math.max(0, price - edge) : Math.max(0, edge - price);
-		final int pct = (int) Math.max(0, Math.min(100, 100 - dist * 100 / Math.max(1, edge)));
-		return new int[]{pct, seated ? 1 : 0};
+		if (seated)
+		{
+			return new int[]{0, 1};   // at/through the fill edge: fills now
+		}
+		// The GAP to a real fill, in tenths of a percent (21 == 2.1%) - the same
+		// honest distance the per-slot bar shows. Small = close.
+		final long dist = sell ? (price - edge) : (edge - price);
+		final int tenths = (int) Math.max(1, Math.min(9999, Math.round(dist * 1000.0 / edge)));
+		return new int[]{tenths, 0};
 	}
 
 	private static long lastNonZero(long[] arr)
@@ -300,7 +306,7 @@ class GeOffersPanelOverlay extends Overlay
 		long price;
 		long liveMargin;    // per-unit live margin, advisor's notion
 		long unfilledQty;   // open units on this offer (0 when done)
-		int closenessPct;   // 0..100, -1 unknown
+		int closenessTenths;   // gap to a fill in tenths of a percent; -1 unknown, 0 when seated
 		boolean seated;
 		String lastTrade;   // "@price age" or "@edge", null when none
 		String pressure;    // "buy" | "sell" | "flat" | null
@@ -402,10 +408,15 @@ class GeOffersPanelOverlay extends Overlay
 		final List<Color> cols = new ArrayList<>();
 		segs.add("you " + Fmt.compact(r.price));
 		cols.add(Palette.LIGHT);
-		if (r.closenessPct >= 0)
+		if (r.seated)
 		{
-			segs.add(r.closenessPct + "% " + (r.seated ? "seat" : "off"));
-			cols.add(r.seated ? Palette.GREEN : Palette.AMBER);
+			segs.add("at mkt");
+			cols.add(Palette.GREEN);
+		}
+		else if (r.closenessTenths >= 0)
+		{
+			segs.add((r.closenessTenths / 10) + "." + (r.closenessTenths % 10) + "% off");
+			cols.add(r.closenessTenths <= 20 ? Palette.GOLD : Palette.SUBTLE_CANVAS);
 		}
 		final List<String> opt = new ArrayList<>();
 		final List<Color> optc = new ArrayList<>();

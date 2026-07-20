@@ -140,26 +140,36 @@ class PriceCheckPanel extends PluginPanel
 
 		final JPanel display = new JPanel(new BorderLayout());
 		final MaterialTabGroup tabGroup = new MaterialTabGroup(display);
-		tabGroup.setLayout(new GridLayout(1, 5, 6, 0));
 		tabGroup.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 		final MaterialTab flipsTab = new MaterialTab("Flips", tabGroup, buildFlipsView());
 		final MaterialTab logTab = new MaterialTab("Log", tabGroup, buildLogView());
 		final MaterialTab planTab = new MaterialTab("Plan", tabGroup, buildPlanView());
+		// Always build the catch view (so setCatches has a live panel), but only
+		// give it a TAB when the user opts in - five text tabs will not fit a
+		// 225px panel as one row without clipping ("Fli...", "Set...").
 		final MaterialTab catchTab = new MaterialTab("Catch", tabGroup, buildCatchView());
 		settingsTab = new MaterialTab("Setup", tabGroup, buildSettingsView());
 		settingsTab.setOnSelectEvent(() -> { listener.onFetchAccount(); return true; });
-		// Equal grid cells clip long labels ("Settings" read "Set..."), and the
-		// default left-hung labels looked ragged; short names, centred, one size.
-		for (final MaterialTab t : new MaterialTab[]{ flipsTab, logTab, planTab, catchTab, settingsTab })
+		final java.util.List<MaterialTab> tabs = new ArrayList<>();
+		tabs.add(flipsTab);
+		tabs.add(logTab);
+		tabs.add(planTab);
+		if (config.showCatches())
+		{
+			tabs.add(catchTab);
+		}
+		tabs.add(settingsTab);
+		// One row of equal, centred cells; wrap to two rows once the optional
+		// Catch tab pushes the count to five so no label ever clips.
+		final int cols = tabs.size() <= 4 ? tabs.size() : 3;
+		final int gridRows = (tabs.size() + cols - 1) / cols;
+		tabGroup.setLayout(new GridLayout(gridRows, cols, 6, 4));
+		for (final MaterialTab t : tabs)
 		{
 			t.setHorizontalAlignment(SwingConstants.CENTER);
 			t.setFont(t.getFont().deriveFont(Font.BOLD, 12f));
+			tabGroup.addTab(t);
 		}
-		tabGroup.addTab(flipsTab);
-		tabGroup.addTab(logTab);
-		tabGroup.addTab(planTab);
-		tabGroup.addTab(catchTab);
-		tabGroup.addTab(settingsTab);
 		tabGroup.select(flipsTab);
 
 		add(tabGroup, BorderLayout.NORTH);
