@@ -372,12 +372,17 @@ class GeItemCardOverlay extends Overlay
 			{
 				cols.add(new Point(b.x - CARD_W - 8, top));
 			}
-			if (b.x + b.width + 8 + CARD_W <= client.getCanvasWidth() - 4)
+			// Yield the right column to the active-offers board when it owns the
+			// dock; the board's predicate is the single source of truth.
+			if (!plugin.geOffersPanelVisible() && b.x + b.width + 8 + CARD_W <= client.getCanvasWidth() - 4)
 			{
 				cols.add(new Point(b.x + b.width + 8, top));
 			}
 		}
-		if (cols.isEmpty())
+		// Board-aware fallback: when the board owns the right and there is no left
+		// room, cols stays empty and the grid yields entirely (render() returns on
+		// empty cols). Board-off behaviour is unchanged.
+		if (cols.isEmpty() && !plugin.geOffersPanelVisible())
 		{
 			cols.add(new Point(10, 120));
 		}

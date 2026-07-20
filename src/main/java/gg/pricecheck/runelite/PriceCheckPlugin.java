@@ -128,6 +128,7 @@ public class PriceCheckPlugin extends Plugin
 	private OfferAdvisorSlotOverlay slotOverlay;
 	private OfferSetupOverlay setupOverlay;
 	private GeItemCardOverlay geCardOverlay;
+	private GeOffersPanelOverlay offersPanelOverlay;
 	private ScheduledFuture<?> panelTask;
 	private ScheduledFuture<?> advisorTask;
 	private ScheduledFuture<?> telemetryTask;
@@ -290,6 +291,8 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(setupOverlay);
 		geCardOverlay = new GeItemCardOverlay(client, this, config, configManager);
 		overlayManager.add(geCardOverlay);
+		offersPanelOverlay = new GeOffersPanelOverlay(client, this);
+		overlayManager.add(offersPanelOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->
 		{
@@ -559,6 +562,11 @@ public class PriceCheckPlugin extends Plugin
 			overlayManager.remove(geCardOverlay);
 			geCardOverlay = null;
 		}
+		if (offersPanelOverlay != null)
+		{
+			overlayManager.remove(offersPanelOverlay);
+			offersPanelOverlay = null;
+		}
 		for (int i = 0; i < SLOTS; i++)
 		{
 			tracked.set(i, null);
@@ -664,6 +672,9 @@ public class PriceCheckPlugin extends Plugin
 			trackedById = Collections.emptyMap();
 		}
 		p.update(flips, tracked, config.minEvPerHrK());
+		// The Catch tab reads the movers sibling array off the same flips poll;
+		// gate it on a live board so a lapsed key never shows stale dumps.
+		p.setCatches(flips.state == PriceCheckApiClient.AuthState.OK ? flips.catches : Collections.emptyList());
 		final FlipLogEngine engine = flipLog;
 		if (engine != null)
 		{
@@ -806,6 +817,77 @@ public class PriceCheckPlugin extends Plugin
 	{
 		final net.runelite.api.widgets.Widget w = client.getWidget(465, 0);
 		return w != null && !w.isHidden();
+	}
+
+	/** The GE grid window bounds (465:2, else 465:0), the anchor both the
+	 *  mini-cards and the offers board dock against. Null when it isn't up. */
+	java.awt.Rectangle geGridBounds()
+	{
+		net.runelite.api.widgets.Widget w = client.getWidget(465, 2);
+		if (w == null || w.isHidden())
+		{
+			w = client.getWidget(465, 0);
+		}
+		return w != null ? w.getBounds() : null;
+	}
+
+	/**
+	 * The single, order-independent gate for the right-of-GE active-offers board.
+	 * On only when the board is enabled, market data is live, the GE grid
+	 * overview is on screen (no slot open, no set-up panel), at least one offer is
+	 * relevant, and the fixed board width fits in the right dock. Read by
+	 * GeItemCardOverlay to yield its right column, so it must stay a pure
+	 * client+config state function, never a "painted this frame" flag.
+	 */
+	boolean geOffersPanelVisible()
+	{
+		if (!config.geOffersPanel() || !marketDataOk() || !isGrandExchangeOpen())
+		{
+			return false;
+		}
+		// A selected slot means a slot screen, not the overview; only count it
+		// when the offer there is real (mirrors GeItemCardOverlay).
+		final int slotVal = client.getVarbitValue(4439);
+		if (slotVal >= 1 && slotVal <= 8)
+		{
+			final GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
+			if (offers != null && offers.length >= slotVal)
+			{
+				final GrandExchangeOffer o = offers[slotVal - 1];
+				if (o != null && o.getState() != net.runelite.api.GrandExchangeOfferState.EMPTY && o.getItemId() > 0)
+				{
+					return false;
+				}
+			}
+		}
+		for (final int child : new int[]{15, 26})
+		{
+			final net.runelite.api.widgets.Widget w = client.getWidget(465, child);
+			if (w != null && !w.isHidden())
+			{
+				return false;
+			}
+		}
+		boolean anyRelevant = false;
+		for (int slot = 0; slot < SLOTS; slot++)
+		{
+			final TrackedOffer t = tracked.get(slot);
+			if (t != null && t.isRelevant())
+			{
+				anyRelevant = true;
+				break;
+			}
+		}
+		if (!anyRelevant)
+		{
+			return false;
+		}
+		final java.awt.Rectangle b = geGridBounds();
+		if (b == null)
+		{
+			return false;
+		}
+		return b.x + b.width + 8 + GeOffersPanelOverlay.W <= client.getCanvasWidth() - 4;
 	}
 
 	// The item currently open in the GE "Set up offer" screen: the setup overlay
@@ -1505,6 +1587,11 @@ public class PriceCheckPlugin extends Plugin
 		else if ("showAdvisor".equals(key))
 		{
 			if (p != null) { p.syncSettings(); }
+		}
+		else if ("showCatches".equals(key))
+		{
+			// Toggle the Catch tab's content immediately; no network round-trip.
+			if (p != null) { p.syncCatches(); }
 		}
 		else if ("showPanel".equals(key) && navButton != null)
 		{

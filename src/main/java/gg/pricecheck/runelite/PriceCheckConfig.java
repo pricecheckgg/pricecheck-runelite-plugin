@@ -179,4 +179,26 @@ public interface PriceCheckConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		keyName = "showCatches",
+		name = "Show dump catches",
+		description = "Add a Catch tab that lists live dump-reversion plays, ranked. It surfaces the board's measured base rate and a conservative, taxed, contingent target, and hides any figure it cannot back with trials (a still-falling dump reads as a skip). Trader Pro.",
+		position = 13
+	)
+	default boolean showCatches()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "geOffersPanel",
+		name = "GE: active offers board",
+		description = "Dock a compact board to the right of the open Grand Exchange grid listing every active offer with its live verdict, how close it sits to a real fill, the last trade on your side, and the coarse pressure lean. Overview only. Trader Pro.",
+		position = 16
+	)
+	default boolean geOffersPanel()
+	{
+		return false;
+	}
 }

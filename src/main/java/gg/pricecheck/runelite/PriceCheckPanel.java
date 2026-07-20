@@ -84,6 +84,13 @@ class PriceCheckPanel extends PluginPanel
 	private final IconTextField search = new IconTextField();
 	private final JPanel list = new JPanel();
 
+	// Catch tab: live dump-reversion movers, ranked, gated on the showCatches
+	// toggle. Base rate the loud CATCH read must clear before it may claim a
+	// measured bounce fraction.
+	private static final int CATCH_BAR = 50;
+	private final JPanel catchList = new JPanel();
+	private List<CatchData> lastCatches = new ArrayList<>();
+
 	// Plan tab widgets
 	private final javax.swing.JTextField planCapital = new javax.swing.JTextField();
 	private final JSpinner planSlots = new JSpinner(new SpinnerNumberModel(8, 1, 8, 1));
@@ -133,16 +140,17 @@ class PriceCheckPanel extends PluginPanel
 
 		final JPanel display = new JPanel(new BorderLayout());
 		final MaterialTabGroup tabGroup = new MaterialTabGroup(display);
-		tabGroup.setLayout(new GridLayout(1, 4, 6, 0));
+		tabGroup.setLayout(new GridLayout(1, 5, 6, 0));
 		tabGroup.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
 		final MaterialTab flipsTab = new MaterialTab("Flips", tabGroup, buildFlipsView());
 		final MaterialTab logTab = new MaterialTab("Log", tabGroup, buildLogView());
 		final MaterialTab planTab = new MaterialTab("Plan", tabGroup, buildPlanView());
+		final MaterialTab catchTab = new MaterialTab("Catch", tabGroup, buildCatchView());
 		settingsTab = new MaterialTab("Setup", tabGroup, buildSettingsView());
 		settingsTab.setOnSelectEvent(() -> { listener.onFetchAccount(); return true; });
 		// Equal grid cells clip long labels ("Settings" read "Set..."), and the
 		// default left-hung labels looked ragged; short names, centred, one size.
-		for (final MaterialTab t : new MaterialTab[]{ flipsTab, logTab, planTab, settingsTab })
+		for (final MaterialTab t : new MaterialTab[]{ flipsTab, logTab, planTab, catchTab, settingsTab })
 		{
 			t.setHorizontalAlignment(SwingConstants.CENTER);
 			t.setFont(t.getFont().deriveFont(Font.BOLD, 12f));
@@ -150,6 +158,7 @@ class PriceCheckPanel extends PluginPanel
 		tabGroup.addTab(flipsTab);
 		tabGroup.addTab(logTab);
 		tabGroup.addTab(planTab);
+		tabGroup.addTab(catchTab);
 		tabGroup.addTab(settingsTab);
 		tabGroup.select(flipsTab);
 
@@ -269,6 +278,171 @@ class PriceCheckPanel extends PluginPanel
 		view.add(top, BorderLayout.NORTH);
 		view.add(scroll, BorderLayout.CENTER);
 		return view;
+	}
+
+	// ── Catch tab: live dump-reversion movers, ranked, honesty-gated ──
+	private JPanel buildCatchView()
+	{
+		final JPanel view = new JPanel(new BorderLayout());
+		catchList.setLayout(new BoxLayout(catchList, BoxLayout.Y_AXIS));
+		final ScrollList wrap = new ScrollList();
+		wrap.add(catchList, BorderLayout.NORTH);
+		final JScrollPane scroll = new JScrollPane(wrap,
+			ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+		scroll.setBorder(null);
+		scroll.getVerticalScrollBar().setUnitIncrement(16);
+		view.add(scroll, BorderLayout.CENTER);
+		renderCatches();
+		return view;
+	}
+
+	private void renderCatches()
+	{
+		catchList.removeAll();
+		if (!config.showCatches())
+		{
+			catchList.add(note("Dump catches are off. Enable “Show dump catches” in Setup to watch measured reversion plays here.", Palette.SUBTLE));
+			catchList.add(Box.createVerticalGlue());
+			catchList.revalidate();
+			catchList.repaint();
+			return;
+		}
+		// Rank strongest first; drop faded movers (no play left on them).
+		final List<CatchData> rows = new ArrayList<>();
+		for (final CatchData c : lastCatches)
+		{
+			if (c != null && !"faded".equals(c.getState()))
+			{
+				rows.add(c);
+			}
+		}
+		rows.sort((a, b) -> Integer.compare(b.getRating(), a.getRating()));
+
+		if (rows.isEmpty())
+		{
+			// Honest empty state: do not claim it is scanning-but-quiet when the
+			// board simply is not sending movers.
+			catchList.add(note("The dump-catch board comes online when the measured detector is live.", Palette.SUBTLE));
+		}
+		else
+		{
+			catchList.add(sectionHeader("Catches · " + rows.size()));
+			for (final CatchData c : rows)
+			{
+				catchList.add(catchRow(c));
+				catchList.add(gap(5));
+			}
+		}
+		catchList.add(Box.createVerticalGlue());
+		catchList.revalidate();
+		catchList.repaint();
+	}
+
+	// ── catch row: icon | name + state chip / displaced + bid>target / read ──
+	// Package-visible for the headless preview harness. Every measured claim is
+	// gated: loud CATCH reads only when the row earns it, a still-falling dump
+	// reads "FALLING KNIFE - skip", and the projected profit is an explicit,
+	// taxed, contingent estimate, never a guarantee.
+	JPanel catchRow(CatchData c)
+	{
+		final boolean loud = c.loudEligible(CATCH_BAR);
+		final boolean knife = c.isKnife() || "knife".equals(c.getState());
+		final boolean fresh = !c.isCatchable() && !knife
+			&& (c.getMinutesRunning() > 0 && c.getMinutesRunning() < 5 || "watch".equals(c.getState()) && c.getMinutesRunning() < 5);
+
+		final JPanel rowP = new JPanel(new BorderLayout(6, 0));
+		rowP.setBackground(CARD);
+		rowP.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+		rowP.setAlignmentX(Component.LEFT_ALIGNMENT);
+		if (c.getReasons() != null && !c.getReasons().isEmpty())
+		{
+			rowP.setToolTipText(escHtml(String.join(", ", c.getReasons())));
+		}
+
+		final JLabel icon = new JLabel();
+		icon.setPreferredSize(new Dimension(28, 32));
+		icon.setHorizontalAlignment(SwingConstants.CENTER);
+		if (itemManager != null) { itemManager.getImage(c.getGeId()).addTo(icon); }
+
+		// Line 1: name + a state chip.
+		final JLabel name = new JLabel("<html><body style='width:118px'><b>" + escHtml(c.getName()) + "</b></body></html>");
+		name.setForeground(Color.WHITE);
+		final String chipText;
+		final Color chipCol;
+		if (loud) { chipText = "CATCH"; chipCol = Palette.GREEN; }
+		else if (knife) { chipText = "SKIP"; chipCol = Palette.RED; }
+		else if (fresh) { chipText = "FORMING"; chipCol = Palette.AMBER; }
+		else if ("recovering".equals(c.getState())) { chipText = "RECOVER"; chipCol = Palette.GOLD; }
+		else { chipText = "WATCH"; chipCol = Palette.AMBER; }
+		final JLabel chip = pill(chipText, chipCol);
+		final JPanel line1 = row();
+		line1.add(name, BorderLayout.CENTER);
+		line1.add(chip, BorderLayout.EAST);
+
+		// Line 2: the factual displacement, and (loud only) the entry->target.
+		final JLabel displaced = mono("displaced " + pctSigned(c.getPctMove()), Palette.LIGHT);
+		final JPanel line2 = row();
+		line2.add(displaced, BorderLayout.WEST);
+		if (loud && c.getBid() > 0 && c.getTarget() > c.getBid())
+		{
+			final JPanel bt = new JPanel();
+			bt.setLayout(new BoxLayout(bt, BoxLayout.X_AXIS));
+			bt.setOpaque(false);
+			bt.add(mono(Fmt.compact(c.getBid()), Palette.AMBER));
+			bt.add(Box.createRigidArea(new Dimension(5, 0)));
+			bt.add(new Chevron(Palette.SUBTLE));
+			bt.add(Box.createRigidArea(new Dimension(5, 0)));
+			bt.add(mono(Fmt.compact(c.getTarget()), Palette.GREEN));
+			line2.add(bt, BorderLayout.EAST);
+		}
+
+		// Line 3: the honest read.
+		final JPanel line3 = row();
+		if (knife)
+		{
+			final JLabel skip = mono("FALLING KNIFE - skip", Palette.RED);
+			line3.add(skip, BorderLayout.WEST);
+		}
+		else if (loud)
+		{
+			// Measured, backed read: the Wilson fraction (or count) + hold time.
+			line3.add(mono(c.bouncesText() + " · " + c.holdText(), Palette.SUBTLE), BorderLayout.WEST);
+			// Conservative, taxed, contingent projection off the shown target.
+			final long each = GeTax.net(c.getBid(), c.getTarget());
+			if (each != 0 && c.getBid() > 0 && c.getTarget() > 0)
+			{
+				final long est = each * Math.max(1, c.getCatchQty());
+				final JLabel profit = mono(signedGp(est) + " est", est >= 0 ? Palette.GREEN : Palette.RED);
+				profit.setHorizontalAlignment(SwingConstants.RIGHT);
+				profit.setToolTipText("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed.");
+				line3.add(profit, BorderLayout.EAST);
+			}
+		}
+		else
+		{
+			// Not backed: no measured claims, no invented odds.
+			line3.add(mono(c.bouncesText() + " · " + c.holdText(), Palette.SUBTLE), BorderLayout.WEST);
+		}
+
+		final JPanel center = new JPanel(new BorderLayout());
+		center.setOpaque(false);
+		center.add(line1, BorderLayout.NORTH);
+		final JPanel lower = new JPanel(new BorderLayout());
+		lower.setOpaque(false);
+		lower.add(line2, BorderLayout.NORTH);
+		lower.add(line3, BorderLayout.SOUTH);
+		center.add(lower, BorderLayout.SOUTH);
+
+		rowP.add(icon, BorderLayout.WEST);
+		rowP.add(center, BorderLayout.CENTER);
+		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
+		return rowP;
+	}
+
+	/** Signed compact gp: "+5k", "-12.4m". Never "+-5k". */
+	private static String signedGp(long v)
+	{
+		return (v >= 0 ? "+" : "-") + Fmt.compact(Math.abs(v));
 	}
 
 	// ── Log tab: the FREE flip ledger (works with no key at all) ──
@@ -1579,6 +1753,22 @@ class PriceCheckPanel extends PluginPanel
 			else if (authState == PriceCheckApiClient.AuthState.INVALID_KEY) { setDot(Palette.RED, "Key rejected"); }
 			render();
 		});
+	}
+
+	/** The live movers off the flips poll (empty when the board is dark). */
+	void setCatches(java.util.List<CatchData> catches)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			lastCatches = catches != null ? catches : new ArrayList<>();
+			renderCatches();
+		});
+	}
+
+	/** Re-render the Catch tab after the showCatches toggle flips (no fetch). */
+	void syncCatches()
+	{
+		SwingUtilities.invokeLater(this::renderCatches);
 	}
 
 	void setSearchResults(String query, PriceCheckApiClient.FlipsResult result)

@@ -68,11 +68,20 @@ public class PriceCheckApiClient
 	{
 		final AuthState state;
 		final List<FlipData> flips;
+		// The movers sibling array on /flips: live dumps for the Catch tab. Empty
+		// on every path that carries no board data (search, errors, older builds).
+		final List<CatchData> catches;
 
 		FlipsResult(AuthState state, List<FlipData> flips)
 		{
+			this(state, flips, Collections.emptyList());
+		}
+
+		FlipsResult(AuthState state, List<FlipData> flips, List<CatchData> catches)
+		{
 			this.state = state;
 			this.flips = flips;
+			this.catches = catches != null ? catches : Collections.emptyList();
 		}
 	}
 
@@ -110,7 +119,9 @@ public class PriceCheckApiClient
 			final FlipsResponse parsed = gson.fromJson(res.body().string(), FlipsResponse.class);
 			final List<FlipData> flips = parsed != null && parsed.flips != null
 				? parsed.flips : Collections.emptyList();
-			return new FlipsResult(AuthState.OK, flips);
+			final List<CatchData> movers = parsed != null && parsed.movers != null
+				? parsed.movers : Collections.emptyList();
+			return new FlipsResult(AuthState.OK, flips, movers);
 		}
 		catch (IOException | RuntimeException e)
 		{
@@ -124,6 +135,7 @@ public class PriceCheckApiClient
 		boolean ok;
 		long scannedAt;
 		List<FlipData> flips;
+		List<CatchData> movers;
 	}
 
 	/** A day of 5m windows for one item, plus the board's live read of it. */
