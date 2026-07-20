@@ -51,6 +51,7 @@ class FlipLogEngine
 	private static final int MAX_FLIPS_KEPT = 5000;
 	private static final int MAX_PENDING_FILLS = 2000;
 	private static final int MAX_OPEN_LOTS = 400;
+	private static final long FLIP_MERGE_MS = 5 * 60_000L;   // fold a nibbling sell offer's fills into one flip
 
 	static class SlotSnap
 	{
@@ -677,17 +678,45 @@ class FlipLogEngine
 
 		if (f.buy)
 		{
-			final Lot lot = new Lot();
-			lot.itemId = f.itemId;
-			lot.name = f.name;
-			lot.qty = f.qty;
-			lot.cost = f.gross;
-			lot.openedAt = f.ts;
-			lot.check = f.check;
-			data.openLots.add(lot);
-			while (data.openLots.size() > MAX_OPEN_LOTS)
+			// Merge consecutive fills of the same item at the same unit price into
+			// ONE open position. A buy that fills a nibble at a time was minting a
+			// new lot per nibble (dozens of "open positions" for a single offer);
+			// now it grows one lot instead. Each fill is still recorded the moment
+			// it lands, so a crash loses nothing, and the earliest openedAt is kept
+			// so the held time stays true. Match on item + exact unit price, which
+			// is fixed for the life of one offer.
+			final long unit = f.gross / f.qty;
+			Lot merge = null;
+			for (int i = data.openLots.size() - 1; i >= 0; i--)
 			{
-				data.openLots.remove(0);
+				final Lot l = data.openLots.get(i);
+				if (l.itemId == f.itemId && l.qty > 0 && l.cost / l.qty == unit)
+				{
+					merge = l;
+					break;
+				}
+			}
+			if (merge != null)
+			{
+				merge.qty += f.qty;
+				merge.cost += f.gross;
+				merge.name = merge.name != null ? merge.name : f.name;
+				merge.check = false;   // a multi-fill lot is not a clean 1-item margin check
+			}
+			else
+			{
+				final Lot lot = new Lot();
+				lot.itemId = f.itemId;
+				lot.name = f.name;
+				lot.qty = f.qty;
+				lot.cost = f.gross;
+				lot.openedAt = f.ts;
+				lot.check = f.check;
+				data.openLots.add(lot);
+				while (data.openLots.size() > MAX_OPEN_LOTS)
+				{
+					data.openLots.remove(0);
+				}
 			}
 			data.lotsMutMs = now;
 			return;
@@ -740,6 +769,40 @@ class FlipLogEngine
 		// Proportional slice of the sell for the matched quantity.
 		final long sellGross = matched == f.qty ? f.gross : f.gross * matched / f.qty;
 		final long tax = matched == f.qty ? f.tax : f.tax * matched / f.qty;
+		final long profit = sellGross - tax - buyShare;
+
+		// Fold a nibbling sell offer into ONE flip: if the newest flip is the same
+		// item, closed moments ago, at the same sell unit price and on the same
+		// side of profit, grow it rather than add a new +Xk row per unit. That flip
+		// was already counted, so only the running gp totals move here; no total
+		// changes, the log just stops spamming one line per fill.
+		final Flip prev = data.flips.isEmpty() ? null : data.flips.get(data.flips.size() - 1);
+		final boolean mergeInto = prev != null && prev.itemId == f.itemId && prev.qty > 0
+			&& !prev.check && !(f.check || checkLot)
+			&& f.ts - prev.closedAt <= FLIP_MERGE_MS
+			&& prev.sellGross / prev.qty == sellGross / matched
+			&& (prev.profit > 0) == (profit > 0);
+		if (mergeInto)
+		{
+			prev.qty += matched;
+			prev.buyGross += buyShare;
+			prev.sellGross += sellGross;
+			prev.tax += tax;
+			prev.profit += profit;
+			prev.closedAt = f.ts;
+			final long op = openedAt == Long.MAX_VALUE ? f.ts : openedAt;
+			if (op < prev.openedAt)
+			{
+				prev.openedAt = op;
+			}
+			data.allProfit += profit;
+			data.allTax += tax;
+			if (liveFill)
+			{
+				sessionProfit += profit;
+			}
+			return;
+		}
 
 		final Flip flip = new Flip();
 		flip.id = f.id + ":fl";
@@ -749,7 +812,7 @@ class FlipLogEngine
 		flip.buyGross = buyShare;
 		flip.sellGross = sellGross;
 		flip.tax = tax;
-		flip.profit = sellGross - tax - buyShare;
+		flip.profit = profit;
 		flip.openedAt = openedAt == Long.MAX_VALUE ? f.ts : openedAt;
 		flip.closedAt = f.ts;
 		flip.check = f.check || checkLot;
