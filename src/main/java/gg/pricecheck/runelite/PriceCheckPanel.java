@@ -340,6 +340,11 @@ class PriceCheckPanel extends PluginPanel
 			for (final CatchData c : rows)
 			{
 				catchList.add(catchRow(c));
+				if (c.getGeId() == expandedCatchId)
+				{
+					catchList.add(gap(2));
+					catchList.add(catchExpand(c));
+				}
 				catchList.add(gap(5));
 			}
 		}
@@ -443,10 +448,141 @@ class PriceCheckPanel extends PluginPanel
 		lower.add(line3, BorderLayout.SOUTH);
 		center.add(lower, BorderLayout.SOUTH);
 
+		rowP.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		rowP.addMouseListener(new MouseAdapter()
+		{
+			public void mouseEntered(MouseEvent e) { rowP.setBackground(CARD_HOVER); }
+			public void mouseExited(MouseEvent e) { rowP.setBackground(CARD); }
+
+			public void mousePressed(MouseEvent e)
+			{
+				// The row toggles its evidence chart. The state chip on the right
+				// is a plain label, not a control, so it has nothing to consume;
+				// any interactive mark added here later must keep its own listener
+				// (see flipRow's track mark).
+				expandedCatchId = expandedCatchId == c.getGeId() ? 0 : c.getGeId();
+				renderCatches();
+			}
+		});
+
 		rowP.add(icon, BorderLayout.WEST);
 		rowP.add(center, BorderLayout.CENTER);
 		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
 		return rowP;
+	}
+
+	/** The expanded evidence chart + read under a clicked catch row. */
+	private JPanel catchExpand(CatchData c)
+	{
+		final JPanel card = new JPanel();
+		card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+		card.setBackground(CARD);
+		card.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+		card.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+		// Chart: same construction the flips chart uses; the supplier fetches and
+		// caches on demand for any item, movers included.
+		final PriceCheckApiClient.SeriesData sd = seriesSupplier != null ? seriesSupplier.apply(c.getGeId()) : null;
+		if (sd == null || sd.ts == null || sd.ts.length < 2)
+		{
+			final JLabel wait = mono("Loading chart…", Palette.SUBTLE);
+			wait.setAlignmentX(Component.LEFT_ALIGNMENT);
+			card.add(wait);
+			// The supplier schedules the fetch; repaint shortly to pick it up.
+			final javax.swing.Timer t = new javax.swing.Timer(1200, e -> renderCatches());
+			t.setRepeats(false);
+			t.start();
+		}
+		else
+		{
+			final ItemChart.Series s = new ItemChart.Series();
+			s.ts = sd.ts;
+			s.high = sd.ah;
+			s.low = sd.al;
+			s.hvol = sd.hv;
+			s.lvol = sd.lv;
+			// Paint the entry and (contingent) recovery target as the quote lines.
+			s.quoteBuy = c.getBid();
+			s.quoteSell = c.getTarget();
+			s.fillPct = sd.fillPct;
+			final ItemChart chart = new ItemChart(s, 206, 150);
+			final JPanel chartWrap = new JPanel(new BorderLayout());
+			chartWrap.setOpaque(false);
+			chartWrap.setAlignmentX(Component.LEFT_ALIGNMENT);
+			chartWrap.add(chart, BorderLayout.CENTER);
+			chartWrap.setMaximumSize(new Dimension(Integer.MAX_VALUE, 156));
+			card.add(chartWrap);
+		}
+
+		card.add(gap(4));
+		card.add(hairline());
+		card.add(gap(3));
+
+		final boolean loud = c.loudEligible(CATCH_BAR);
+		final boolean knife = c.isKnife() || "knife".equals(c.getState());
+
+		// Factual displacement always.
+		card.add(catchKv("Displaced", pctSigned(c.getPctMove()), Palette.LIGHT));
+		if (c.getBid() > 0)
+		{
+			card.add(catchKv("Entry", Fmt.full(c.getBid()), Color.WHITE));
+		}
+		if (c.getTarget() > 0)
+		{
+			// Conservative, taxed, half-recovery level: contingent, never a promise.
+			final JPanel t = catchKv("Recover to", Fmt.full(c.getTarget()), Palette.GREEN);
+			t.setToolTipText("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed.");
+			card.add(t);
+		}
+
+		if (knife)
+		{
+			card.add(catchKv("Read", "FALLING KNIFE - skip", Palette.RED));
+		}
+		else if (loud && c.getBid() > 0 && c.getTarget() > 0)
+		{
+			// Taxed, contingent projection off the shown target - matches the row.
+			final long each = GeTax.net(c.getBid(), c.getTarget());
+			if (each != 0)
+			{
+				final long est = each * Math.max(1, c.getCatchQty());
+				final JPanel p = catchKv("Est. profit", signedGp(est) + " est", est >= 0 ? Palette.GREEN : Palette.RED);
+				p.setToolTipText("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed.");
+				card.add(p);
+			}
+			if (c.getRoi() != 0)
+			{
+				card.add(catchKv("ROI", pctSigned(c.getRoi()) + " est", c.getRoi() >= 0 ? Palette.GREEN : Palette.RED));
+			}
+			if (c.getCatchQty() > 0)
+			{
+				card.add(catchKv("Suggested size", Fmt.full(c.getCatchQty()), Palette.SUBTLE));
+			}
+		}
+
+		// Measured base rate + hold, honesty-gated by CatchData's own helpers:
+		// only a measured, non-thin, 20+ trial row shows the Wilson fraction and a
+		// real median hold; anything else reads "est." with no invented odds.
+		card.add(catchKv("Reversion", (c.isMeasured() && c.trialsN() >= 20) ? c.bouncesText() : "est.", Palette.SUBTLE));
+		card.add(catchKv("Exp. hold", c.holdText(), Palette.SUBTLE));
+
+		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, card.getPreferredSize().height));
+		return card;
+	}
+
+	/** A labelled read line for the catch expand: subtle key, coloured value. */
+	private JPanel catchKv(String k, String v, Color col)
+	{
+		final JPanel p = row();
+		p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
+		final JLabel kl = new JLabel(k);
+		kl.setForeground(Palette.SUBTLE);
+		kl.setFont(FontManager.getRunescapeSmallFont());
+		final JLabel vl = mono(v, col);
+		vl.setHorizontalAlignment(SwingConstants.RIGHT);
+		p.add(kl, BorderLayout.WEST);
+		p.add(vl, BorderLayout.EAST);
+		return p;
 	}
 
 	/** Signed compact gp: "+5k", "-12.4m". Never "+-5k". */
@@ -474,6 +610,9 @@ class PriceCheckPanel extends PluginPanel
 	// Click a board row and its day chart expands underneath, with your own
 	// logged fills painted on it. The plugin supplies cached series data.
 	private int expandedChartId = 0;
+	// Same idea on the Catch tab, kept separate so the two boards do not fight
+	// over one expanded id.
+	private int expandedCatchId = 0;
 	private java.util.function.IntFunction<PriceCheckApiClient.SeriesData> seriesSupplier;
 	private volatile FlipLogEngine.Summary lastLogSummary;
 
