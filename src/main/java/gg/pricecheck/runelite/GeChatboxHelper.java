@@ -111,11 +111,16 @@ class GeChatboxHelper
 		{
 			return;
 		}
-		// Defer one tick so the client finishes building the input layer before
-		// children are added to it.
 		clientThread.invokeLater(this::injectPriceLines);
 	}
 
+	private static final java.util.regex.Pattern TRADED_PAT =
+		java.util.regex.Pattern.compile("Actively traded price:\\s*([0-9,]+)");
+
+	/** Clickable price lines in the "Set a price" input: the engine's pick + the
+	 *  actively-traded price, then the low/high of the chart's selected view. Two
+	 *  compact rows at the top so they sit above the game's centred prompt. Dark
+	 *  ink; pre-fill only, the player still presses Enter. */
 	private void injectPriceLines()
 	{
 		final Widget parent = client.getWidget(InterfaceID.Chatbox.MES_LAYER);
@@ -138,66 +143,90 @@ class GeChatboxHelper
 		{
 			return;
 		}
-		final FlipData live = plugin.liveFor(itemId);
-		final long price = live == null ? -1 : (isBuy ? live.getBuy() : live.getSell());
-		if (price <= 0)
+		final FlipData live = plugin.viewFor(itemId);
+		final long rec = live == null ? -1 : (isBuy ? live.getBuy() : live.getSell());
+		final long[] vr = plugin.viewRangeFor(itemId);
+		if (rec <= 0 && vr == null)
 		{
-			return;   // no live data yet: stay silent rather than suggest something wrong
+			return;
 		}
-		// Big-lane items carry a measured resting quote (band levels when the
-		// series backs them): offer the snipe with its odds first, keep the
-		// instant line for context. Everything else keeps the proven line.
-		// Top-left, dark ink: gold text washes out on the parchment and
-		// right-alignment clipped at the screen edge on device.
-		int y = 5;
-		final Long laneP = live == null ? null : (isBuy ? live.getLaneBid() : live.getLaneAsk());
-		if (laneP != null && laneP > 0 && laneP != price)
+		final int colR = 250;
+		final int colW = 235;
+		if (rec > 0)
 		{
-			String tag = "";
-			if (live.getLaneOdds() != null && live.getLaneOdds() > 0)
+			addLine(parent, 10, 3, colW, "rec " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(rec), rec);
+		}
+		final long traded = scanTraded(setup, 0);
+		if (traded > 0)
+		{
+			addLine(parent, colR, 3, colW, "traded: " + Fmt.full(traded), traded);
+		}
+		if (vr != null)
+		{
+			final PriceCheckPlugin.ChartTf tf = plugin.chartTf();
+			final String vl = tf.label + (tf.isTrades() ? " trades" : "");
+			if (vr[2] > 0)
 			{
-				tag = " (" + Math.round(live.getLaneOdds() * 100) + "% fill"
-					+ (live.getLaneHold() != null && live.getLaneHold() > 0 ? ", ~" + hold(live.getLaneHold()) : "") + ")";
+				addLine(parent, 10, 18, colW, vl + " low: " + Fmt.full(vr[2]), vr[2]);
 			}
-			addLine(parent, y, "set to PriceCheck snipe: " + Fmt.full(laneP) + " gp" + tag, laneP);
-			y += 15;
-			addLine(parent, y, "set to instant " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(price) + " gp", price);
-			y += 15;
-		}
-		else
-		{
-			addLine(parent, y, "set to PriceCheck " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(price) + " gp", price);
-			y += 15;
-		}
-		if (isSell)
-		{
-			// Only a HELD position has a real break-even to protect. A watch
-			// row's floor is derived from a board quote, not your cost, so
-			// offering it as "your break-even" would contradict the panel.
-			final TrackedItem t = trackedFor(itemId);
-			if (t != null && t.isHeld() && t.getFloor() > 0)
+			if (vr[0] > 0)
 			{
-				addLine(parent, y, "set to your break-even floor: " + Fmt.full(t.getFloor()) + " gp", t.getFloor());
+				addLine(parent, colR, 18, colW, vl + " high: " + Fmt.full(vr[0]), vr[0]);
 			}
 		}
 	}
 
-	private static String hold(double hrs)
+	private long scanTraded(Widget w, int depth)
 	{
-		return hrs >= 1 ? (Math.round(hrs * 10) / 10.0) + "h" : Math.round(hrs * 60) + "m";
+		if (w == null || depth > 6)
+		{
+			return 0;
+		}
+		final String t = w.getText();
+		if (t != null)
+		{
+			final java.util.regex.Matcher m = TRADED_PAT.matcher(t);
+			if (m.find())
+			{
+				try
+				{
+					return Long.parseLong(m.group(1).replace(",", ""));
+				}
+				catch (NumberFormatException ignored)
+				{
+					// keep scanning
+				}
+			}
+		}
+		for (final Widget[] set : new Widget[][]{w.getStaticChildren(), w.getDynamicChildren(), w.getNestedChildren()})
+		{
+			if (set == null)
+			{
+				continue;
+			}
+			for (final Widget c : set)
+			{
+				final long v = scanTraded(c, depth + 1);
+				if (v > 0)
+				{
+					return v;
+				}
+			}
+		}
+		return 0;
 	}
 
-	private void addLine(Widget parent, int y, String label, long price)
+	private void addLine(Widget parent, int x, int y, int width, String label, long price)
 	{
 		final Widget w = parent.createChild(-1, WidgetType.TEXT);
 		w.setText(label);
 		w.setTextColor(INK);
 		w.setFontId(FontID.VERDANA_11_BOLD);
-		w.setOriginalX(10);
+		w.setOriginalX(x);
 		w.setOriginalY(y);
-		w.setOriginalHeight(16);
+		w.setOriginalWidth(width);
+		w.setOriginalHeight(15);
 		w.setXTextAlignment(WidgetTextAlignment.LEFT);
-		w.setWidthMode(WidgetSizeMode.MINUS);
 		w.setHasListener(true);
 		w.setAction(0, "Set price");
 		w.setOnOpListener((JavaScriptCallback) ev -> fillInput(price));
@@ -250,7 +279,7 @@ class GeChatboxHelper
 		{
 			return false;
 		}
-		final FlipData live = plugin.liveFor(itemId);
+		final FlipData live = plugin.viewFor(itemId);
 		final long price = live == null ? -1 : (isBuy ? live.getBuy() : live.getSell());
 		if (price <= 0)
 		{

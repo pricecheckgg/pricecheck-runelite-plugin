@@ -227,12 +227,25 @@ public class PriceCheckApiClient
 	/** Fetch the evidence-chart series for one item. Null on any failure. */
 	SeriesData fetchSeries(String key, int geId)
 	{
+		return fetchSeries(key, geId, null);
+	}
+
+	/** {@code window} selects a longer server series (e.g. "7d"); null is the
+	 *  default day series. Unknown windows are ignored server-side. */
+	SeriesData fetchSeries(String key, int geId, String window)
+	{
 		if (key == null || key.trim().isEmpty() || geId <= 0)
 		{
 			return null;
 		}
+		final okhttp3.HttpUrl.Builder url = BASE.newBuilder()
+			.addPathSegment("series").addPathSegment(String.valueOf(geId));
+		if (window != null && !window.isEmpty())
+		{
+			url.addQueryParameter("window", window);
+		}
 		final Request req = new Request.Builder()
-			.url(BASE.newBuilder().addPathSegment("series").addPathSegment(String.valueOf(geId)).build())
+			.url(url.build())
 			.header("Authorization", "Bearer " + key.trim())
 			.build();
 		try (Response res = http.newCall(req).execute())
@@ -347,15 +360,26 @@ public class PriceCheckApiClient
 	/** Live data for a set of item ids (the items in your active GE offers). */
 	Map<Integer, FlipData> getItems(String key, Collection<Integer> ids)
 	{
+		return getItems(key, ids, null);
+	}
+
+	/** {@code window} ("1h"/"24h"/"7d") re-prices buy/sell/profit to that window's
+	 *  reachable levels; null is the live quote. */
+	Map<Integer, FlipData> getItems(String key, Collection<Integer> ids, String window)
+	{
 		if (key == null || key.trim().isEmpty() || ids == null || ids.isEmpty())
 		{
 			return Collections.emptyMap();
 		}
 		final String idsCsv = ids.stream().map(String::valueOf).collect(Collectors.joining(","));
-		final HttpUrl url = BASE.newBuilder()
+		final HttpUrl.Builder ub = BASE.newBuilder()
 			.addPathSegment("items")
-			.addQueryParameter("ids", idsCsv)
-			.build();
+			.addQueryParameter("ids", idsCsv);
+		if (window != null && !window.isEmpty())
+		{
+			ub.addQueryParameter("window", window);
+		}
+		final HttpUrl url = ub.build();
 		final Request req = new Request.Builder()
 			.url(url)
 			.header("Authorization", "Bearer " + key.trim())

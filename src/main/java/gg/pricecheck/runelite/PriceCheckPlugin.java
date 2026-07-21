@@ -106,6 +106,10 @@ public class PriceCheckPlugin extends Plugin
 			{
 				e.consume();
 			}
+			else if (setupOverlay != null && setupOverlay.handleClick(e.getPoint(), shift))
+			{
+				e.consume();
+			}
 			return e;
 		}
 	};
@@ -167,7 +171,14 @@ public class PriceCheckPlugin extends Plugin
 	// poller and the overlay render can read them without touching the client.
 	private final AtomicReferenceArray<TrackedOffer> tracked = new AtomicReferenceArray<>(SLOTS);
 	// Live market data for the items you have offers on. Replaced whole on refresh.
+	// This is the tight live quote: it feeds the trade tape, print detection, and
+	// the closeness "will it fill soon" edge, which must always read the live
+	// market regardless of the selected chart timeframe.
 	private volatile Map<Integer, FlipData> liveByItem = Collections.emptyMap();
+	// The same items re-priced to the selected chart timeframe's window (24h/7d),
+	// so the margin/verdict/autofill align with the chart. Equals liveByItem at
+	// the 1h/live timeframe. Consumed via viewFor().
+	private volatile Map<Integer, FlipData> viewByItem = Collections.emptyMap();
 	// The tracked list keyed by item, refreshed with the panel, so overlays can
 	// look up a position's break-even floor without another request.
 	private volatile Map<Integer, TrackedItem> trackedById = Collections.emptyMap();
@@ -183,6 +194,7 @@ public class PriceCheckPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		chartTf = ChartTf.fromName(configManager.getConfiguration(PriceCheckConfig.GROUP, CHART_TF_KEY));
 		panel = new PriceCheckPanel(new PriceCheckPanel.Listener()
 		{
 			@Override
@@ -852,6 +864,28 @@ public class PriceCheckPlugin extends Plugin
 		return config.geOffersPanel() && marketDataOk();
 	}
 
+	/** How many recent trades the GE overlays show: Active 10, Advanced 20,
+	 *  Overnight 30. Drives the item card's tape and on-chart prints. */
+	int overlayTradeDepth()
+	{
+		return config.overlayMode().tradeDepth();
+	}
+
+	/** Draw scale for the hand-painted panels. Overnight enlarges the advisor
+	 *  box and active-offers board so they read from across the room; 1.0
+	 *  otherwise. */
+	double overlayScale()
+	{
+		return config.overlayMode().big() ? OVERLAY_BIG_SCALE : 1.0;
+	}
+
+	/** The item the evidence card is currently showing (0 = none), so the docked
+	 *  "Your trades" panel below the GE tracks the same item. */
+	int viewedItem()
+	{
+		return viewedItemId;
+	}
+
 	boolean geOffersPanelVisible()
 	{
 		if (!config.geOffersPanel() || !marketDataOk() || !isGrandExchangeOpen())
@@ -937,12 +971,121 @@ public class PriceCheckPlugin extends Plugin
 	// Failed fetches back off so a missing series or a network flap cannot
 	// queue a request per render frame on the single poller thread.
 	private final Map<Integer, Long> seriesFailedAt = java.util.Collections.synchronizedMap(new java.util.HashMap<>());
+	// The 7d window is a separate, heavier server series (snapshot-backed), only
+	// fetched when the card's timeframe pill asks for it. Its own cache with a
+	// longer freshness since a week of data moves slowly.
+	private final Map<Integer, CachedSeries> series7dCache = new java.util.LinkedHashMap<Integer, CachedSeries>(8, 0.75f, true)
+	{
+		@Override
+		protected boolean removeEldestEntry(java.util.Map.Entry<Integer, CachedSeries> e)
+		{
+			return size() > 8;
+		}
+	};
+	private final Set<Integer> series7dFetching = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+	private final Map<Integer, Long> series7dFailedAt = java.util.Collections.synchronizedMap(new java.util.HashMap<>());
+	// Overnight overlay mode draws the panels this much larger than normal.
+	private static final double OVERLAY_BIG_SCALE = 1.3;
+	// Trade tape sizing: seed a fresh tape up to this depth from history, and
+	// keep up to this many live prints per item. Both sit at/above the deepest
+	// overlay mode (Overnight = 30) so a just-opened card is already full there.
+	private static final int PRINTS_SEED = 30;
+	private static final int PRINTS_KEPT = 40;
 	// Prints per item: every advisor poll where an item's insta price moved is
 	// one observed trade. Tracks all items the poll fetches (your offers plus
 	// the viewed item), bounded per item, pruned when an item leaves the set.
 	private final Map<Integer, java.util.ArrayDeque<GeItemInfoPainter.Print>> cardPrints = new java.util.HashMap<>();
 	private final java.util.Set<Integer> printsSeeded = java.util.concurrent.ConcurrentHashMap.newKeySet();
 	private final Map<Integer, long[]> printsLast = new java.util.HashMap<>();
+
+	/** Which window the evidence card's chart shows, cycled from the card's
+	 *  timeframe pill. 1h and 24h come from the standard day series (1h is the
+	 *  tail of it); 7d needs the wider server series. */
+	/** The card chart's view. TIME kinds draw the traded corridor over a window
+	 *  (LATEST auto-widens from the last hour until it can form a shape); TRADES
+	 *  kinds draw the last N actual trades as a tick chart, which always has data. */
+	enum ChartTf
+	{
+		LATEST("Latest", Kind.TIME, 0),
+		D1("24h", Kind.TIME, 24 * 3600),
+		D7("7d", Kind.TIME, 7 * 24 * 3600),
+		T10("10", Kind.TRADES, 10),
+		T20("20", Kind.TRADES, 20),
+		T30("30", Kind.TRADES, 30);
+
+		enum Kind { TIME, TRADES }
+
+		final String label;
+		final Kind kind;
+		final int amount;   // TIME: window seconds (0 = auto-widening Latest). TRADES: trade count.
+
+		ChartTf(String label, Kind kind, int amount)
+		{
+			this.label = label;
+			this.kind = kind;
+			this.amount = amount;
+		}
+
+		boolean isTrades()
+		{
+			return kind == Kind.TRADES;
+		}
+
+		ChartTf next()
+		{
+			return values()[(ordinal() + 1) % values().length];
+		}
+
+		static ChartTf fromName(String s)
+		{
+			if (s != null)
+			{
+				for (final ChartTf t : values())
+				{
+					if (t.name().equals(s))
+					{
+						return t;
+					}
+				}
+			}
+			return D1;
+		}
+	}
+
+	private static final String CHART_TF_KEY = "chartTf";
+	private volatile ChartTf chartTf = ChartTf.D1;
+
+	ChartTf chartTf()
+	{
+		return chartTf;
+	}
+
+	/** Advance the card chart's window (1h -> 24h -> 7d -> 1h). */
+	void cycleChartTf()
+	{
+		setChartTf(chartTf.next());
+	}
+
+	/** Set the card chart's window and persist it. Warms the 7d series and
+	 *  refetches the windowed margins now so the switch takes effect at once. */
+	void setChartTf(ChartTf tf)
+	{
+		if (tf == null || tf == chartTf)
+		{
+			return;
+		}
+		chartTf = tf;
+		configManager.setConfiguration(PriceCheckConfig.GROUP, CHART_TF_KEY, chartTf.name());
+		if (poller != null)
+		{
+			if (chartTf == ChartTf.D7 && viewedItemId > 0)
+			{
+				final int id = viewedItemId;
+				poller.execute(() -> refreshSeries7d(id));
+			}
+			poller.execute(this::refreshAdvisor);   // refetch items for the new window now
+		}
+	}
 
 	/** Called from the card overlay's render with whatever item the open GE
 	 * screen shows (0 = none). Schedules the series fetch on change. */
@@ -1022,6 +1165,153 @@ public class PriceCheckPlugin extends Plugin
 		return c != null ? c.data : null;
 	}
 
+	/** Cached 7d series for the card's 7d timeframe; schedules a refresh when
+	 *  absent or stale. Returns null until the first fetch lands (callers fall
+	 *  back to the day series so the chart is never blank). */
+	PriceCheckApiClient.SeriesData cardSeries7dFor(int geId)
+	{
+		if (geId <= 0)
+		{
+			return null;
+		}
+		CachedSeries c;
+		synchronized (series7dCache)
+		{
+			c = series7dCache.get(geId);
+		}
+		final Long failed = series7dFailedAt.get(geId);
+		final boolean coolingDown = failed != null && System.currentTimeMillis() - failed < 45_000L;
+		if (poller != null && !coolingDown && (c == null || System.currentTimeMillis() - c.atMs > 300_000L))
+		{
+			poller.execute(() -> refreshSeries7d(geId));
+		}
+		return c != null ? c.data : null;
+	}
+
+	/** Low/high (with timestamps) for the CURRENTLY SELECTED chart view, so the
+	 *  range read and the price-entry options track whatever the graph shows: the
+	 *  last N trades for a trades view, else the traded corridor over the time
+	 *  window (Latest auto-widens). {high, highTsSec, low, lowTsSec}, or null. */
+	long[] viewRangeFor(int geId)
+	{
+		final ChartTf tf = chartTf;
+		final long now = System.currentTimeMillis() / 1000L;
+		if (tf.isTrades())
+		{
+			final java.util.List<GeItemInfoPainter.Print> prints = cardPrintsFor(geId);
+			final int have = prints.size();
+			final int n = Math.min(tf.amount, have);
+			long hp = 0;
+			long hts = 0;
+			long lp = 0;
+			long lts = 0;
+			for (int i = have - n; i < have; i++)
+			{
+				final GeItemInfoPainter.Print p = prints.get(i);
+				if (p.price <= 0)
+				{
+					continue;
+				}
+				if (p.price > hp)
+				{
+					hp = p.price;
+					hts = p.ts;
+				}
+				if (lp == 0 || p.price < lp)
+				{
+					lp = p.price;
+					lts = p.ts;
+				}
+			}
+			return hp == 0 && lp == 0 ? null : new long[]{hp, hts, lp, lts};
+		}
+		if (tf == ChartTf.LATEST)
+		{
+			final PriceCheckApiClient.SeriesData day = cardSeriesFor(geId);
+			for (final long w : new long[]{4 * 3600L, 8 * 3600L})
+			{
+				final long[] r = hiLo(day, now - w);
+				if (r != null && r[0] > 0 && r[2] > 0)
+				{
+					return r;
+				}
+			}
+			return hiLo(day, 0L);
+		}
+		final long windowSec = tf == ChartTf.D7 ? 7 * 24 * 3600L : 24 * 3600L;
+		final PriceCheckApiClient.SeriesData sd = tf == ChartTf.D7 ? cardSeries7dFor(geId) : cardSeriesFor(geId);
+		final PriceCheckApiClient.SeriesData use = sd != null && sd.ts != null && sd.ts.length >= 2 ? sd : cardSeriesFor(geId);
+		return hiLo(use, now - windowSec);
+	}
+
+	private static long[] hiLo(PriceCheckApiClient.SeriesData sd, long sinceSec)
+	{
+		if (sd == null || sd.ts == null)
+		{
+			return null;
+		}
+		long hp = 0;
+		long hts = 0;
+		long lp = 0;
+		long lts = 0;
+		for (int i = 0; i < sd.ts.length; i++)
+		{
+			if (sd.ts[i] < sinceSec)
+			{
+				continue;
+			}
+			if (sd.ah != null && sd.ah[i] > hp)
+			{
+				hp = sd.ah[i];
+				hts = sd.ts[i];
+			}
+			if (sd.al != null && sd.al[i] > 0 && (lp == 0 || sd.al[i] < lp))
+			{
+				lp = sd.al[i];
+				lts = sd.ts[i];
+			}
+		}
+		return hp == 0 && lp == 0 ? null : new long[]{hp, hts, lp, lts};
+	}
+
+	private void refreshSeries7d(int geId)
+	{
+		if (geId <= 0 || !series7dFetching.add(geId))
+		{
+			return;
+		}
+		try
+		{
+			synchronized (series7dCache)
+			{
+				final CachedSeries c = series7dCache.get(geId);
+				if (c != null && System.currentTimeMillis() - c.atMs < 300_000L)
+				{
+					return;
+				}
+			}
+			final PriceCheckApiClient.SeriesData d = api.fetchSeries(config.apiKey(), geId, "7d");
+			if (d != null && d.ts != null && d.ts.length >= 2)
+			{
+				synchronized (series7dCache)
+				{
+					series7dCache.put(geId, new CachedSeries(d, System.currentTimeMillis()));
+				}
+				series7dFailedAt.remove(geId);
+			}
+			else
+			{
+				// An older server (no window support) returns an empty/day series;
+				// back off so 7d falls through to the day view without hammering.
+				series7dFailedAt.put(geId, System.currentTimeMillis());
+			}
+		}
+		finally
+		{
+			series7dFetching.remove(geId);
+		}
+	}
+
 	java.util.List<GeItemInfoPainter.Print> cardPrintsFor(int geId)
 	{
 		maybeSeedPrints(geId);
@@ -1065,10 +1355,10 @@ public class PriceCheckPlugin extends Plugin
 		// Reach back a week, not 12h: a high-value item like a Harmonised orb only
 		// trades a few times a day, so a short window leaves the tape near-empty.
 		// The loop still runs newest-first, so a liquid item fills from the last
-		// hour; an illiquid one just keeps pulling back until it has ten prints.
+		// hour; an illiquid one just keeps pulling back until the tape is full.
 		final long cutoff = System.currentTimeMillis() / 1000L - 7 * 24 * 3600;
 		final java.util.List<GeItemInfoPainter.Print> seeds = new ArrayList<>();
-		for (int i = d.ts.length - 1; i >= 0 && seeds.size() < 10; i--)
+		for (int i = d.ts.length - 1; i >= 0 && seeds.size() < PRINTS_SEED; i--)
 		{
 			if (d.ts[i] < cutoff)
 			{
@@ -1081,7 +1371,7 @@ public class PriceCheckPlugin extends Plugin
 			{
 				seeds.add(new GeItemInfoPainter.Print(ts, d.ah[i], true));
 			}
-			if (seeds.size() < 10 && d.lv != null && d.lv[i] > 0 && d.al[i] > 0)
+			if (seeds.size() < PRINTS_SEED && d.lv != null && d.lv[i] > 0 && d.al[i] > 0)
 			{
 				seeds.add(new GeItemInfoPainter.Print(ts, d.al[i], false));
 			}
@@ -1317,7 +1607,7 @@ public class PriceCheckPlugin extends Plugin
 					q.addLast(new GeItemInfoPainter.Print(now, f.getBuy(), false));
 					last[1] = f.getBuy();
 				}
-				while (q.size() > 24)
+				while (q.size() > PRINTS_KEPT)
 				{
 					q.removeFirst();
 				}
@@ -1497,9 +1787,20 @@ public class PriceCheckPlugin extends Plugin
 	}
 
 	// Live market row for one item (from the poller's cache), or null if not loaded.
+	// Live = the tight current quote; use this for the tape, prints, and the
+	// closeness-to-a-real-fill edge.
 	FlipData liveFor(int geId)
 	{
 		return liveByItem.get(geId);
+	}
+
+	// Timeframe-aware row: the item re-priced to the selected chart window (24h/7d)
+	// for the margin/verdict/autofill; falls back to the live row when no windowed
+	// data is loaded (and equals it at the 1h/live timeframe).
+	FlipData viewFor(int geId)
+	{
+		final FlipData v = viewByItem.get(geId);
+		return v != null ? v : liveByItem.get(geId);
 	}
 
 	// Fetch live data for the items you have offers on, then recompute advice.
@@ -1527,15 +1828,29 @@ public class PriceCheckPlugin extends Plugin
 		if (ids.isEmpty())
 		{
 			liveByItem = Collections.emptyMap();
+			viewByItem = Collections.emptyMap();
 		}
 		else
 		{
 			final Map<Integer, FlipData> fresh = api.getItems(config.apiKey(), ids);
 			// Keep the last good data on a transient blip so advice doesn't flicker.
+			// The live fetch always runs: it feeds the trade tape and print detection.
 			if (!fresh.isEmpty())
 			{
 				liveByItem = fresh;
 				samplePrints(fresh);
+			}
+			// For 24h/7d, pull the same items re-priced to that window so the margin,
+			// verdict and autofill align with the chart. 1h/live reuses the live row.
+			final ChartTf tf = chartTf;
+			if (tf == ChartTf.D1 || tf == ChartTf.D7)
+			{
+				final Map<Integer, FlipData> win = api.getItems(config.apiKey(), ids, tf == ChartTf.D7 ? "7d" : "24h");
+				viewByItem = win.isEmpty() ? liveByItem : win;
+			}
+			else
+			{
+				viewByItem = liveByItem;
 			}
 		}
 		recomputeAdvice();
@@ -1543,7 +1858,9 @@ public class PriceCheckPlugin extends Plugin
 
 	private void recomputeAdvice()
 	{
-		final Map<Integer, FlipData> live = liveByItem;
+		// Advise against the timeframe-aware view so the advisor box + card verdict
+		// follow the selected window (equals the live quote at 1h/live).
+		final Map<Integer, FlipData> view = viewByItem;
 		final List<OfferAdvice> out = new ArrayList<>();
 		for (int slot = 0; slot < SLOTS; slot++)
 		{
@@ -1552,7 +1869,7 @@ public class PriceCheckPlugin extends Plugin
 			{
 				continue;
 			}
-			final OfferAdvice a = OfferAdvisor.advise(t, live.get(t.getItemId()));
+			final OfferAdvice a = OfferAdvisor.advise(t, view.get(t.getItemId()));
 			if (a != null)
 			{
 				out.add(a);

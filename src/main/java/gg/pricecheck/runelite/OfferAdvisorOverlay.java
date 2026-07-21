@@ -110,16 +110,29 @@ class OfferAdvisorOverlay extends Overlay
 			return null;
 		}
 
+		// Overnight overlay mode draws the box larger for at-a-glance watching.
+		// A uniform scale keeps the hand-painted layout intact; the reported
+		// bounds and the toggle hit box scale with it.
+		final double scale = plugin.overlayScale();
+		final java.awt.geom.AffineTransform save = graphics.getTransform();
+		graphics.scale(scale, scale);
 		final Result r = paint(graphics, rows, collapsed, client.isKeyPressed(KeyCode.KC_SHIFT));
+		graphics.setTransform(save);
 		if (r.button != null)
 		{
 			final Rectangle mine = getBounds();
 			if (mine != null)
 			{
-				toggleBounds = new Rectangle(mine.x + r.button.x, mine.y + r.button.y, r.button.width, r.button.height);
+				toggleBounds = new Rectangle(
+					mine.x + (int) Math.round(r.button.x * scale),
+					mine.y + (int) Math.round(r.button.y * scale),
+					(int) Math.round(r.button.width * scale),
+					(int) Math.round(r.button.height * scale));
 			}
 		}
-		return r.size;
+		return new Dimension(
+			(int) Math.round(r.size.width * scale),
+			(int) Math.round(r.size.height * scale));
 	}
 
 	/** What one paint produced: the box size, and the toggle's local hit box (null unless drawn). */

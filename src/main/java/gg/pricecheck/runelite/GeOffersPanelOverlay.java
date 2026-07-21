@@ -98,44 +98,53 @@ class GeOffersPanelOverlay extends Overlay
 		{
 			return null;
 		}
+		// Overnight overlay mode draws the board larger; the dock reserves the
+		// scaled width so it still never overlaps the GE.
+		final double scale = plugin.overlayScale();
+		final int effW = (int) Math.round(W * scale);
 		final int y = 8;
 		final int x;
-		if (plugin.geOffersPanelVisible())
+		if (plugin.isGrandExchangeOpen())
 		{
-			// GE overview open: dock to the right of the grid. The mini-cards
-			// yield this column via the same predicate, so nothing overlaps.
+			// GE open (overview OR a slot/offer-status screen): dock to the right
+			// of the GE window so the board never vanishes when you open a slot.
+			// On the overview the mini-cards yield this column via
+			// geOffersPanelVisible; the single item card anchors left, so no
+			// overlap on a slot screen either.
 			final Rectangle b = plugin.geGridBounds();
 			if (b == null)
 			{
 				return null;
 			}
 			x = b.x + b.width + 8;
-			if (x + W > client.getCanvasWidth() - 4)
+			if (x + effW > client.getCanvasWidth() - 4)
 			{
 				return null;   // no room to the right; never overlap the GE
 			}
-		}
-		else if (plugin.isGrandExchangeOpen())
-		{
-			return null;   // GE open on a slot/set-up screen: the mini-cards own it
 		}
 		else
 		{
 			// GE closed: float in the top-right so the board stays up like the
 			// advisor box does on the left.
-			x = client.getCanvasWidth() - W - 8;
+			x = client.getCanvasWidth() - effW - 8;
 			if (x < 4)
 			{
 				return null;
 			}
 		}
 		final boolean shift = client.isKeyPressed(KeyCode.KC_SHIFT);
+		final java.awt.geom.AffineTransform save = g.getTransform();
 		g.translate(x, y);
+		g.scale(scale, scale);
 		final Result r = paint(g, rows, collapsed, shift);
-		g.translate(-x, -y);
+		g.setTransform(save);
 		if (r.button != null)
 		{
-			toggleBounds = new Rectangle(x + r.button.x, y + r.button.y, r.button.width, r.button.height);
+			toggleBounds = new Rectangle(
+				x + (int) Math.round(r.button.x * scale),
+				y + (int) Math.round(r.button.y * scale),
+				(int) Math.round(r.button.width * scale),
+				(int) Math.round(r.button.height * scale));
 		}
 		return null;
 	}
@@ -162,6 +171,10 @@ class GeOffersPanelOverlay extends Overlay
 		final Row r = new Row();
 		final int itemId = t.getItemId();
 		final FlipData live = plugin.liveFor(itemId);
+		// Margin/whole-flip profit follow the selected chart timeframe; the closeness
+		// edge and last-trade fallback below stay on the live quote (they answer
+		// "will this fill soon", which is inherently about the live market).
+		final FlipData view = plugin.viewFor(itemId);
 		final boolean sell = t.getState() == GrandExchangeOfferState.SELLING
 			|| t.getState() == GrandExchangeOfferState.SOLD;
 
@@ -187,7 +200,7 @@ class GeOffersPanelOverlay extends Overlay
 		}
 
 		r.price = t.getPrice();
-		r.liveMargin = live != null ? live.getProfit() : 0;
+		r.liveMargin = view != null ? view.getProfit() : 0;
 		r.totalQty = Math.max(0, t.getTotalQty());
 		r.soldQty = Math.max(0, Math.min(r.totalQty, t.getSoldQty()));
 		r.unfilledQty = t.isActive() ? Math.max(0, r.totalQty - r.soldQty) : 0;

@@ -37,6 +37,48 @@ public interface PriceCheckConfig extends Config
 		}
 	}
 
+	/** How much the GE overlays show and how large they draw. Overnight is for
+	 *  AFK watching: a deeper trade tape and larger panels you can read from
+	 *  across the room. */
+	enum OverlayMode
+	{
+		ACTIVE(10, false),
+		ADVANCED(20, false),
+		OVERNIGHT(30, true);
+
+		private final int depth;
+		private final boolean big;
+
+		OverlayMode(int depth, boolean big)
+		{
+			this.depth = depth;
+			this.big = big;
+		}
+
+		/** How many recent trades the tape and on-chart prints show. */
+		int tradeDepth()
+		{
+			return depth;
+		}
+
+		/** Overnight draws the hand-painted panels larger for at-a-glance reading. */
+		boolean big()
+		{
+			return big;
+		}
+
+		@Override
+		public String toString()
+		{
+			switch (this)
+			{
+				case ADVANCED: return "Standard (20)";
+				case OVERNIGHT: return "Large (30, big)";
+				default: return "Compact (10)";
+			}
+		}
+	}
+
 	@ConfigItem(
 		keyName = "apiKey",
 		name = "Plugin key",
@@ -200,5 +242,19 @@ public interface PriceCheckConfig extends Config
 	default boolean geOffersPanel()
 	{
 		return false;
+	}
+
+	@ConfigItem(
+		keyName = "overlayMode",
+		name = "GE: card size",
+		description = "How deep the card's trade tape runs and how big the overlays draw (this is size and detail, "
+			+ "not a time window: the chart's own 1h/24h/7d and last-trades views are picked on the card). "
+			+ "Compact keeps the last 10 trades at the normal size, Standard the last 20, and Large the last 30 "
+			+ "while drawing the advisor box and active-offers board larger for at-a-glance watching.",
+		position = 17
+	)
+	default OverlayMode overlayMode()
+	{
+		return OverlayMode.ACTIVE;
 	}
 }

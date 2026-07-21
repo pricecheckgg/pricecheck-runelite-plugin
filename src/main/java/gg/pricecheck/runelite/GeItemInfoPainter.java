@@ -57,7 +57,14 @@ final class GeItemInfoPainter
 		String stateText2;     // second verdict when both sides are live
 		Color stateColor2;
 		ItemChart.Series series;
+		String chartLabel;         // active timeframe tag drawn on the chart, e.g. "24h"
 		List<Print> prints;        // newest last
+		int tradeDepth = 10;       // how many recent prints the tape shows
+		int tradesChartN = 0;      // >0: draw the last-N-trades tick chart instead of the corridor
+		// Low/high (with timestamps) for the selected chart view, shown as the range
+		// read: {highPrice, highTsSec, lowPrice, lowTsSec}. Null = not shown. The
+		// view label reuses chartLabel (+ tradesChartN>0 for a trades view).
+		long[] rangeRow;
 		int fillPct = -1;          // measured odds at the board's prices, -1 unknown
 		String outcomeText;        // bottom line, prebuilt by the caller
 		Color outcomeColor;
@@ -72,10 +79,6 @@ final class GeItemInfoPainter
 		// cost, openedAt ms}. When they differ in price the holding line
 		// itemises them instead of pretending one blended entry.
 		long[][] lotEntries;
-		// Your trade history for this item, newest first: {tsMs, unit, qty,
-		// buy 1/0, stillOpen 1/0, flip profit}. Rendered as its own section
-		// at the card's foot; the overlay sizes it to the screen space left.
-		long[][] ownTrades;
 
 		long refSell()
 		{
@@ -118,15 +121,15 @@ final class GeItemInfoPainter
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
 
 		final int lineH = fm.getHeight();
-		final int tapeRows = Math.min(c.prints != null ? c.prints.size() : 0, 10);
+		final int tapeRows = Math.min(c.prints != null ? c.prints.size() : 0, Math.max(1, c.tradeDepth));
 		final boolean holding = c.lotQty > 0;
 		final long[] pressure = pressureOf(c.series, c.nowTs);
-		final int ownRows = c.ownTrades != null ? c.ownTrades.length : 0;
+		final int rangeH = c.rangeRow != null ? 3 * (lineH - 1) + 6 : 0;
 		final int h = PAD + lineH + 6 + CHART_H + 6 + (pressure != null ? lineH + 3 : 0)
+			+ rangeH
 			+ (tapeRows > 0 ? tapeRows * 13 + 14 : 0)
 			+ (holding ? lineH : 0) + 2 * lineH
-			+ (c.outcomeText2 != null ? lineH : 0)
-			+ (ownRows > 0 ? lineH + ownRows * 13 + 10 : 0) + PAD + 2;
+			+ (c.outcomeText2 != null ? lineH : 0) + PAD + 2;
 
 		g.setColor(Palette.INK);
 		g.fillRoundRect(0, 0, w - 1, h - 1, 8, 8);
@@ -143,8 +146,24 @@ final class GeItemInfoPainter
 		g.drawLine(PAD - 2, y, w - PAD + 2, y);
 		y += 4;
 
-		// Chart: corridor + your offer line.
-		paintChart(g, c, PAD, y, w - 2 * PAD, CHART_H, fm, false);
+		// Chart: the traded corridor over a window, OR the last-N-trades tick chart,
+		// tagged with its active view so what it covers is never ambiguous.
+		if (c.tradesChartN > 0)
+		{
+			paintTradesChart(g, c, PAD, y, w - 2 * PAD, CHART_H, fm);
+		}
+		else
+		{
+			paintChart(g, c, PAD, y, w - 2 * PAD, CHART_H, fm, false);
+		}
+		if (c.chartLabel != null && !c.chartLabel.isEmpty())
+		{
+			final String tag = c.chartLabel + (c.tradesChartN > 0 ? " trades" : " price");
+			final int tw = fm.stringWidth(tag) + 8;
+			g.setColor(SHADOW);
+			g.fillRoundRect(PAD + 2, y + 2, tw, lineH - 1, 5, 5);
+			shadowed(g, tag, PAD + 6, y + fm.getAscent() + 1, Palette.GOLD);
+		}
 		y += CHART_H + 4;
 
 		// Pressure: its own labeled row. A split meter with a centre notch so
@@ -190,6 +209,37 @@ final class GeItemInfoPainter
 				g.fillRect(bx + bw / 2, by - 1, 1, 9);
 			}
 			y += lineH + 3;
+		}
+
+		// Range: the low/high of whatever view the chart is showing (a time window
+		// or the last N trades), each with its clock time and how long ago, so a
+		// set-up price reads against where the item has actually been in that view.
+		if (c.rangeRow != null)
+		{
+			final int vx = PAD + fm.stringWidth("Range ") + 6;
+			final int px = PAD + 34;
+			final long[] row = c.rangeRow;
+			int ry = y + fm.getAscent();
+			shadowed(g, "Range", PAD, ry, Palette.SUBTLE);
+			if (c.chartLabel != null)
+			{
+				shadowed(g, c.chartLabel + (c.tradesChartN > 0 ? " trades" : ""), vx, ry, Palette.SUBTLE_CANVAS);
+			}
+			y += lineH - 1;
+			ry = y + fm.getAscent();
+			shadowed(g, "high", PAD, ry, new Color(0x49, 0xc9, 0x7f, 210));
+			if (row[0] > 0)
+			{
+				shadowed(g, Fmt.full(row[0]) + "  " + clockShort(row[1], c.nowTs), px, ry, Palette.GREEN);
+			}
+			y += lineH - 1;
+			ry = y + fm.getAscent();
+			shadowed(g, "low", PAD, ry, new Color(0xd9, 0x5c, 0x5e, 210));
+			if (row[2] > 0)
+			{
+				shadowed(g, Fmt.full(row[2]) + "  " + clockShort(row[3], c.nowTs), px, ry, Palette.RED);
+			}
+			y += lineH - 1 + 5;
 		}
 
 		// Tape: the prints this client has watched arrive, newest first. The
@@ -395,67 +445,7 @@ final class GeItemInfoPainter
 			y += lineH;
 		}
 
-		// Your trades: the flip log's history for THIS item, at the card's
-		// foot. Buys are green entries, sells gold exits carrying that flip's
-		// profit; a buy still held says so.
-		if (ownRows > 0)
-		{
-			y += 3;
-			g.setColor(RULE);
-			g.drawLine(PAD - 2, y, w - PAD + 2, y);
-			y += 4;
-			shadowed(g, "Your trades", PAD, y + fm.getAscent(), Palette.SUBTLE);
-			y += lineH + 1;
-			for (int i = 0; i < ownRows; i++)
-			{
-				final long[] t = c.ownTrades[i];
-				final boolean buy = t[3] == 1;
-				final int ty = y + i * 13 + 9;
-				final Path2D tri = new Path2D.Float();
-				if (buy)
-				{
-					tri.moveTo(PAD + 1, ty);
-					tri.lineTo(PAD + 8, ty);
-					tri.lineTo(PAD + 4.5, ty - 6);
-				}
-				else
-				{
-					tri.moveTo(PAD + 1, ty - 6);
-					tri.lineTo(PAD + 8, ty - 6);
-					tri.lineTo(PAD + 4.5, ty);
-				}
-				tri.closePath();
-				g.setColor(SHADOW);
-				g.translate(1, 1);
-				g.fill(tri);
-				g.translate(-1, -1);
-				g.setColor(buy ? Palette.GREEN : Palette.GOLD);
-				g.fill(tri);
-				String label = Fmt.full(t[1]);
-				if (t[2] > 1)
-				{
-					label += " x" + Fmt.full(t[2]);
-				}
-				shadowed(g, label, PAD + 14, ty, NAME);
-				String mid;
-				Color midCol = Palette.SUBTLE;
-				if (buy)
-				{
-					mid = t[4] == 1 ? "holding" : "";
-				}
-				else
-				{
-					mid = (t[5] >= 0 ? "+" : "") + Fmt.compact(t[5]);
-					midCol = t[5] >= 0 ? Palette.GREEN : Palette.RED;
-				}
-				shadowed(g, mid, w / 2 + 14, ty, midCol);
-				final long ago = Math.max(0, c.nowTs - t[0] / 1000L);
-				final String age = ago < 60 ? ago + "s ago"
-					: ago < 5400 ? (ago / 60) + "m ago"
-					: ago < 172800 ? (ago / 3600) + "h ago" : (ago / 86400) + "d ago";
-				shadowed(g, age, w - PAD - fm.stringWidth(age), ty, Palette.SUBTLE);
-			}
-		}
+		// (Your trades moved to the docked panel below the GE window.)
 
 		return new Dimension(w, h);
 	}
@@ -648,6 +638,197 @@ final class GeItemInfoPainter
 		return new Dimension(W, h);
 	}
 
+	/** Where the full card draws its timeframe tag, in card-local coordinates,
+	 *  so the overlay can make it the clickable timeframe control. Mirrors the
+	 *  tag geometry in {@link #paint}; null when there is no label. */
+	static java.awt.Rectangle chartTagBounds(FontMetrics fm, String label, boolean trades)
+	{
+		if (label == null || label.isEmpty())
+		{
+			return null;
+		}
+		final int lineH = fm.getHeight();
+		final int chartTop = PAD + fm.getAscent() + 8;   // header baseline + rule gap
+		final int tw = fm.stringWidth(label + (trades ? " trades" : " price")) + 8;
+		return new java.awt.Rectangle(PAD + 2, chartTop + 2, tw, lineH - 1);
+	}
+
+	private static int tyf(long price, long pMin, long pMax, int y0, int plotH)
+	{
+		final double f = (price - pMin) / (double) Math.max(1, pMax - pMin);
+		return y0 + plotH - (int) Math.round(Math.max(0, Math.min(1, f)) * plotH);
+	}
+
+	/** The last-N-trades tick chart: each recent print is a point (up = someone
+	 *  insta-bought, down = insta-sold, gold = your own fill), connected in order
+	 *  and scaled to the trades plus your offer lines. Always has data, so it
+	 *  never starves the way a short time window can on a big-ticket item. */
+	private static void paintTradesChart(Graphics2D g, Context c, int x0, int y0, int cw, int ch, FontMetrics fm)
+	{
+		final int have = c.prints != null ? c.prints.size() : 0;
+		if (have < 2)
+		{
+			shadowed(g, "Not enough trades yet", x0 + 4, y0 + ch / 2, Palette.SUBTLE);
+			return;
+		}
+		final int n = Math.min(Math.max(2, c.tradesChartN), have);
+		final int plotW = cw - PRICE_GUTTER;
+		final int plotH = ch - 4;
+		final List<Print> pts = c.prints.subList(have - n, have);
+
+		long lo = Long.MAX_VALUE;
+		long hi = Long.MIN_VALUE;
+		for (final Print p : pts)
+		{
+			if (p.price > 0)
+			{
+				lo = Math.min(lo, p.price);
+				hi = Math.max(hi, p.price);
+			}
+		}
+		if (lo == Long.MAX_VALUE)
+		{
+			shadowed(g, "No priced trades yet", x0 + 4, y0 + ch / 2, Palette.SUBTLE);
+			return;
+		}
+		for (final long p : c.youSells)
+		{
+			if (p > 0)
+			{
+				lo = Math.min(lo, p);
+				hi = Math.max(hi, p);
+			}
+		}
+		for (final long p : c.youBuys)
+		{
+			if (p > 0)
+			{
+				lo = Math.min(lo, p);
+				hi = Math.max(hi, p);
+			}
+		}
+		if (lo >= hi)
+		{
+			hi = lo + 1;
+		}
+		final long pad = Math.max(1, (hi - lo) / 10);
+		final long pMin = lo - pad;
+		final long pMax = hi + pad;
+
+		// Price gridlines + gutter labels.
+		for (int i = 0; i < 4; i++)
+		{
+			final long p = pMin + (pMax - pMin) * i / 3;
+			final int yy = tyf(p, pMin, pMax, y0, plotH);
+			g.setColor(ChartKit.GRID);
+			g.drawLine(x0, yy, x0 + plotW, yy);
+			g.setColor(Palette.SUBTLE_CANVAS);
+			g.drawString(Fmt.compact(p), x0 + plotW + 6, Math.max(y0 + fm.getAscent() - 2, yy + 4));
+		}
+
+		// The trades: evenly spaced left (oldest) to right (newest), joined.
+		final double dx = n > 1 ? plotW / (double) (n - 1) : 0;
+		final int[] xs = new int[n];
+		final int[] ys = new int[n];
+		final Path2D line = new Path2D.Float();
+		boolean started = false;
+		for (int i = 0; i < n; i++)
+		{
+			final Print p = pts.get(i);
+			xs[i] = (int) Math.round(x0 + i * dx);
+			ys[i] = p.price > 0 ? tyf(p.price, pMin, pMax, y0, plotH) : -1;
+			if (p.price > 0)
+			{
+				if (!started)
+				{
+					line.moveTo(xs[i], ys[i]);
+					started = true;
+				}
+				else
+				{
+					line.lineTo(xs[i], ys[i]);
+				}
+			}
+		}
+		g.setColor(new Color(255, 255, 255, 90));
+		g.setStroke(new BasicStroke(1.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+		g.draw(line);
+		g.setStroke(new BasicStroke(1f));
+
+		for (int i = 0; i < n; i++)
+		{
+			final Print p = pts.get(i);
+			if (p.price <= 0)
+			{
+				continue;
+			}
+			final int r = p.yours ? 4 : 3;
+			final Path2D tri = new Path2D.Float();
+			if (p.buySide)
+			{
+				tri.moveTo(xs[i] - r, ys[i] + r - 1);
+				tri.lineTo(xs[i] + r, ys[i] + r - 1);
+				tri.lineTo(xs[i], ys[i] - r);
+			}
+			else
+			{
+				tri.moveTo(xs[i] - r, ys[i] - r + 1);
+				tri.lineTo(xs[i] + r, ys[i] - r + 1);
+				tri.lineTo(xs[i], ys[i] + r);
+			}
+			tri.closePath();
+			g.setColor(SHADOW);
+			g.translate(1, 1);
+			g.fill(tri);
+			g.translate(-1, -1);
+			g.setColor(p.yours ? Palette.GOLD : (p.buySide ? Palette.GREEN : Palette.RED));
+			g.fill(tri);
+		}
+
+		// Your offers, drawn on top with the same labelled chip the corridor uses,
+		// so where your price sits among these trades is unmistakable. Seated =
+		// your price already meets the freshest print on the side that fills you.
+		long lastHigh = 0;
+		long lastLow = 0;
+		for (int i = n - 1; i >= 0; i--)
+		{
+			final Print p = pts.get(i);
+			if (p.price <= 0)
+			{
+				continue;
+			}
+			if (p.buySide && lastHigh == 0)
+			{
+				lastHigh = p.price;
+			}
+			if (!p.buySide && lastLow == 0)
+			{
+				lastLow = p.price;
+			}
+			if (lastHigh != 0 && lastLow != 0)
+			{
+				break;
+			}
+		}
+		final int chipH = fm.getHeight() + 2;
+		for (final long p : c.youSells)
+		{
+			if (p >= pMin && p <= pMax)
+			{
+				final int yy = tyf(p, pMin, pMax, y0, plotH);
+				yourLine(g, p, yy, yy, true, lastHigh > 0 && p <= lastHigh, x0, plotW, fm, chipH);
+			}
+		}
+		for (final long p : c.youBuys)
+		{
+			if (p >= pMin && p <= pMax)
+			{
+				final int yy = tyf(p, pMin, pMax, y0, plotH);
+				yourLine(g, p, yy, yy, false, lastLow > 0 && p >= lastLow, x0, plotW, fm, chipH);
+			}
+		}
+	}
+
 	private static void paintChart(Graphics2D g, Context c, int x0, int y0, int cw, int ch, FontMetrics fm, boolean compact)
 	{
 		final int plotW = cw - PRICE_GUTTER;
@@ -782,7 +963,7 @@ final class GeItemInfoPainter
 		// each trade landed against your lines.
 		if (!compact && c.prints != null && !c.prints.isEmpty())
 		{
-			final int from = Math.max(0, c.prints.size() - 10);
+			final int from = Math.max(0, c.prints.size() - Math.max(1, c.tradeDepth));
 			for (int i = from; i < c.prints.size(); i++)
 			{
 				final Print p = c.prints.get(i);
@@ -976,6 +1157,24 @@ final class GeItemInfoPainter
 		g.drawString(letter, chipX + 5, chipY + fm.getAscent());
 		g.setColor(Color.WHITE);
 		g.drawString(label, chipX + 5 + lw + 3, chipY + fm.getAscent());
+	}
+
+	/** "HH:mm 12m": the print's clock time in game (UTC) time, matching the GE's
+	 *  own 24h-high/low timestamps, plus how long ago it happened. */
+	private static String clockShort(long tsSec, long nowSec)
+	{
+		if (tsSec <= 0)
+		{
+			return "";
+		}
+		final long hh = (tsSec % 86400L) / 3600L;
+		final long mm = (tsSec % 3600L) / 60L;
+		final String hm = (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm;
+		final long ago = Math.max(0, nowSec - tsSec);
+		final String rel = ago < 60 ? "now"
+			: ago < 3600 ? (ago / 60) + "m"
+			: ago < 86400 ? (ago / 3600) + "h" : (ago / 86400) + "d";
+		return hm + " " + rel;
 	}
 
 	private static void shadowed(Graphics2D g, String s, int x, int yy, Color c)
