@@ -162,6 +162,10 @@ class FlipLogEngine
 	static class Data
 	{
 		int v = 1;
+		// One-time heal flag for the merge-resync fix. Absent in all pre-fix
+		// saves, so it defaults false and the re-sync runs exactly once per
+		// account, then stays true.
+		boolean resyncFlipsV2;
 		SlotSnap[] slots = new SlotSnap[SLOTS];
 		List<Lot> openLots = new ArrayList<>();
 		List<Flip> flips = new ArrayList<>();           // oldest first
@@ -246,6 +250,19 @@ class FlipLogEngine
 		}
 		accountHash = hash;
 		data = load();
+		// One-time heal: older builds synced each flip once and never re-sent it,
+		// so any flip that grew via a merge left a stale, smaller total on the
+		// server. Re-push every flip once (the server now upserts by clientFlipId)
+		// so the web portfolio and leaderboard match the local log.
+		if (!data.resyncFlipsV2)
+		{
+			for (final Flip f : data.flips)
+			{
+				f.synced = false;
+			}
+			data.resyncFlipsV2 = true;
+			save();
+		}
 		sessionStartMs = System.currentTimeMillis();
 		sessionProfit = 0;
 		activeMs = 0;
@@ -790,6 +807,11 @@ class FlipLogEngine
 			prev.tax += tax;
 			prev.profit += profit;
 			prev.closedAt = f.ts;
+			// The flip grew after its last sync. Mark it unsynced so syncBatch
+			// re-sends it: the server upserts by (userId, clientFlipId), so the
+			// merged totals replace the stale pre-merge row instead of being
+			// dropped. Without this the web portfolio/leaderboard undercount.
+			prev.synced = false;
 			final long op = openedAt == Long.MAX_VALUE ? f.ts : openedAt;
 			if (op < prev.openedAt)
 			{
