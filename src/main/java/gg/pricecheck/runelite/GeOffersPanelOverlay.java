@@ -144,6 +144,7 @@ class GeOffersPanelOverlay extends Overlay
 		final long[] cl = closeness(t, sd, live);
 		r.closenessGp = cl[0];
 		r.seated = cl[1] == 1;
+		r.trend = gapTrend(sell, sd);
 
 		r.lastTrade = lastTrade(itemId, sell, live, nowSec);
 
@@ -224,6 +225,50 @@ class GeOffersPanelOverlay extends Overlay
 		// colour carries near/far so the raw gp still reads as close or distant.
 		final long dist = sell ? (price - edge) : (edge - price);
 		return new long[]{Math.max(1, dist), 0};
+	}
+
+	/** Is the fill-side market price moving TOWARD our resting offer (so a fill
+	 *  is coming) or away from it? +1 closing, -1 drifting, 0 flat/unknown. A
+	 *  SELL fills as the insta-buy (high) rises to our ask; a BUY fills as the
+	 *  insta-sell (low) falls to our bid. Compares the newest real print on that
+	 *  side to one roughly half an hour earlier. */
+	private static int gapTrend(boolean sell, PriceCheckApiClient.SeriesData s)
+	{
+		if (s == null || s.ts == null)
+		{
+			return 0;
+		}
+		final long[] side = sell ? s.ah : s.al;
+		final int[] vol = sell ? s.hv : s.lv;
+		if (side == null)
+		{
+			return 0;
+		}
+		long now = 0;
+		long prev = 0;
+		int seen = 0;
+		for (int i = side.length - 1; i >= 0 && seen < 8; i--)
+		{
+			if (side[i] > 0 && (vol == null || i >= vol.length || vol[i] > 0))
+			{
+				if (now == 0)
+				{
+					now = side[i];
+				}
+				prev = side[i];
+				seen++;
+			}
+		}
+		if (now <= 0 || prev <= 0 || seen < 3)
+		{
+			return 0;
+		}
+		if (Math.abs(now - prev) * 1000 < now)
+		{
+			return 0;   // under ~0.1% of drift either way reads as flat
+		}
+		final boolean closing = sell ? now > prev : now < prev;
+		return closing ? 1 : -1;
 	}
 
 	private static long lastNonZero(long[] arr)
@@ -313,7 +358,8 @@ class GeOffersPanelOverlay extends Overlay
 		long soldQty;       // units already bought/sold on this offer
 		long totalQty;      // full offer size
 		long posProfit;     // whole-flip profit at the live margin (margin x totalQty)
-		long closenessGp;   // exact gp to a fill; -1 unknown, 0 when seated
+		long closenessGp;   // exact gp the market must still move to fill us; -1 unknown, 0 seated
+		int trend;          // +1 the fill edge is moving toward us (fills soon), -1 drifting away, 0 flat
 		boolean seated;
 		String lastTrade;   // "@price age" or "@edge", null when none
 		String pressure;    // "buy" | "sell" | "flat" | null
@@ -425,10 +471,12 @@ class GeOffersPanelOverlay extends Overlay
 		}
 		else if (r.closenessGp > 0)
 		{
-			segs.add(Fmt.compact(r.closenessGp) + " off");
-			// Gold within ~2% of the fill, grey further out (the raw gp alone
-			// does not say near or far across items of wildly different price).
-			cols.add(r.closenessGp <= r.price / 50 ? Palette.GOLD : Palette.SUBTLE_CANVAS);
+			// How far the market must still move to fill us, and whether it is
+			// coming (closing -> fills soon) or drifting off. The point is to
+			// watch the offer fill, not to reprice it.
+			final String word = r.trend > 0 ? "closing" : r.trend < 0 ? "drifting" : "away";
+			segs.add(Fmt.compact(r.closenessGp) + " " + word);
+			cols.add(r.trend > 0 ? Palette.GREEN : r.trend < 0 ? Palette.RED : Palette.SUBTLE_CANVAS);
 		}
 		final List<String> opt = new ArrayList<>();
 		final List<Color> optc = new ArrayList<>();

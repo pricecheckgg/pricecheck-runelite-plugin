@@ -22,7 +22,7 @@ public final class GeOffersPanelPreview
 	}
 
 	private static GeOffersPanelOverlay.Row row(String chip, Color chipCol, String name, String verdict, Color vCol,
-		long price, long margin, long total, long sold, long closeGp, boolean seated, String last, String lean)
+		long price, long margin, long total, long sold, long closeGp, int trend, boolean seated, String last, String lean)
 	{
 		final GeOffersPanelOverlay.Row r = new GeOffersPanelOverlay.Row();
 		r.chip = chip;
@@ -37,6 +37,7 @@ public final class GeOffersPanelPreview
 		r.unfilledQty = Math.max(0, total - sold);
 		r.posProfit = margin * total;
 		r.closenessGp = closeGp;
+		r.trend = trend;
 		r.seated = seated;
 		r.lastTrade = last;
 		r.pressure = lean;
@@ -47,13 +48,13 @@ public final class GeOffersPanelPreview
 	public static void main(String[] args) throws Exception
 	{
 		final List<GeOffersPanelOverlay.Row> rows = new ArrayList<>();
-		rows.add(row("S", SELL, "Inquisitor's hauberk", "OK +1.85m", Palette.GREEN, 116_240_000L, 1_850_000L, 1, 0, 0, true, "@116.24m 19m", "sell"));
-		rows.add(row("S", SELL, "Scythe of vitur (uncharged)", "OK -2.64m", Palette.RED, 1_300_000_000L, -2_640_000L, 1, 0, 3_900_000L, false, "@1.3b 14m", "flat"));
-		rows.add(row("B", BUY, "Inquisitor's hauberk", "OK +1.85m", Palette.GREEN, 112_060_000L, 1_850_000L, 6, 2, 112_000L, false, "@112m 29m", "sell"));
-		rows.add(row("B", BUY, "Serpentine visage", "RAISE +156.88k", Palette.AMBER, 3_360_000L, 156_880L, 5, 0, 150_000L, false, "@3.51m 14m", "sell"));
-		rows.add(row("S", SELL, "Twisted bow", "OK +538.99k", Palette.GREEN, 1_490_000_000L, 538_990L, 1, 0, 1_490_000L, false, "@1.49b 9m", "flat"));
-		rows.add(row("B", BUY, "Harmonised orb", "HOLD", HOLD, 374_100_000L, 0, 1, 0, 7_100_000L, false, "@378.46m 19m", "flat"));
-		rows.add(row("B", BUY, "Twisted buckler", "OK +136.23k", Palette.GREEN, 17_800_000L, 136_230L, 8, 3, 90_000L, false, "@17.89m 21s", "flat"));
+		rows.add(row("S", SELL, "Inquisitor's hauberk", "OK +1.85m", Palette.GREEN, 116_240_000L, 1_850_000L, 1, 0, 0, 1, true, "@116.24m 19m", "sell"));
+		rows.add(row("S", SELL, "Scythe of vitur (uncharged)", "OK -2.64m", Palette.RED, 1_300_000_000L, -2_640_000L, 1, 0, 3_900_000L, 1, false, "@1.3b 14m", "flat"));
+		rows.add(row("B", BUY, "Inquisitor's hauberk", "OK +1.85m", Palette.GREEN, 112_060_000L, 1_850_000L, 6, 2, 112_000L, 1, false, "@112m 29m", "sell"));
+		rows.add(row("B", BUY, "Serpentine visage", "RAISE +156.88k", Palette.AMBER, 3_360_000L, 156_880L, 5, 0, 150_000L, -1, false, "@3.51m 14m", "sell"));
+		rows.add(row("S", SELL, "Twisted bow", "OK +538.99k", Palette.GREEN, 1_490_000_000L, 538_990L, 1, 0, 1_490_000L, 0, false, "@1.49b 9m", "flat"));
+		rows.add(row("B", BUY, "Harmonised orb", "HOLD", HOLD, 374_100_000L, 0, 1, 0, 7_100_000L, 1, false, "@378.46m 19m", "flat"));
+		rows.add(row("B", BUY, "Twisted buckler", "OK +136.23k", Palette.GREEN, 17_800_000L, 136_230L, 8, 3, 90_000L, 0, false, "@17.89m 21s", "flat"));
 
 		final int scale = 2;
 		final int wLogical = GeOffersPanelOverlay.W + 16;
