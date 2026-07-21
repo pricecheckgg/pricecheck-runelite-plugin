@@ -31,8 +31,9 @@ import net.runelite.client.ui.overlay.OverlayPosition;
  */
 class GeOffersPanelOverlay extends Overlay
 {
-	static final int W = 224;
+	static final int W = 250;
 	private static final int PAD = 9;
+	private static final Color BAR_TRACK = new Color(0xff, 0xff, 0xff, 24);
 
 	private static final Color FRAME = new Color(0xe6, 0xc6, 0x67, 62);
 	private static final Color RULE = new Color(0xe6, 0xc6, 0x67, 38);
@@ -134,11 +135,14 @@ class GeOffersPanelOverlay extends Overlay
 
 		r.price = t.getPrice();
 		r.liveMargin = live != null ? live.getProfit() : 0;
-		r.unfilledQty = t.isActive() ? Math.max(0, t.getTotalQty() - t.getSoldQty()) : 0;
+		r.totalQty = Math.max(0, t.getTotalQty());
+		r.soldQty = Math.max(0, Math.min(r.totalQty, t.getSoldQty()));
+		r.unfilledQty = t.isActive() ? Math.max(0, r.totalQty - r.soldQty) : 0;
+		r.posProfit = r.liveMargin * r.totalQty;
 
 		final PriceCheckApiClient.SeriesData sd = plugin.cardSeriesFor(itemId);
-		final int[] cl = closeness(t, sd, live);
-		r.closenessTenths = cl[0];
+		final long[] cl = closeness(t, sd, live);
+		r.closenessGp = cl[0];
 		r.seated = cl[1] == 1;
 
 		r.lastTrade = lastTrade(itemId, sell, live, nowSec);
@@ -192,14 +196,15 @@ class GeOffersPanelOverlay extends Overlay
 		return edge > 0 ? "@" + Fmt.compact(edge) : null;
 	}
 
-	/** {pct 0..100, seated 1/0}; pct -1 unknown. Edge is the LIVE quote when
-	 *  present (consistent with liveMargin), the series only as a fallback. */
-	private static int[] closeness(TrackedOffer o, PriceCheckApiClient.SeriesData s, FlipData live)
+	/** {gpGap, seated 1/0}; gpGap -1 unknown, 0 seated, else the exact gp your
+	 *  price sits from the fill edge. Edge is the LIVE quote when present
+	 *  (consistent with liveMargin), the series only as a fallback. */
+	private static long[] closeness(TrackedOffer o, PriceCheckApiClient.SeriesData s, FlipData live)
 	{
 		final long price = o.getPrice();
 		if (price <= 0)
 		{
-			return new int[]{-1, 0};
+			return new long[]{-1, 0};
 		}
 		final boolean sell = o.getState() == GrandExchangeOfferState.SELLING
 			|| o.getState() == GrandExchangeOfferState.SOLD;
@@ -208,18 +213,17 @@ class GeOffersPanelOverlay extends Overlay
 			: (live != null && live.getBuy() > 0 ? live.getBuy() : lastNonZero(s == null ? null : s.al));
 		if (edge <= 0)
 		{
-			return new int[]{-1, 0};
+			return new long[]{-1, 0};
 		}
 		final boolean seated = sell ? price <= edge : price >= edge;
 		if (seated)
 		{
-			return new int[]{0, 1};   // at/through the fill edge: fills now
+			return new long[]{0, 1};   // at/through the fill edge: fills now
 		}
-		// The GAP to a real fill, in tenths of a percent (21 == 2.1%) - the same
-		// honest distance the per-slot bar shows. Small = close.
+		// The exact gp to a real fill - how far to move to head the queue. The
+		// colour carries near/far so the raw gp still reads as close or distant.
 		final long dist = sell ? (price - edge) : (edge - price);
-		final int tenths = (int) Math.max(1, Math.min(9999, Math.round(dist * 1000.0 / edge)));
-		return new int[]{tenths, 0};
+		return new long[]{Math.max(1, dist), 0};
 	}
 
 	private static long lastNonZero(long[] arr)
@@ -306,7 +310,10 @@ class GeOffersPanelOverlay extends Overlay
 		long price;
 		long liveMargin;    // per-unit live margin, advisor's notion
 		long unfilledQty;   // open units on this offer (0 when done)
-		int closenessTenths;   // gap to a fill in tenths of a percent; -1 unknown, 0 when seated
+		long soldQty;       // units already bought/sold on this offer
+		long totalQty;      // full offer size
+		long posProfit;     // whole-flip profit at the live margin (margin x totalQty)
+		long closenessGp;   // exact gp to a fill; -1 unknown, 0 when seated
 		boolean seated;
 		String lastTrade;   // "@price age" or "@edge", null when none
 		String pressure;    // "buy" | "sell" | "flat" | null
@@ -325,7 +332,7 @@ class GeOffersPanelOverlay extends Overlay
 
 		final int lineH = fm.getHeight();
 		final int headerH = fm.getHeight() + 5;
-		final int rowH = 2 * lineH + 3;
+		final int rowH = 2 * lineH + 8;   // two text lines + a hairline fill bar
 		final int footerH = lineH + 6;
 
 		final int w = W;
@@ -347,7 +354,7 @@ class GeOffersPanelOverlay extends Overlay
 
 		int y = headerH + 4;
 		int seatedCount = 0;
-		long liveTotal = 0;
+		long flipTotal = 0;
 		for (final Row r : rows)
 		{
 			paintRow(g, fm, w, y, r);
@@ -355,7 +362,7 @@ class GeOffersPanelOverlay extends Overlay
 			{
 				seatedCount++;
 			}
-			liveTotal += r.liveMargin * r.unfilledQty;
+			flipTotal += r.posProfit;
 			y += rowH;
 		}
 
@@ -365,10 +372,10 @@ class GeOffersPanelOverlay extends Overlay
 		final int fb = footY + 2 + fm.getAscent();
 		final String left = seatedCount + "/" + rows.size() + " seated";
 		shadowed(g, left, PAD, fb, Palette.SUBTLE_CANVAS);
-		// Qty-weighted open spread: a real gp figure, not a per-unit sum.
-		final String right = "±" + Fmt.compact(Math.abs(liveTotal)) + " live";
+		// Whole-board profit if every offer completes at the live margin.
+		final String right = "all " + (flipTotal >= 0 ? "+" : "-") + Fmt.compact(Math.abs(flipTotal));
 		final int rw = fm.stringWidth(right);
-		shadowed(g, right, w - PAD - rw, fb, liveTotal >= 0 ? Palette.GREEN : Palette.RED);
+		shadowed(g, right, w - PAD - rw, fb, flipTotal >= 0 ? Palette.GREEN : Palette.RED);
 
 		return new Dimension(w, h);
 	}
@@ -402,24 +409,37 @@ class GeOffersPanelOverlay extends Overlay
 		final int nameMax = w - PAD - (verdict.isEmpty() ? 0 : vw + 6) - nameX;
 		shadowed(g, ellipsize(r.name, fm, nameMax), nameX, base1, NAME);
 
-		// Line 2: floors kept, optionals dropped pressure-first when narrow.
+		// Line 2: price [x qty] | closeness | whole-flip profit | last trade |
+		// lean. Floors are the price and closeness; the rest drop back-to-front
+		// (lean, then last trade) so the whole-flip profit survives longest.
 		final int base2 = top + lineH + fm.getAscent();
+		final int maxW = w - 2 * PAD;
 		final List<String> segs = new ArrayList<>();
 		final List<Color> cols = new ArrayList<>();
-		segs.add("you " + Fmt.compact(r.price));
+		segs.add(Fmt.compact(r.price) + (r.totalQty > 1 ? " x" + r.totalQty : ""));
 		cols.add(Palette.LIGHT);
 		if (r.seated)
 		{
 			segs.add("at mkt");
 			cols.add(Palette.GREEN);
 		}
-		else if (r.closenessTenths >= 0)
+		else if (r.closenessGp > 0)
 		{
-			segs.add((r.closenessTenths / 10) + "." + (r.closenessTenths % 10) + "% off");
-			cols.add(r.closenessTenths <= 20 ? Palette.GOLD : Palette.SUBTLE_CANVAS);
+			segs.add(Fmt.compact(r.closenessGp) + " off");
+			// Gold within ~2% of the fill, grey further out (the raw gp alone
+			// does not say near or far across items of wildly different price).
+			cols.add(r.closenessGp <= r.price / 50 ? Palette.GOLD : Palette.SUBTLE_CANVAS);
 		}
 		final List<String> opt = new ArrayList<>();
 		final List<Color> optc = new ArrayList<>();
+		// Whole-flip profit (margin x full size) - the number that actually
+		// matters, which the per-unit verdict never shows. Only when qty > 1
+		// adds information (for a single unit it equals the verdict).
+		if (r.totalQty > 1 && r.posProfit != 0)
+		{
+			opt.add((r.posProfit >= 0 ? "+" : "-") + Fmt.compact(Math.abs(r.posProfit)));
+			optc.add(r.posProfit >= 0 ? Palette.GREEN : Palette.RED);
+		}
 		if (r.lastTrade != null)
 		{
 			opt.add(r.lastTrade);
@@ -432,7 +452,6 @@ class GeOffersPanelOverlay extends Overlay
 		}
 
 		final String sep = "  ";
-		final int maxW = w - 2 * PAD;
 		List<String> pick = segs;
 		List<Color> pickC = cols;
 		for (int take = opt.size(); take >= 0; take--)
@@ -469,6 +488,22 @@ class GeOffersPanelOverlay extends Overlay
 			}
 			shadowed(g, pick.get(i), x, base2, pickC.get(i));
 			x += fm.stringWidth(pick.get(i));
+		}
+
+		// Hairline fill bar at the row foot: the bought/sold fraction, in the
+		// offer's side colour over a dim track, so progress reads across the
+		// whole board at a glance without opening each slot.
+		if (r.totalQty > 1)
+		{
+			final int barY = top + 2 * lineH + 3;
+			g.setColor(BAR_TRACK);
+			g.fillRect(PAD, barY, maxW, 2);
+			final int fw = (int) Math.max(0, Math.min(maxW, maxW * r.soldQty / Math.max(1, r.totalQty)));
+			if (fw > 0)
+			{
+				g.setColor(r.chipColor);
+				g.fillRect(PAD, barY, fw, 2);
+			}
 		}
 	}
 
