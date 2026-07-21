@@ -102,6 +102,10 @@ public class PriceCheckPlugin extends Plugin
 			{
 				e.consume();
 			}
+			else if (offersPanelOverlay != null && offersPanelOverlay.handleClick(e.getPoint(), shift))
+			{
+				e.consume();
+			}
 			return e;
 		}
 	};
@@ -291,7 +295,7 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(setupOverlay);
 		geCardOverlay = new GeItemCardOverlay(client, this, config, configManager);
 		overlayManager.add(geCardOverlay);
-		offersPanelOverlay = new GeOffersPanelOverlay(client, this);
+		offersPanelOverlay = new GeOffersPanelOverlay(client, this, configManager);
 		overlayManager.add(offersPanelOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->
@@ -839,6 +843,15 @@ public class PriceCheckPlugin extends Plugin
 	 * GeItemCardOverlay to yield its right column, so it must stay a pure
 	 * client+config state function, never a "painted this frame" flag.
 	 */
+	/** The panel's base gate, independent of GE state: toggle on + market data.
+	 *  render() shows the board whenever this holds and there are relevant
+	 *  offers (docked right when geOffersPanelVisible, floating when GE closed);
+	 *  geOffersPanelVisible() layers the docked-overview conditions on top. */
+	boolean geOffersPanelEnabled()
+	{
+		return config.geOffersPanel() && marketDataOk();
+	}
+
 	boolean geOffersPanelVisible()
 	{
 		if (!config.geOffersPanel() || !marketDataOk() || !isGrandExchangeOpen())

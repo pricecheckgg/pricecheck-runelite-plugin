@@ -5,12 +5,15 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.util.ArrayList;
 import java.util.List;
 import net.runelite.api.Client;
 import net.runelite.api.GrandExchangeOfferState;
+import net.runelite.api.KeyCode;
+import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
@@ -44,46 +47,96 @@ class GeOffersPanelOverlay extends Overlay
 	private static final Color CHIP_INK = new Color(0x9a, 0x91, 0x7c);
 	private static final Color CHIP_TEXT = new Color(0x12, 0x0e, 0x08);
 
+	private static final int BTN = 14;
+	private static final String COLLAPSED_KEY = "offersPanelCollapsed";
+
 	private final Client client;
 	private final PriceCheckPlugin plugin;
+	private final ConfigManager configManager;
 
-	GeOffersPanelOverlay(Client client, PriceCheckPlugin plugin)
+	// Written on the mouse thread, read on the render thread (same as the advisor
+	// box). collapsed persists across sessions; toggleBounds is the canvas-space
+	// hit box for the [-]/[+] button, valid only while Shift shows it.
+	private volatile boolean collapsed;
+	private volatile Rectangle toggleBounds;
+
+	GeOffersPanelOverlay(Client client, PriceCheckPlugin plugin, ConfigManager configManager)
 	{
 		super(plugin);
 		this.client = client;
 		this.plugin = plugin;
+		this.configManager = configManager;
+		this.collapsed = Boolean.parseBoolean(configManager.getConfiguration(PriceCheckConfig.GROUP, COLLAPSED_KEY));
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
+	}
+
+	/** Mouse hook from the plugin: collapse/expand when the Shift-only button is
+	 *  clicked. Mirrors OfferAdvisorOverlay.handleClick. */
+	boolean handleClick(Point p, boolean shiftHeld)
+	{
+		final Rectangle t = toggleBounds;
+		if (!shiftHeld || t == null || p == null || !t.contains(p))
+		{
+			return false;
+		}
+		collapsed = !collapsed;
+		configManager.setConfiguration(PriceCheckConfig.GROUP, COLLAPSED_KEY, collapsed);
+		return true;
 	}
 
 	@Override
 	public Dimension render(Graphics2D g)
 	{
-		// The render gate IS the shared predicate, so nothing here can disagree
-		// with the mini-cards' right-column guard.
-		if (!plugin.geOffersPanelVisible())
+		toggleBounds = null;
+		if (!plugin.geOffersPanelEnabled())
 		{
 			return null;
-		}
-		final Rectangle b = plugin.geGridBounds();
-		if (b == null)
-		{
-			return null;
-		}
-		final int x = b.x + b.width + 8;
-		final int y = 8;
-		if (x + W > client.getCanvasWidth() - 4)
-		{
-			return null;   // never falls back to the left
 		}
 		final List<Row> rows = buildRows();
 		if (rows.isEmpty())
 		{
 			return null;
 		}
+		final int y = 8;
+		final int x;
+		if (plugin.geOffersPanelVisible())
+		{
+			// GE overview open: dock to the right of the grid. The mini-cards
+			// yield this column via the same predicate, so nothing overlaps.
+			final Rectangle b = plugin.geGridBounds();
+			if (b == null)
+			{
+				return null;
+			}
+			x = b.x + b.width + 8;
+			if (x + W > client.getCanvasWidth() - 4)
+			{
+				return null;   // no room to the right; never overlap the GE
+			}
+		}
+		else if (plugin.isGrandExchangeOpen())
+		{
+			return null;   // GE open on a slot/set-up screen: the mini-cards own it
+		}
+		else
+		{
+			// GE closed: float in the top-right so the board stays up like the
+			// advisor box does on the left.
+			x = client.getCanvasWidth() - W - 8;
+			if (x < 4)
+			{
+				return null;
+			}
+		}
+		final boolean shift = client.isKeyPressed(KeyCode.KC_SHIFT);
 		g.translate(x, y);
-		paint(g, rows);
+		final Result r = paint(g, rows, collapsed, shift);
 		g.translate(-x, -y);
+		if (r.button != null)
+		{
+			toggleBounds = new Rectangle(x + r.button.x, y + r.button.y, r.button.width, r.button.height);
+		}
 		return null;
 	}
 
@@ -366,8 +419,9 @@ class GeOffersPanelOverlay extends Overlay
 		Color pressureColor;
 	}
 
-	/** Draws the whole board at 0,0 and reports its size. Pure over its inputs. */
-	static Dimension paint(Graphics2D g, List<Row> rows)
+	/** Draws the board (or a collapsed title pill) at 0,0 and reports its size
+	 *  plus the Shift-only toggle's local hit box. Pure over its inputs. */
+	static Result paint(Graphics2D g, List<Row> rows, boolean collapsed, boolean shiftHeld)
 	{
 		final Font font = FontManager.getRunescapeSmallFont();
 		g.setFont(font);
@@ -378,9 +432,26 @@ class GeOffersPanelOverlay extends Overlay
 
 		final int lineH = fm.getHeight();
 		final int headerH = fm.getHeight() + 5;
+		final int baseline = 3 + fm.getAscent();
+		final String title = "Active offers";
+		final String count = " · " + rows.size();
+
+		if (collapsed)
+		{
+			// A pill hugging the title, with room for the button on Shift.
+			final int w = PAD + fm.stringWidth(title + count) + (shiftHeld ? BTN + 6 : 0) + PAD;
+			final int h = headerH + 3;
+			g.setColor(Palette.INK);
+			g.fillRoundRect(0, 0, w - 1, h - 1, 8, 8);
+			g.setColor(FRAME);
+			g.drawRoundRect(0, 0, w - 1, h - 1, 8, 8);
+			shadowed(g, title, PAD, baseline, Palette.GOLD);
+			shadowed(g, count, PAD + fm.stringWidth(title), baseline, Palette.SUBTLE_CANVAS);
+			return new Result(new Dimension(w, h), shiftHeld ? drawToggle(g, w, true) : null);
+		}
+
 		final int rowH = 2 * lineH + 8;   // two text lines + a hairline fill bar
 		final int footerH = lineH + 6;
-
 		final int w = W;
 		final int h = headerH + 4 + rows.size() * rowH + 5 + footerH + PAD - 4;
 
@@ -389,11 +460,9 @@ class GeOffersPanelOverlay extends Overlay
 		g.setColor(FRAME);
 		g.drawRoundRect(0, 0, w - 1, h - 1, 8, 8);
 
-		final int baseline = 3 + fm.getAscent();
-		final String title = "Active offers";
 		shadowed(g, title, PAD, baseline, Palette.GOLD);
-		final String count = " · " + rows.size();
 		shadowed(g, count, PAD + fm.stringWidth(title), baseline, Palette.SUBTLE_CANVAS);
+		final Rectangle btn = shiftHeld ? drawToggle(g, w, false) : null;
 
 		g.setColor(RULE);
 		g.drawLine(PAD - 2, headerH, w - PAD + 2, headerH);
@@ -423,7 +492,42 @@ class GeOffersPanelOverlay extends Overlay
 		final int rw = fm.stringWidth(right);
 		shadowed(g, right, w - PAD - rw, fb, flipTotal >= 0 ? Palette.GREEN : Palette.RED);
 
-		return new Dimension(w, h);
+		return new Result(new Dimension(w, h), btn);
+	}
+
+	/** The Shift-only [-]/[+] toggle at the header's top-right; returns its local
+	 *  hit box. Same glyphs as the advisor box so the two read alike. */
+	private static Rectangle drawToggle(Graphics2D g, int w, boolean collapsed)
+	{
+		final Rectangle btn = new Rectangle(w - BTN - 4, 2, BTN, BTN);
+		final int cx = btn.x + BTN / 2;
+		final int cy = btn.y + BTN / 2;
+		g.setColor(SHADOW);
+		g.drawLine(cx - 3 + 1, cy + 1, cx + 3 + 1, cy + 1);
+		g.setColor(Palette.GOLD);
+		g.drawLine(cx - 3, cy, cx + 3, cy);   // minus
+		if (collapsed)
+		{
+			g.setColor(SHADOW);
+			g.drawLine(cx + 1, cy - 3 + 1, cx + 1, cy + 3 + 1);
+			g.setColor(Palette.GOLD);
+			g.drawLine(cx, cy - 3, cx, cy + 3);   // vertical stroke turns it into a plus
+		}
+		return btn;
+	}
+
+	/** What one paint produced: the box size + the toggle's local hit box (null
+	 *  unless Shift drew it). */
+	static final class Result
+	{
+		final Dimension size;
+		final Rectangle button;
+
+		Result(Dimension size, Rectangle button)
+		{
+			this.size = size;
+			this.button = button;
+		}
 	}
 
 	private static void paintRow(Graphics2D g, FontMetrics fm, int w, int top, Row r)

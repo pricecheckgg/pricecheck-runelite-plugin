@@ -56,6 +56,13 @@ public final class GeOffersPanelPreview
 		rows.add(row("B", BUY, "Harmonised orb", "HOLD", HOLD, 374_100_000L, 0, 1, 0, 7_100_000L, 1, false, "@378.46m 19m", "flat"));
 		rows.add(row("B", BUY, "Twisted buckler", "OK +136.23k", Palette.GREEN, 17_800_000L, 136_230L, 8, 3, 90_000L, 0, false, "@17.89m 21s", "flat"));
 
+		final String base = args.length > 0 ? args[0] : "offers-panel.png";
+		render(rows, false, true, base);                                  // expanded, Shift shows [-]
+		render(rows, true, true, base.replace(".png", "-collapsed.png")); // collapsed pill, [+]
+	}
+
+	private static void render(List<GeOffersPanelOverlay.Row> rows, boolean collapsed, boolean shift, String path) throws Exception
+	{
 		final int scale = 2;
 		final int wLogical = GeOffersPanelOverlay.W + 16;
 		final int hLogical = 340;
@@ -65,10 +72,9 @@ public final class GeOffersPanelPreview
 		g.setColor(new Color(0x33, 0x2c, 0x22));   // GE-parchment-ish backdrop
 		g.fillRect(0, 0, wLogical, hLogical);
 		g.translate(8, 8);
-		final Dimension d = GeOffersPanelOverlay.paint(g, rows);
+		final GeOffersPanelOverlay.Result r = GeOffersPanelOverlay.paint(g, rows, collapsed, shift);
 		g.dispose();
-		final File out = new File(args.length > 0 ? args[0] : "offers-panel.png");
-		ImageIO.write(img, "png", out);
-		System.out.println("wrote " + out.getAbsolutePath() + " panel " + d.width + "x" + d.height);
+		ImageIO.write(img, "png", new File(path));
+		System.out.println("wrote " + path + " panel " + r.size.width + "x" + r.size.height);
 	}
 }
