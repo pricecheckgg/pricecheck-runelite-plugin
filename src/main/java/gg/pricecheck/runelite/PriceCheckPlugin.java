@@ -45,6 +45,11 @@ public class PriceCheckPlugin extends Plugin
 	private static final int SLOTS = 8;
 	private static final int PANEL_REFRESH_SECONDS = 6;
 	private static final int ADVISOR_REFRESH_SECONDS = 3;
+	// A transient network blip (timeout / 5xx / dropped poll) returns AuthState.ERROR,
+	// which is NOT a lapsed key. Hold the last-good overlays through this window
+	// instead of flickering them all off on a single missed panel poll. Only a
+	// genuine key/plan lapse, or an outage longer than this, actually hides them.
+	private static final long MARKET_GRACE_MS = 30_000;
 	private static final int FLIP_LIMIT = 40;
 
 	@Inject
@@ -669,8 +674,33 @@ public class PriceCheckPlugin extends Plugin
 		}
 		healItemNames();
 		final String key = config.apiKey();
-		final PriceCheckApiClient.FlipsResult flips = api.getFlips(key, FLIP_LIMIT);
-		marketDataOk = flips.state == PriceCheckApiClient.AuthState.OK;
+		final PriceCheckApiClient.FlipsResult fetched = api.getFlips(key, FLIP_LIMIT);
+		final long nowMs = System.currentTimeMillis();
+		final PriceCheckApiClient.FlipsResult flips;   // what the panel + overlays actually render
+		if (fetched.state == PriceCheckApiClient.AuthState.OK)
+		{
+			marketDataOk = true;
+			lastMarketOkMs = nowMs;
+			lastGoodFlips = fetched;
+			flips = fetched;
+		}
+		else if (fetched.state == PriceCheckApiClient.AuthState.ERROR
+			&& nowMs - lastMarketOkMs <= MARKET_GRACE_MS && lastGoodFlips != null)
+		{
+			// Transient blip within the grace window: keep the last-good board and
+			// leave marketDataOk as it was, so the overlays don't flicker off.
+			flips = lastGoodFlips;
+		}
+		else
+		{
+			// Genuine key/plan lapse, or an outage past the grace window: go dark.
+			marketDataOk = false;
+			if (fetched.state != PriceCheckApiClient.AuthState.ERROR)
+			{
+				lastGoodFlips = null;   // a real lapse must not leave a stale board behind
+			}
+			flips = fetched;
+		}
 		final PriceCheckApiClient.TrackedResult tracked = api.getTracked(key);
 		if (tracked != null && tracked.state == PriceCheckApiClient.AuthState.OK && tracked.tracked != null)
 		{
@@ -681,10 +711,15 @@ public class PriceCheckPlugin extends Plugin
 			}
 			trackedById = byId;
 		}
+		else if (tracked == null || tracked.state == PriceCheckApiClient.AuthState.ERROR)
+		{
+			// Transient blip / no response: hold the last-good tracked floor so the
+			// setup ring doesn't flicker off with the rest. (Intentionally no-op.)
+		}
 		else
 		{
-			// Key lapsed / logged out / server error: drop the cache so a stale
-			// floor from the previous session can never colour the setup ring.
+			// Key lapsed / logged out: drop the cache so a stale floor from the
+			// previous session can never colour the setup ring.
 			trackedById = Collections.emptyMap();
 		}
 		p.update(flips, tracked, config.minEvPerHrK());
@@ -1647,6 +1682,10 @@ public class PriceCheckPlugin extends Plugin
 	// The last flips poll's verdict on market-data access. Premium surfaces
 	// (the GE cards) stay dark for free keys instead of rendering shells.
 	private volatile boolean marketDataOk;
+	// When the last OK flips poll landed, and that poll's board. Together they let
+	// a transient ERROR keep showing the last-good overlays for MARKET_GRACE_MS.
+	private volatile long lastMarketOkMs;
+	private volatile PriceCheckApiClient.FlipsResult lastGoodFlips;
 	// Trial state from the last /me, and the bind bookkeeping. The bind only
 	// ever fires while a trial is active.
 	private volatile boolean trialActive;
