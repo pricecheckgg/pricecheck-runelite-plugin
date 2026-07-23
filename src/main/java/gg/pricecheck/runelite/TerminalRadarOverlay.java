@@ -24,7 +24,7 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 class TerminalRadarOverlay extends Overlay
 {
 	static final int W = 300;
-	private static final int GAP = 8;
+	private static final int GAP = 6;
 	private static final int TOP_Y = 8;
 
 	private final Client client;
@@ -81,14 +81,14 @@ class TerminalRadarOverlay extends Overlay
 		return new Dimension(W, availH);
 	}
 
-	private static final int RADAR_ROW = 17;
-	private static final int LIST_ROW = 16;
-	private static final int SUBHEAD = 14;
+	private static final int RADAR_ROW = 16;
+	private static final int LIST_ROW = 15;
+	private static final int SUBHEAD = 13;
 
 	/** Panel height for a section: title strip + optional sub-header + rows + pad. */
 	private static int sectionH(int rows, boolean subhead)
 	{
-		return 32 + (subhead ? SUBHEAD : 0) + rows * (subhead ? RADAR_ROW : LIST_ROW) + 6;
+		return 32 + (subhead ? SUBHEAD : 0) + rows * (subhead ? RADAR_ROW : LIST_ROW) + 5;
 	}
 
 	/** Pure drawing (0,0-origin) so the preview harness can render it headless. */
@@ -96,9 +96,10 @@ class TerminalRadarOverlay extends Overlay
 	{
 		TerminalKit.hints(g);
 
-		// Fresh dips: live, actionable dumps only. Drop stale moves (already ended /
-		// faded / recovering) and data-artifact spikes (a "real" dip almost never
-		// exceeds ~85%), so vendor-junk noise like arrows and lockpicks stays out.
+		// Fresh dips: live dumps. Drop only the clearly-dead moves (ended / faded),
+		// data-artifact spikes (a real dip almost never exceeds ~85%), and low-value
+		// vendor junk (arrows, seeds, darts) by their entry price. Keep the rest
+		// (catchable / knife / watch / settling / recovering are all informative).
 		final List<CatchData> dips = new ArrayList<>();
 		for (final CatchData c : catches)
 		{
@@ -107,9 +108,13 @@ class TerminalRadarOverlay extends Overlay
 				continue;
 			}
 			final String st = c.getState() == null ? "" : c.getState().toLowerCase();
-			if (st.equals("ended") || st.equals("faded") || st.equals("recovering"))
+			if (st.equals("ended") || st.equals("faded"))
 			{
 				continue;
+			}
+			if (c.getBid() > 0 && c.getBid() < 50_000)
+			{
+				continue;   // vendor-tier junk, not a flip
 			}
 			dips.add(c);
 		}
@@ -132,15 +137,13 @@ class TerminalRadarOverlay extends Overlay
 		int dipRows = Math.min(dips.size(), 5);
 		int gainRows = Math.min(gainers.size(), 8);
 
-		// Fit to the available height: trim the radar first, then movers, then dips.
-		while (radarRows + dipRows + gainRows > 0
-			&& sectionH(radarRows, true) + gap(dipRows) + sectionH(dipRows, false)
+		// Fresh dips always keeps its panel (>=1 row: a dip or a "quiet" placeholder)
+		// so the left column never loses a section. Trim the radar to fit first.
+		while (radarRows > 3
+			&& sectionH(radarRows, true) + GAP + sectionH(Math.max(1, dipRows), false)
 				+ gap(gainRows) + sectionH(gainRows, false) > availH)
 		{
-			if (radarRows > 4) { radarRows--; }
-			else if (gainRows > 0) { gainRows--; }
-			else if (dipRows > 0) { dipRows--; }
-			else { radarRows--; }
+			radarRows--;
 		}
 
 		int y = 0;
@@ -148,10 +151,7 @@ class TerminalRadarOverlay extends Overlay
 		{
 			y = paintRadar(g, w, y, flips, radarRows) + GAP;
 		}
-		if (dipRows > 0)
-		{
-			y = paintDips(g, w, y, dips, dipRows) + GAP;
-		}
+		y = paintDips(g, w, y, dips, dipRows) + GAP;
 		if (gainRows > 0)
 		{
 			paintGainers(g, w, y, gainers, gainRows);
@@ -191,8 +191,14 @@ class TerminalRadarOverlay extends Overlay
 
 	private static int paintDips(Graphics2D g, int w, int y, List<CatchData> dips, int rows)
 	{
-		final int h = sectionH(rows, false);
+		final int h = sectionH(Math.max(1, rows), false);
 		final int cy = TerminalKit.panel(g, 0, y, w, h, "FRESH DIPS  ·  DUMP CATCHER");
+		if (rows <= 0)
+		{
+			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.DIM);
+			g.drawString("quiet  ·  no live dumps", 8, cy);
+			return y + h;
+		}
 		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
 		for (int i = 0; i < rows; i++)
 		{
