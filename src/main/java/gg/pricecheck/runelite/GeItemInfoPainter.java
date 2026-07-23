@@ -394,21 +394,24 @@ final class GeItemInfoPainter
 		// 4. tape
 		y = paintTermTape(g, c, L, R, y, tapeRows, hiddenRows);
 
-		// 5. position
+		// 5. position - what you hold, your cost, the current mark, and unrealised P&L
 		if (holding)
 		{
 			final long unit = c.lotCost / c.lotQty;
 			final long edge = lastHighOf(s);
 			final long pnl = edge > 0 ? c.lotQty * GeTax.net(unit, edge) : 0;
 			g.setColor(TerminalKit.GRID); g.drawLine(L, y - 6, R, y - 6);
-			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); g.drawString("POS", L, y + 6);
+			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); g.drawString("HELD", L, y + 6);
 			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.AMBER);
-			g.drawString(c.lotQty + " @ " + Fmt.compact(unit), L + 30, y + 6);
+			g.drawString("x" + c.lotQty + " @ " + Fmt.compact(unit), L + 40, y + 6);
 			if (edge > 0)
 			{
-				g.setColor(TerminalKit.LABEL); g.setFont(TerminalKit.mono(10)); g.drawString("uP&L", L + 150, y + 6);
-				g.setFont(TerminalKit.monoB(11)); g.setColor(pnl >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
-				g.drawString((pnl >= 0 ? "+" : "") + Fmt.compact(pnl), L + 188, y + 6);
+				g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); g.drawString("NOW", L + 176, y + 6);
+				g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.AMBER); g.drawString(Fmt.compact(edge), L + 210, y + 6);
+				final String v = (pnl >= 0 ? "+" : "") + Fmt.compact(pnl);
+				g.setFont(TerminalKit.monoB(13)); final int vw = g.getFontMetrics().stringWidth(v);
+				g.setColor(pnl >= 0 ? TerminalKit.GREEN : TerminalKit.RED); TerminalKit.rt(g, v, R, y + 7);
+				g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); TerminalKit.rt(g, "uP&L", R - vw - 6, y + 6);
 			}
 			y += 20;
 		}
