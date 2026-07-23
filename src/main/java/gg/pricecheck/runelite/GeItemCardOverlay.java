@@ -295,6 +295,12 @@ class GeItemCardOverlay extends Overlay
 
 		// Main grid: one card per distinct item across your offers.
 		plugin.noteViewedItem(0);
+		// The terminal desk owns the space around the GE (radar left, blotter right,
+		// held/session/fills), so the classic overview mini-cards stand down for it.
+		if (plugin.terminalDesk())
+		{
+			return null;
+		}
 		if (offers == null)
 		{
 			return null;

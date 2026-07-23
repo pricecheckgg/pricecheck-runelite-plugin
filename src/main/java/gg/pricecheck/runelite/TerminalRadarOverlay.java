@@ -41,7 +41,9 @@ class TerminalRadarOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D g)
 	{
-		if (!plugin.terminalDesk() || !plugin.marketDataOk() || !plugin.isGrandExchangeOpen())
+		// Overview-only: when a slot/setup screen is up, the left dock belongs to the
+		// single terminal card, so the radar column stands down.
+		if (!plugin.terminalDesk() || !plugin.marketDataOk() || !plugin.geOverviewOpen())
 		{
 			return null;
 		}

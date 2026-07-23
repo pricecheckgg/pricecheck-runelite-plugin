@@ -144,6 +144,10 @@ public class PriceCheckPlugin extends Plugin
 	private GeOffersPanelOverlay offersPanelOverlay;
 	private TerminalStatusOverlay terminalStatusOverlay;
 	private TerminalRadarOverlay terminalRadarOverlay;
+	private TerminalSessionOverlay terminalSessionOverlay;
+	private TerminalHeldOverlay terminalHeldOverlay;
+	private TerminalFillsOverlay terminalFillsOverlay;
+	private TerminalTickerOverlay terminalTickerOverlay;
 	private ScheduledFuture<?> panelTask;
 	private ScheduledFuture<?> advisorTask;
 	private ScheduledFuture<?> telemetryTask;
@@ -321,6 +325,14 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(terminalStatusOverlay);
 		terminalRadarOverlay = new TerminalRadarOverlay(client, this);
 		overlayManager.add(terminalRadarOverlay);
+		terminalSessionOverlay = new TerminalSessionOverlay(client, this);
+		overlayManager.add(terminalSessionOverlay);
+		terminalHeldOverlay = new TerminalHeldOverlay(client, this);
+		overlayManager.add(terminalHeldOverlay);
+		terminalFillsOverlay = new TerminalFillsOverlay(client, this);
+		overlayManager.add(terminalFillsOverlay);
+		terminalTickerOverlay = new TerminalTickerOverlay(client, this);
+		overlayManager.add(terminalTickerOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->
 		{
@@ -606,6 +618,26 @@ public class PriceCheckPlugin extends Plugin
 			overlayManager.remove(terminalRadarOverlay);
 			terminalRadarOverlay = null;
 		}
+		if (terminalSessionOverlay != null)
+		{
+			overlayManager.remove(terminalSessionOverlay);
+			terminalSessionOverlay = null;
+		}
+		if (terminalHeldOverlay != null)
+		{
+			overlayManager.remove(terminalHeldOverlay);
+			terminalHeldOverlay = null;
+		}
+		if (terminalFillsOverlay != null)
+		{
+			overlayManager.remove(terminalFillsOverlay);
+			terminalFillsOverlay = null;
+		}
+		if (terminalTickerOverlay != null)
+		{
+			overlayManager.remove(terminalTickerOverlay);
+			terminalTickerOverlay = null;
+		}
 		for (int i = 0; i < SLOTS; i++)
 		{
 			tracked.set(i, null);
@@ -749,6 +781,7 @@ public class PriceCheckPlugin extends Plugin
 		{
 			final FlipLogEngine.Summary logSummary = engine.summary();
 			p.setFlipLog(logSummary, syncEnabled());
+			lastSummary = logSummary;
 			openLots = logSummary.openLots != null ? logSummary.openLots : Collections.emptyList();
 			recentFlips = logSummary.recent != null ? logSummary.recent : Collections.emptyList();
 		}
@@ -945,6 +978,40 @@ public class PriceCheckPlugin extends Plugin
 	boolean terminalDesk()
 	{
 		return config.terminalDesk();
+	}
+
+	/** True when the GE grid OVERVIEW is on screen: no offer slot selected and no
+	 *  set-up panel open. The desk's left column (radar) shows only here, so when a
+	 *  slot is open it yields the left dock to the single terminal card; the classic
+	 *  mini-card grid also stands down while the desk is on. */
+	boolean geOverviewOpen()
+	{
+		if (!isGrandExchangeOpen())
+		{
+			return false;
+		}
+		final int slotVal = client.getVarbitValue(4439);
+		if (slotVal >= 1 && slotVal <= 8)
+		{
+			final GrandExchangeOffer[] offers = client.getGrandExchangeOffers();
+			if (offers != null && offers.length >= slotVal)
+			{
+				final GrandExchangeOffer o = offers[slotVal - 1];
+				if (o != null && o.getState() != net.runelite.api.GrandExchangeOfferState.EMPTY && o.getItemId() > 0)
+				{
+					return false;
+				}
+			}
+		}
+		for (final int child : new int[]{15, 26})
+		{
+			final net.runelite.api.widgets.Widget w = client.getWidget(465, child);
+			if (w != null && !w.isHidden())
+			{
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/** The ranked flip board for the desk panels (radar / movers / ticker); empty
@@ -1792,6 +1859,9 @@ public class PriceCheckPlugin extends Plugin
 	// Open lots from the flip log, refreshed with the panel cycle: the GE
 	// cards draw your cost basis from them.
 	private volatile List<FlipLogEngine.Lot> openLots = Collections.emptyList();
+	// Latest flip-log summary (session flow + held lots + recent flips) for the
+	// terminal desk panels; null until the first poll lands.
+	private volatile FlipLogEngine.Summary lastSummary;
 	private volatile List<FlipLogEngine.Flip> recentFlips = Collections.emptyList();
 
 	/** Aggregated holding for one item: {qty, totalCost, earliestOpenedAtMs},
@@ -1811,6 +1881,13 @@ public class PriceCheckPlugin extends Plugin
 			}
 		}
 		return qty > 0 ? new long[]{qty, cost, opened} : null;
+	}
+
+	/** Latest flip-log summary for the desk panels (session flow, held lots,
+	 *  recent flips); null until the first poll lands. */
+	FlipLogEngine.Summary flipSummary()
+	{
+		return lastSummary;
 	}
 
 	/** Exact FIFO cost of {@code qty} units of an item, taken from the raw
