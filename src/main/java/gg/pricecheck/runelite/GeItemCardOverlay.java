@@ -175,16 +175,16 @@ class GeItemCardOverlay extends Overlay
 			paintAt(g, anchor[0], anchor[1], () -> term
 				? GeItemInfoPainter.paintTerminal(g, c, anchor[2])
 				: GeItemInfoPainter.paint(g, c, anchor[2]));
-			notePill(anchor[0], anchor[1], c.chartLabel, tfFm);
+			notePill(anchor[0], anchor[1], c.chartLabel, tfFm, term);
 			if (c.chartLabel != null)
 			{
 				if (shiftDown)
 				{
-					drawTfChips(g, anchor[0], anchor[1], tfFm);
+					drawTfChips(g, anchor[0], anchor[1], tfFm, term);
 				}
 				else
 				{
-					drawShiftHint(g, anchor[0], anchor[1], tfFm);
+					drawShiftHint(g, anchor[0], anchor[1], tfFm, term);
 				}
 			}
 			return null;
@@ -266,16 +266,16 @@ class GeItemCardOverlay extends Overlay
 			paintAt(g, anchor[0], anchor[1], () -> term
 				? GeItemInfoPainter.paintTerminal(g, c, anchor[2])
 				: GeItemInfoPainter.paint(g, c, anchor[2]));
-			notePill(anchor[0], anchor[1], c.chartLabel, tfFm);
+			notePill(anchor[0], anchor[1], c.chartLabel, tfFm, term);
 			if (c.chartLabel != null)
 			{
 				if (shiftDown)
 				{
-					drawTfChips(g, anchor[0], anchor[1], tfFm);
+					drawTfChips(g, anchor[0], anchor[1], tfFm, term);
 				}
 				else
 				{
-					drawShiftHint(g, anchor[0], anchor[1], tfFm);
+					drawShiftHint(g, anchor[0], anchor[1], tfFm, term);
 				}
 			}
 			return null;
@@ -382,16 +382,16 @@ class GeItemCardOverlay extends Overlay
 				final int fwF = fw;
 				paintedX = fx;
 				d = paintAt(g, fx, yy, () -> GeItemInfoPainter.paint(g, c, fwF));
-				notePill(fx, yy, c.chartLabel, tfFm);
+				notePill(fx, yy, c.chartLabel, tfFm, false);
 				if (c.chartLabel != null)
 				{
 					if (shiftDown)
 					{
-						drawTfChips(g, fx, yy, tfFm);
+						drawTfChips(g, fx, yy, tfFm, false);
 					}
 					else
 					{
-						drawShiftHint(g, fx, yy, tfFm);
+						drawShiftHint(g, fx, yy, tfFm, false);
 					}
 				}
 			}
@@ -709,9 +709,11 @@ class GeItemCardOverlay extends Overlay
 	/** Registers the chart's timeframe tag (drawn by the painter at a fixed card
 	 *  offset) as the clickable timeframe control for a full card at (cardX,
 	 *  cardY). No-op when the card drew no chart. */
-	private void notePill(int cardX, int cardY, String label, java.awt.FontMetrics fm)
+	private void notePill(int cardX, int cardY, String label, java.awt.FontMetrics fm, boolean term)
 	{
-		final Rectangle local = GeItemInfoPainter.chartTagBounds(fm, label, plugin.chartTf().isTrades());
+		final Rectangle local = term
+			? GeItemInfoPainter.termTagBounds(fm, label, plugin.chartTf().isTrades())
+			: GeItemInfoPainter.chartTagBounds(fm, label, plugin.chartTf().isTrades());
 		if (local != null)
 		{
 			tfPillBounds = new Rectangle(cardX + local.x, cardY + local.y, local.width, local.height);
@@ -721,9 +723,11 @@ class GeItemCardOverlay extends Overlay
 	/** A quiet "hold shift" cue after the timeframe tag so users discover the
 	 *  chart-view selector. Drawn only when Shift is NOT held (the chips replace
 	 *  it when it is). */
-	private void drawShiftHint(Graphics2D g, int cardX, int cardY, java.awt.FontMetrics fm)
+	private void drawShiftHint(Graphics2D g, int cardX, int cardY, java.awt.FontMetrics fm, boolean term)
 	{
-		final Rectangle tag = GeItemInfoPainter.chartTagBounds(fm, plugin.chartTf().label, plugin.chartTf().isTrades());
+		final Rectangle tag = term
+			? GeItemInfoPainter.termTagBounds(fm, plugin.chartTf().label, plugin.chartTf().isTrades())
+			: GeItemInfoPainter.chartTagBounds(fm, plugin.chartTf().label, plugin.chartTf().isTrades());
 		if (tag == null)
 		{
 			return;
@@ -745,9 +749,11 @@ class GeItemCardOverlay extends Overlay
 	/** Draws the chart-view selector over the chart's timeframe tag while Shift is
 	 *  held: time views (Latest/24h/7d) on the top row, raw-trade views (10/20/30)
 	 *  below. Registers each chip's canvas hit box so it selects that view. */
-	private void drawTfChips(Graphics2D g, int cardX, int cardY, java.awt.FontMetrics fm)
+	private void drawTfChips(Graphics2D g, int cardX, int cardY, java.awt.FontMetrics fm, boolean term)
 	{
-		final Rectangle tag = GeItemInfoPainter.chartTagBounds(fm, plugin.chartTf().label, plugin.chartTf().isTrades());
+		final Rectangle tag = term
+			? GeItemInfoPainter.termTagBounds(fm, plugin.chartTf().label, plugin.chartTf().isTrades())
+			: GeItemInfoPainter.chartTagBounds(fm, plugin.chartTf().label, plugin.chartTf().isTrades());
 		if (tag == null)
 		{
 			return;

@@ -251,8 +251,18 @@ final class GeItemInfoPainter
 		if (two) { g.setColor(c.stateColor2 != null ? c.stateColor2 : TerminalKit.AMBER); g.drawString(clip(c.stateText2, g.getFontMetrics(), halfW - 12), L + halfW + 16, y + 14); }
 		y += 30;
 
-		// 3. band chart from series
-		y = paintTermChart(g, s, L, y, R - L, chartH, c.refSell());
+		// 3. band chart + timeframe tag (click-to-cycle) drawn over the chart top-left
+		final int chartY = y;
+		y = paintTermChart(g, s, L, chartY, R - L, chartH, c.refSell());
+		if (c.chartLabel != null && !c.chartLabel.isEmpty())
+		{
+			final String tag = c.chartLabel + (c.tradesChartN > 0 ? " trades" : " price");
+			g.setFont(TerminalKit.monoB(10));
+			final int tw = g.getFontMetrics().stringWidth(tag) + 8;
+			g.setColor(TerminalKit.TITLEBG); g.fillRect(L + 2, chartY + 2, tw, 14);
+			g.setColor(TerminalKit.BORDER); g.drawRect(L + 2, chartY + 2, tw, 14);
+			g.setColor(TerminalKit.AMBERHI); g.drawString(tag, L + 6, chartY + 12);
+		}
 		y += 8;
 
 		// 4. tape
@@ -925,6 +935,23 @@ final class GeItemInfoPainter
 		final int chartTop = PAD + fm.getAscent() + 8;   // header baseline + rule gap
 		final int tw = fm.stringWidth(label + (trades ? " trades" : " price")) + 8;
 		return new java.awt.Rectangle(PAD + 2, chartTop + 2, tw, lineH - 1);
+	}
+
+	/** Terminal card's chart top (header + quote grid + verdict row). */
+	static final int TERM_CHART_Y = 46 + 5 * 26 + 30;
+
+	/** Timeframe-tag click region for the TERMINAL card: over its chart top-left,
+	 *  not the classic position. Mirrors chartTagBounds so the overlay can register
+	 *  the same cycle/selector control on either layout. */
+	static java.awt.Rectangle termTagBounds(FontMetrics fm, String label, boolean trades)
+	{
+		if (label == null || label.isEmpty())
+		{
+			return null;
+		}
+		final int lineH = fm.getHeight();
+		final int tw = fm.stringWidth(label + (trades ? " trades" : " price")) + 8;
+		return new java.awt.Rectangle(12 + 2, TERM_CHART_Y + 2, tw, lineH - 1);
 	}
 
 	private static int tyf(long price, long pMin, long pMax, int y0, int plotH)
