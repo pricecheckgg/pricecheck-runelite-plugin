@@ -117,11 +117,9 @@ public final class TerminalDeskPreview
 		g.setFont(TerminalKit.monoB(10)); g.setColor(TerminalKit.AMBERHI);
 		g.drawString("POSITIONS BLOTTER  ·  (shipped)", bx + 8, 21);
 
-		final int floorY = Hc - TerminalTickerOverlay.H - 8;
-		int rowN = Math.min(s.recent.size(), 8);
-		final int fh = 32 + rowN * 16 + 6;
-		final int fN = rowN;
-		draw(g, bx, floorY - fh, () -> TerminalFillsOverlay.paintFills(g, TerminalFillsOverlay.W, s.recent, fN, now));
+		// Recent flips stack directly under the blotter (bottom at y=248 here).
+		final int fN = Math.min(s.recent.size(), 8);
+		draw(g, bx, 248 + 8, () -> TerminalFillsOverlay.paintFills(g, TerminalFillsOverlay.W, s.recent, fN, now));
 
 		draw(g, 0, Hc - TerminalTickerOverlay.H, () -> TerminalTickerOverlay.paintTicker(g, W, flips, 0));
 

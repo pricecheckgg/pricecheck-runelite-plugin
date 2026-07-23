@@ -164,13 +164,16 @@ class TerminalHeldOverlay extends Overlay
 			g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
 			TerminalKit.rt(g, hidden > 0 ? "+" + hidden + " more  NET" : "NET", w - 8 - vw - 6, 13);
 		}
-		final FontMetrics fm = g.getFontMetrics();
+		// Metrics for the ACTUAL name font (11pt) - clipping with a smaller font's
+		// metrics under-truncates and the name runs into the qty column.
+		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
+		final int qtyX = Math.min(230, w / 2);
 		for (final Row r : rows)
 		{
 			g.setFont(TerminalKit.mono(11)); g.setColor(TerminalKit.AMBER);
-			g.drawString(clip(r.name, fm, 150), 8, cy);
+			g.drawString(clip(r.name, fm, qtyX - 8 - 10), 8, cy);
 			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL);
-			g.drawString(r.qty + " @ " + TerminalKit.gp(r.unitCost), 170, cy);
+			g.drawString(r.qty + " @ " + TerminalKit.gp(r.unitCost), qtyX, cy);
 			if (r.live)
 			{
 				g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);

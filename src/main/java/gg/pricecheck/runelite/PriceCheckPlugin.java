@@ -1889,6 +1889,9 @@ public class PriceCheckPlugin extends Plugin
 	// Latest flip-log summary (session flow + held lots + recent flips) for the
 	// terminal desk panels; null until the first poll lands.
 	private volatile FlipLogEngine.Summary lastSummary;
+	// Canvas y of the offers blotter's bottom edge this frame (-1 when it isn't
+	// docked right of the GE), so the recent-flips panel can stack right under it.
+	private volatile int blotterBottomY = -1;
 	private volatile List<FlipLogEngine.Flip> recentFlips = Collections.emptyList();
 
 	/** Aggregated holding for one item: {qty, totalCost, earliestOpenedAtMs},
@@ -1915,6 +1918,18 @@ public class PriceCheckPlugin extends Plugin
 	FlipLogEngine.Summary flipSummary()
 	{
 		return lastSummary;
+	}
+
+	/** The offers blotter publishes its bottom edge here each frame so the
+	 *  recent-flips panel can stack directly beneath it; -1 = not docked right. */
+	void noteBlotterBottom(int y)
+	{
+		blotterBottomY = y;
+	}
+
+	int blotterBottomY()
+	{
+		return blotterBottomY;
 	}
 
 	/** Exact FIFO cost of {@code qty} units of an item, taken from the raw

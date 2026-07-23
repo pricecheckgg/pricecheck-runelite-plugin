@@ -53,17 +53,18 @@ class TerminalFillsOverlay extends Overlay
 		{
 			return null;   // no room to the right
 		}
-		// Bottom-anchored above the ticker; capped so it never rises over the GE top
-		// (where the blotter lives), keeping the two right-column panels apart. The
-		// floor also clears the chat box (and the ticker lifted above it) so a tall
-		// panel can't overwrite the chat input.
+		// Stack directly under the blotter to form one tight right column; if the
+		// blotter isn't docked right this frame, top-align with the GE instead.
+		final int bb = plugin.blotterBottomY();
+		final int y = bb > 0 ? bb + 8 : ge.y;
+		// Grow downward, but stop above the ticker and the chat box.
 		int floorY = client.getCanvasHeight() - TerminalTickerOverlay.H - 8;
 		final Rectangle cb = plugin.chatboxBounds();
 		if (cb != null && cb.height > 0)
 		{
 			floorY = Math.min(floorY, cb.y - TerminalTickerOverlay.H - 8);
 		}
-		final int maxH = floorY - ge.y;
+		final int maxH = floorY - y;
 		int rowN = Math.min(s.recent.size(), MAX_ROWS);
 		while (rowN > 0 && 32 + rowN * ROW + 6 > maxH)
 		{
@@ -75,7 +76,6 @@ class TerminalFillsOverlay extends Overlay
 		}
 		final long now = System.currentTimeMillis();
 		final int h = 32 + rowN * ROW + 6;
-		final int y = floorY - h;
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);

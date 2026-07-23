@@ -96,14 +96,22 @@ class TerminalRadarOverlay extends Overlay
 	{
 		TerminalKit.hints(g);
 
-		// Fresh dips: dumps only (falling / negative move), sharpest first.
+		// Fresh dips: live, actionable dumps only. Drop stale moves (already ended /
+		// faded / recovering) and data-artifact spikes (a "real" dip almost never
+		// exceeds ~85%), so vendor-junk noise like arrows and lockpicks stays out.
 		final List<CatchData> dips = new ArrayList<>();
 		for (final CatchData c : catches)
 		{
-			if (c != null && c.getPctMove() < 0)
+			if (c == null || c.getPctMove() >= 0 || Math.abs(c.getPctMove()) >= 85)
 			{
-				dips.add(c);
+				continue;
 			}
+			final String st = c.getState() == null ? "" : c.getState().toLowerCase();
+			if (st.equals("ended") || st.equals("faded") || st.equals("recovering"))
+			{
+				continue;
+			}
+			dips.add(c);
 		}
 		// Actionable first (the engine's catchable reads), then sharpest drop.
 		dips.sort(Comparator.comparing((CatchData c) -> !c.isCatchable())
@@ -165,7 +173,7 @@ class TerminalRadarOverlay extends Overlay
 		TerminalKit.rt(g, "MARGIN", w - 92, cy);
 		TerminalKit.rt(g, "EV/HR", w - 26, cy);
 		cy += SUBHEAD;
-		final FontMetrics fm = g.getFontMetrics();
+		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
 		for (int i = 0; i < rows; i++)
 		{
 			final FlipData f = flips.get(i);
@@ -185,7 +193,7 @@ class TerminalRadarOverlay extends Overlay
 	{
 		final int h = sectionH(rows, false);
 		final int cy = TerminalKit.panel(g, 0, y, w, h, "FRESH DIPS  ·  DUMP CATCHER");
-		final FontMetrics fm = g.getFontMetrics();
+		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
 		for (int i = 0; i < rows; i++)
 		{
 			final CatchData c = dips.get(i);
@@ -219,7 +227,7 @@ class TerminalRadarOverlay extends Overlay
 	{
 		final int h = sectionH(rows, false);
 		final int cy = TerminalKit.panel(g, 0, y, w, h, "TOP MOVERS  ·  GAINERS");
-		final FontMetrics fm = g.getFontMetrics();
+		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
 		for (int i = 0; i < rows; i++)
 		{
 			final FlipData f = gainers.get(i);

@@ -89,6 +89,7 @@ class GeOffersPanelOverlay extends Overlay
 	public Dimension render(Graphics2D g)
 	{
 		toggleBounds = null;
+		plugin.noteBlotterBottom(-1);
 		if (!plugin.geOffersPanelEnabled())
 		{
 			return null;
@@ -146,6 +147,12 @@ class GeOffersPanelOverlay extends Overlay
 				y + (int) Math.round(r.button.y * scale),
 				(int) Math.round(r.button.width * scale),
 				(int) Math.round(r.button.height * scale));
+		}
+		// Publish the bottom edge (GE-open right dock only) so the recent-flips
+		// panel stacks directly beneath the blotter instead of pinning to the floor.
+		if (plugin.isGrandExchangeOpen())
+		{
+			plugin.noteBlotterBottom(y + (int) Math.round(r.size.height * scale));
 		}
 		return null;
 	}
