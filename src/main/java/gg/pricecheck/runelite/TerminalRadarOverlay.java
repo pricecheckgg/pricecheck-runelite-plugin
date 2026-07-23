@@ -15,10 +15,10 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * The desk's left column: three stacked terminal panels docked to the left of the
- * Grand Exchange window - OPPORTUNITY RADAR (top flips by EV/hr), FRESH DIPS (live
- * dump movers) and TOP MOVERS (biggest gainers). All three read the live ranked
- * board (Trader Pro), so the column only shows when market data is live and there
+ * The desk's left column: stacked terminal panels docked to the left of the Grand
+ * Exchange window - OPPORTUNITY RADAR (top flips by EV/hr), FRESH DIPS (live dump
+ * movers), and TOP MOVERS gainers + losers with a 1H/24H/7D window toggle. All read
+ * the live ranked board (Trader Pro), so the column shows only when data is live and
  * is room to the left. Opt-in via config.terminalDesk(); look from TerminalKit.
  */
 class TerminalRadarOverlay extends Overlay
@@ -65,12 +65,15 @@ class TerminalRadarOverlay extends Overlay
 		}
 		final int availH = client.getCanvasHeight() - TOP_Y - 8;
 
+		final int tfIdx = plugin.moversTf().ordinal();
+		final List<Rectangle> chipRects = new ArrayList<>();
+
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
 		g.translate(x, TOP_Y);
 		try
 		{
-			paintColumn(g, W, availH, flips, catches);
+			paintColumn(g, W, availH, flips, catches, tfIdx, chipRects);
 		}
 		finally
 		{
@@ -78,7 +81,39 @@ class TerminalRadarOverlay extends Overlay
 			if (aa != null) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, aa); }
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}
+		// Publish the timeframe chips in canvas space so the plugin mouse hook can
+		// route a click to the matching window. chipRects are column-local (order
+		// 1H, 24H, 7D); shift them by the column origin.
+		final List<Object[]> hits = new ArrayList<>();
+		final PriceCheckPlugin.MoversTf[] tfs = PriceCheckPlugin.MoversTf.values();
+		for (int i = 0; i < chipRects.size() && i < tfs.length; i++)
+		{
+			final Rectangle r = chipRects.get(i);
+			hits.add(new Object[]{ new Rectangle(r.x + x, r.y + TOP_Y, r.width, r.height), tfs[i] });
+		}
+		tfChipHits = hits;
 		return new Dimension(W, availH);
+	}
+
+	// Canvas-space TOP MOVERS timeframe chips, {Rectangle, MoversTf}, refreshed
+	// each render. The plugin's mouse listener routes a press here.
+	private volatile List<Object[]> tfChipHits = java.util.Collections.emptyList();
+
+	boolean handleClick(java.awt.Point p)
+	{
+		if (p == null)
+		{
+			return false;
+		}
+		for (final Object[] b : tfChipHits)
+		{
+			if (((Rectangle) b[0]).contains(p))
+			{
+				plugin.setMoversTf((PriceCheckPlugin.MoversTf) b[1]);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static final int RADAR_ROW = 16;
@@ -92,7 +127,7 @@ class TerminalRadarOverlay extends Overlay
 	}
 
 	/** Pure drawing (0,0-origin) so the preview harness can render it headless. */
-	static void paintColumn(Graphics2D g, int w, int availH, List<FlipData> flips, List<CatchData> catches)
+	static void paintColumn(Graphics2D g, int w, int availH, List<FlipData> flips, List<CatchData> catches, int tfIdx, List<Rectangle> chipOut)
 	{
 		TerminalKit.hints(g);
 
@@ -122,26 +157,31 @@ class TerminalRadarOverlay extends Overlay
 		dips.sort(Comparator.comparing((CatchData c) -> !c.isCatchable())
 			.thenComparingDouble(CatchData::getPctMove));
 
-		// Top movers: board rows rising the hardest.
+		// Top movers over the selected window (tfIdx: 0=1h, 1=24h, 2=7d): board
+		// rows rising the hardest (gainers) and falling the hardest (losers).
 		final List<FlipData> gainers = new ArrayList<>();
+		final List<FlipData> losers = new ArrayList<>();
 		for (final FlipData f : flips)
 		{
-			if (f != null && f.getTrendPct() > 0)
-			{
-				gainers.add(f);
-			}
+			if (f == null) { continue; }
+			final double t = trendFor(f, tfIdx);
+			if (t > 0) { gainers.add(f); }
+			else if (t < 0) { losers.add(f); }
 		}
-		gainers.sort(Comparator.comparingDouble(FlipData::getTrendPct).reversed());
+		gainers.sort((a, b) -> Double.compare(trendFor(b, tfIdx), trendFor(a, tfIdx)));
+		losers.sort((a, b) -> Double.compare(trendFor(a, tfIdx), trendFor(b, tfIdx)));   // sharpest drop first
 
 		int radarRows = Math.min(flips.size(), 10);
 		int dipRows = Math.min(dips.size(), 5);
 		int gainRows = Math.min(gainers.size(), 8);
+		int loseRows = Math.min(losers.size(), 8);
 
 		// Fresh dips always keeps its panel (>=1 row: a dip or a "quiet" placeholder)
 		// so the left column never loses a section. Trim the radar to fit first.
 		while (radarRows > 3
 			&& sectionH(radarRows, true) + GAP + sectionH(Math.max(1, dipRows), false)
-				+ gap(gainRows) + sectionH(gainRows, false) > availH)
+				+ gap(gainRows) + sectionH(gainRows, false)
+				+ gap(loseRows) + sectionH(loseRows, false) > availH)
 		{
 			radarRows--;
 		}
@@ -154,7 +194,11 @@ class TerminalRadarOverlay extends Overlay
 		y = paintDips(g, w, y, dips, dipRows) + GAP;
 		if (gainRows > 0)
 		{
-			paintGainers(g, w, y, gainers, gainRows);
+			y = paintGainers(g, w, y, gainers, gainRows, tfIdx, chipOut) + GAP;
+		}
+		if (loseRows > 0)
+		{
+			paintLosers(g, w, y, losers, loseRows, tfIdx);
 		}
 	}
 
@@ -229,10 +273,11 @@ class TerminalRadarOverlay extends Overlay
 		return s == null || s.isEmpty() ? "WATCH" : s.toUpperCase();
 	}
 
-	private static int paintGainers(Graphics2D g, int w, int y, List<FlipData> gainers, int rows)
+	private static int paintGainers(Graphics2D g, int w, int y, List<FlipData> gainers, int rows, int tfIdx, List<Rectangle> chipOut)
 	{
 		final int h = sectionH(rows, false);
 		final int cy = TerminalKit.panel(g, 0, y, w, h, "TOP MOVERS  ·  GAINERS");
+		paintTfChips(g, w, y, tfIdx, chipOut);
 		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
 		for (int i = 0; i < rows; i++)
 		{
@@ -243,9 +288,66 @@ class TerminalRadarOverlay extends Overlay
 			g.setFont(TerminalKit.mono(11)); g.setColor(TerminalKit.AMBER);
 			g.drawString(clip(name(f), fm, 190), 24, ry);
 			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.GREEN);
-			TerminalKit.rt(g, String.format("+%.1f%%", f.getTrendPct()), w - 10, ry);
+			TerminalKit.rt(g, String.format("+%.1f%%", trendFor(f, tfIdx)), w - 10, ry);
 		}
 		return y + h;
+	}
+
+	private static int paintLosers(Graphics2D g, int w, int y, List<FlipData> losers, int rows, int tfIdx)
+	{
+		final int h = sectionH(rows, false);
+		final int cy = TerminalKit.panel(g, 0, y, w, h, "TOP MOVERS  ·  LOSERS");
+		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
+		for (int i = 0; i < rows; i++)
+		{
+			final FlipData f = losers.get(i);
+			final int ry = cy + i * LIST_ROW;
+			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.RED);
+			g.drawString("▼", 8, ry);
+			g.setFont(TerminalKit.mono(11)); g.setColor(TerminalKit.AMBER);
+			g.drawString(clip(name(f), fm, 190), 24, ry);
+			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.RED);
+			TerminalKit.rt(g, String.format("%.1f%%", trendFor(f, tfIdx)), w - 10, ry);
+		}
+		return y + h;
+	}
+
+	/** The trend for the active TOP MOVERS window (0=1h, 1=24h, 2=7d). */
+	static double trendFor(FlipData f, int tfIdx)
+	{
+		if (f == null) { return 0; }
+		switch (tfIdx)
+		{
+			case 1: return f.getTrend24h();
+			case 2: return f.getTrend7d();
+			default: return f.getTrendPct();
+		}
+	}
+
+	/** 1H / 24H / 7D chips in the movers title strip, right-aligned, active one
+	 *  boxed brighter. Records each chip's column-local bounds into chipOut (order
+	 *  1H, 24H, 7D) so render() can map them to canvas space for clicks. */
+	private static void paintTfChips(Graphics2D g, int w, int y, int tfIdx, List<Rectangle> chipOut)
+	{
+		final String[] labels = { "1H", "24H", "7D" };
+		g.setFont(TerminalKit.monoB(9));
+		final FontMetrics fm = g.getFontMetrics();
+		int right = w - 6;
+		for (int i = labels.length - 1; i >= 0; i--)
+		{
+			final int cw = fm.stringWidth(labels[i]) + 8;
+			final int cx = right - cw;
+			final int chy = y + 3;
+			final boolean active = i == tfIdx;
+			g.setColor(active ? new Color(0x2c, 0x24, 0x10) : new Color(0x17, 0x12, 0x07));
+			g.fillRect(cx, chy, cw, 13);
+			g.setColor(active ? new Color(0x5c, 0x4d, 0x22) : new Color(0x30, 0x2a, 0x16));
+			g.drawRect(cx, chy, cw, 13);
+			g.setColor(active ? TerminalKit.AMBERHI : TerminalKit.LABEL);
+			g.drawString(labels[i], cx + 4, chy + 10);
+			if (chipOut != null) { chipOut.add(0, new Rectangle(cx, chy, cw + 1, 14)); }
+			right = cx - 3;
+		}
 	}
 
 	private static void trendMark(Graphics2D g, int x, int y, double trend)

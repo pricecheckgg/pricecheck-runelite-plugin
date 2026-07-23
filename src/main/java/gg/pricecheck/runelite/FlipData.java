@@ -22,6 +22,8 @@ public class FlipData
 	private boolean confirmed;
 	private boolean fallingKnife;   // price dropping vs its 1h average -> margin at risk
 	private double trendPct;        // mid vs 1h-avg, % (negative = falling)
+	private double trend24h;        // mid vs 24h-avg, % (TOP MOVERS 24h window)
+	private double trend7d;         // mid vs 7d-avg, %  (TOP MOVERS 7d window)
 	private Long limit;             // null = no published buy limit for this item
 	private long vol1h;
 	private String risk;            // null = clean board row; else why it missed one quality bar

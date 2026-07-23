@@ -118,6 +118,10 @@ public class PriceCheckPlugin extends Plugin
 			{
 				e.consume();
 			}
+			else if (terminalRadarOverlay != null && terminalRadarOverlay.handleClick(e.getPoint()))
+			{
+				e.consume();
+			}
 			return e;
 		}
 	};
@@ -212,6 +216,7 @@ public class PriceCheckPlugin extends Plugin
 	protected void startUp()
 	{
 		chartTf = ChartTf.fromName(configManager.getConfiguration(PriceCheckConfig.GROUP, CHART_TF_KEY));
+		moversTf = MoversTf.fromName(configManager.getConfiguration(PriceCheckConfig.GROUP, MOVERS_TF_KEY));
 		panel = new PriceCheckPanel(new PriceCheckPanel.Listener()
 		{
 			@Override
@@ -1294,6 +1299,46 @@ public class PriceCheckPlugin extends Plugin
 			}
 			return D1;
 		}
+	}
+
+	/** TOP MOVERS timeframe: which window the movers panels rank + show. */
+	enum MoversTf
+	{
+		H1("1H"), H24("24H"), D7("7D");
+
+		final String label;
+		MoversTf(String label) { this.label = label; }
+
+		static MoversTf fromName(String s)
+		{
+			if (s != null)
+			{
+				for (final MoversTf t : values())
+				{
+					if (t.name().equals(s)) { return t; }
+				}
+			}
+			return H1;
+		}
+	}
+
+	private static final String MOVERS_TF_KEY = "moversTf";
+	private volatile MoversTf moversTf = MoversTf.H1;
+
+	MoversTf moversTf()
+	{
+		return moversTf;
+	}
+
+	/** Set the TOP MOVERS window and persist it. */
+	void setMoversTf(MoversTf tf)
+	{
+		if (tf == null || tf == moversTf)
+		{
+			return;
+		}
+		moversTf = tf;
+		configManager.setConfiguration(PriceCheckConfig.GROUP, MOVERS_TF_KEY, moversTf.name());
 	}
 
 	private static final String CHART_TF_KEY = "chartTf";

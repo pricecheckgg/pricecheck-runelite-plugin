@@ -23,6 +23,8 @@ public final class TerminalRadarPreview
 		f.setMargin(margin);
 		f.setEvPerHr(evPerHr);
 		f.setTrendPct(trend);
+		f.setTrend24h(Math.round(trend * 2.3 * 10) / 10.0);
+		f.setTrend7d(Math.round(trend * 3.7 * 10) / 10.0);
 		return f;
 	}
 
@@ -72,7 +74,8 @@ public final class TerminalRadarPreview
 		g.setColor(new Color(0x14, 0x12, 0x0d));
 		g.fillRect(0, 0, w + pad * 2, availH + pad * 2);
 		g.translate(pad, pad);
-		TerminalRadarOverlay.paintColumn(g, w, availH, flips, catches);
+		final int tfIdx = args.length > 1 ? Integer.parseInt(args[1]) : 0;
+		TerminalRadarOverlay.paintColumn(g, w, availH, flips, catches, tfIdx, new ArrayList<>());
 		g.dispose();
 		ImageIO.write(img, "png", new File(out));
 		System.out.println("wrote " + out);

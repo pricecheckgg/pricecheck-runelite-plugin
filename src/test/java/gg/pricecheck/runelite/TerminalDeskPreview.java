@@ -119,7 +119,7 @@ public final class TerminalDeskPreview
 		draw(g, geX, heldTop - 4 - wlH, () -> TerminalWatchlistOverlay.paintWatchlist(g, geW, wlH, watch, picks, 0, 1));
 
 		draw(g, geX - TerminalRadarOverlay.W - 8, 8,
-			() -> TerminalRadarOverlay.paintColumn(g, TerminalRadarOverlay.W, Hc - 16, flips, catches));
+			() -> TerminalRadarOverlay.paintColumn(g, TerminalRadarOverlay.W, Hc - 16, flips, catches, 0, new ArrayList<>()));
 
 		draw(g, geX, geY + geH + 4, () -> TerminalSessionOverlay.paintStrip(g, geW, s));
 
