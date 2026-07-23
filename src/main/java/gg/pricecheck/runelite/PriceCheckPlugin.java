@@ -907,6 +907,12 @@ public class PriceCheckPlugin extends Plugin
 		return config.geOffersPanel() && marketDataOk();
 	}
 
+	/** Draw the active-offers board in the Bloomberg-terminal blotter style. */
+	boolean terminalOffers()
+	{
+		return config.terminalOffers();
+	}
+
 	/** How many recent trades the GE overlays show: Active 10, Advanced 20,
 	 *  Overnight 30. Drives the item card's tape and on-chart prints. */
 	int overlayTradeDepth()

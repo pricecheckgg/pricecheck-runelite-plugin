@@ -101,7 +101,8 @@ class GeOffersPanelOverlay extends Overlay
 		// Overnight overlay mode draws the board larger; the dock reserves the
 		// scaled width so it still never overlaps the GE.
 		final double scale = plugin.overlayScale();
-		final int effW = (int) Math.round(W * scale);
+		final boolean term = plugin.terminalOffers();
+		final int effW = (int) Math.round((term ? TERM_W : W) * scale);
 		final int y = 8;
 		final int x;
 		if (plugin.isGrandExchangeOpen())
@@ -136,7 +137,7 @@ class GeOffersPanelOverlay extends Overlay
 		final java.awt.geom.AffineTransform save = g.getTransform();
 		g.translate(x, y);
 		g.scale(scale, scale);
-		final Result r = paint(g, rows, collapsed, shift);
+		final Result r = term ? paintTerminal(g, rows, collapsed, shift) : paint(g, rows, collapsed, shift);
 		g.setTransform(save);
 		if (r.button != null)
 		{
@@ -430,6 +431,109 @@ class GeOffersPanelOverlay extends Overlay
 		String lastTrade;   // "@price age" or "@edge", null when none
 		String pressure;    // "buy" | "sell" | "flat" | null
 		Color pressureColor;
+	}
+
+	// ── Terminal (Bloomberg) blotter ───────────────────────────────
+	// Same rows as the classic board, re-skinned amber-on-black to sit under the
+	// terminal status bar. Routed here from render() when config.terminalOffers().
+	static final int TERM_W = 292;
+
+	static Result paintTerminal(Graphics2D g, List<Row> rows, boolean collapsed, boolean shiftHeld)
+	{
+		TerminalKit.hints(g);
+		if (collapsed)
+		{
+			g.setFont(TerminalKit.monoB(11));
+			final String t = "POSITIONS  " + rows.size();
+			final int cw = 12 + g.getFontMetrics().stringWidth(t) + (shiftHeld ? BTN + 6 : 0) + 12;
+			final int h = 22;
+			g.setColor(TerminalKit.PANEL); g.fillRect(0, 0, cw, h);
+			g.setColor(TerminalKit.BORDER); g.drawRect(0, 0, cw, h);
+			g.setColor(TerminalKit.AMBERHI); g.drawString(t, 12, 15);
+			return new Result(new Dimension(cw, h), shiftHeld ? drawToggle(g, cw, true) : null);
+		}
+		final int w = TERM_W;
+		final int rowH = 30;
+		final int headerH = 18;
+		final int footerH = 18;
+		final int h = headerH + rows.size() * rowH + footerH + 4;
+		g.setColor(TerminalKit.PANEL); g.fillRect(0, 0, w, h);
+		g.setColor(TerminalKit.BORDER); g.drawRect(0, 0, w, h);
+		// header
+		g.setColor(TerminalKit.TITLEBG); g.fillRect(1, 1, w - 2, 16);
+		g.setFont(TerminalKit.monoB(10)); g.setColor(TerminalKit.AMBERHI);
+		g.drawString("POSITIONS", 8, 12);
+		g.setColor(TerminalKit.LABEL);
+		g.drawString("· " + rows.size() + " OFFERS", 8 + g.getFontMetrics().stringWidth("POSITIONS") + 6, 12);
+		final Rectangle btn = shiftHeld ? drawToggle(g, w, false) : null;
+		g.setColor(TerminalKit.GRID); g.drawLine(1, 18, w - 1, 18);
+		// rows
+		int y = headerH + 4;
+		int seated = 0;
+		long total = 0;
+		for (final Row r : rows)
+		{
+			if (r.seated) { seated++; }
+			total += r.posProfit;
+			paintTermRow(g, w, y, r);
+			y += rowH;
+		}
+		// footer
+		g.setColor(TerminalKit.TITLEBG); g.fillRect(1, h - footerH, w - 2, footerH - 1);
+		g.setColor(TerminalKit.GRID); g.drawLine(1, h - footerH, w - 1, h - footerH);
+		g.setFont(TerminalKit.monoB(10));
+		g.setColor(rows.size() > 0 && seated == rows.size() ? TerminalKit.GREEN : TerminalKit.AMBER);
+		g.drawString(seated + "/" + rows.size() + " SEATED", 8, h - 5);
+		g.setColor(total >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+		TerminalKit.rt(g, "NET " + (total >= 0 ? "+" : "") + Fmt.compact(total), w - 8, h - 5);
+		return new Result(new Dimension(w, h), btn);
+	}
+
+	private static void paintTermRow(Graphics2D g, int w, int top, Row r)
+	{
+		final int base1 = top + 11;
+		final int base2 = top + 24;
+		// side chip + name (line 1), verdict right-aligned
+		int nameX = 8;
+		if (r.chip != null && !r.chip.isEmpty())
+		{
+			g.setFont(TerminalKit.monoB(11));
+			g.setColor(r.chipColor != null ? r.chipColor : TerminalKit.AMBER);
+			g.drawString(r.chip, 8, base1);
+			nameX = 8 + g.getFontMetrics().stringWidth(r.chip) + 6;
+		}
+		g.setFont(TerminalKit.monoB(11));
+		final FontMetrics fm = g.getFontMetrics();
+		int verdW = 0;
+		if (r.verdict != null)
+		{
+			g.setColor(r.verdictColor != null ? r.verdictColor : TerminalKit.AMBER);
+			verdW = fm.stringWidth(r.verdict);
+			TerminalKit.rt(g, r.verdict, w - 8, base1);
+		}
+		g.setColor(TerminalKit.AMBERHI);
+		g.drawString(ellipsize(r.name, fm, w - 8 - verdW - 8 - nameX), nameX, base1);
+		// line 2: qty @ price | closeness/drift | uP&L
+		g.setFont(TerminalKit.mono(10));
+		g.setColor(TerminalKit.LABEL);
+		final long q = r.totalQty > 0 ? r.totalQty : r.unfilledQty;
+		g.drawString(q + " @ " + Fmt.compact(r.price), 8, base2);
+		final String mid;
+		final Color midC;
+		if (r.seated) { mid = "seated"; midC = TerminalKit.GREEN; }
+		else if (r.closenessGp > 0)
+		{
+			mid = Fmt.compact(r.closenessGp) + (r.trend > 0 ? " closing" : r.trend < 0 ? " drifting" : " away");
+			midC = r.trend > 0 ? TerminalKit.GREEN : r.trend < 0 ? TerminalKit.RED : TerminalKit.LABEL;
+		}
+		else { mid = ""; midC = TerminalKit.LABEL; }
+		g.setColor(midC);
+		g.drawString(mid, 8 + 96, base2);
+		g.setFont(TerminalKit.monoB(11));
+		g.setColor(r.posProfit >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+		TerminalKit.rt(g, (r.posProfit >= 0 ? "+" : "") + Fmt.compact(r.posProfit), w - 8, base2);
+		g.setColor(TerminalKit.GRID);
+		g.drawLine(4, top + 28, w - 4, top + 28);
 	}
 
 	/** Draws the board (or a collapsed title pill) at 0,0 and reports its size
