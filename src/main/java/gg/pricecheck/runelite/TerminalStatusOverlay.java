@@ -47,7 +47,7 @@ class TerminalStatusOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D g)
 	{
-		if (!config.terminalStatusBar())
+		if (!config.terminalStatusBar() && !plugin.terminalDesk())
 		{
 			return null;
 		}
@@ -78,8 +78,10 @@ class TerminalStatusOverlay extends Overlay
 		g.scale(scale, scale);
 		try
 		{
+			final FlipLogEngine.Summary sum = plugin.flipSummary();
 			paintBar(g, (int) Math.round(w / scale), BAR_H, cash(), usedSlots(),
-				client.getWorld(), LocalTime.now().format(CLOCK));
+				client.getWorld(), LocalTime.now().format(CLOCK),
+				sum != null ? sum.todayProfit : Long.MIN_VALUE);
 		}
 		finally
 		{
@@ -95,7 +97,7 @@ class TerminalStatusOverlay extends Overlay
 	 *  Fully metrics-driven and self-clamping: fields are only drawn if they fit
 	 *  before the right-pinned LIVE/clock block, so it never overlaps on a narrow
 	 *  (single-offer) GE window — it just shows fewer fields. */
-	static void paintBar(Graphics2D g, int w, int h, long cash, int slots, int world, String clock)
+	static void paintBar(Graphics2D g, int w, int h, long cash, int slots, int world, String clock, long pnlToday)
 	{
 		TerminalKit.hints(g);
 		g.setColor(TerminalKit.PANEL);
@@ -133,6 +135,12 @@ class TerminalStatusOverlay extends Overlay
 		fx = field(g, fx, rEdge, "CASH", TerminalKit.commas(cash), TerminalKit.AMBER);
 		fx = field(g, fx, rEdge, "SLOTS", slots + "/8", slots >= 8 ? TerminalKit.RED : TerminalKit.AMBER);
 		fx = field(g, fx, rEdge, "WORLD", Integer.toString(world), TerminalKit.AMBER);
+		if (pnlToday != Long.MIN_VALUE)
+		{
+			fx = field(g, fx, rEdge, "P&L TODAY",
+				(pnlToday >= 0 ? "+" : "-") + TerminalKit.gp(Math.abs(pnlToday)),
+				pnlToday >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+		}
 	}
 
 	private static int field(Graphics2D g, int x, int rEdge, String label, String value, Color vc)

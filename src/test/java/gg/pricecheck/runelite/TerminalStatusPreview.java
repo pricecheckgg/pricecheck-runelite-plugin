@@ -30,9 +30,9 @@ public final class TerminalStatusPreview
 		g.setColor(new Color(0x14, 0x12, 0x0d));
 		g.fillRect(0, 0, wide + pad * 2, h * 2 + pad * 3);
 		g.translate(pad, pad);
-		TerminalStatusOverlay.paintBar(g, wide, h, 4_266_644_991L, 4, 302, "20:14:07");
+		TerminalStatusOverlay.paintBar(g, wide, h, 4_266_644_991L, 4, 302, "20:14:07", 48_700_000L);
 		g.translate(0, h + pad);
-		TerminalStatusOverlay.paintBar(g, narrow, h, 64_139_323L, 4, 465, "20:59:24");
+		TerminalStatusOverlay.paintBar(g, narrow, h, 64_139_323L, 4, 465, "20:59:24", -2_300_000L);
 		g.dispose();
 		ImageIO.write(img, "png", new File(out));
 		System.out.println("wrote " + out);

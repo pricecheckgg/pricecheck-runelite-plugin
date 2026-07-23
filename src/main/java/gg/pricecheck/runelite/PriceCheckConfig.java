@@ -293,8 +293,8 @@ public interface PriceCheckConfig extends Config
 
 	@ConfigItem(
 		keyName = "terminalDesk",
-		name = "GE: terminal desk panels",
-		description = "Dock the full Bloomberg-style desk around the Grand Exchange: an opportunity radar, fresh dips and top movers to the left; your held positions above; session flow, recent fills and a price ticker around it. Uses the live board (Trader Pro) plus your own flip log. Panels that need room quietly hide when there isn't any. Part of the terminal desk.",
+		name = "GE: terminal desk (everything)",
+		description = "One switch for the whole Bloomberg-style desk around the Grand Exchange: the status bar, terminal item card and offers blotter, plus an opportunity radar, fresh dips and top movers to the left, your held positions above, and session flow, recent fills and a price ticker around it. Uses the live board (Trader Pro) plus your own flip log. Turning this on lights up every terminal piece; the individual toggles above still work on their own if you want just one. Panels quietly hide when there isn't room.",
 		position = 21
 	)
 	default boolean terminalDesk()

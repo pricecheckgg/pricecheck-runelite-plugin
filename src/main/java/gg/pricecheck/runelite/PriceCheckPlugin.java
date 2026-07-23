@@ -964,13 +964,14 @@ public class PriceCheckPlugin extends Plugin
 		// Either toggle shows the board: geOffersPanel = classic, terminalOffers =
 		// the terminal blotter skin. terminalOffers works on its own (no need to
 		// also enable the classic board).
-		return (config.geOffersPanel() || config.terminalOffers()) && marketDataOk();
+		return (config.geOffersPanel() || config.terminalOffers() || config.terminalDesk()) && marketDataOk();
 	}
 
-	/** Draw the active-offers board in the Bloomberg-terminal blotter style. */
+	/** Draw the active-offers board in the Bloomberg-terminal blotter style. The
+	 *  master desk toggle implies it, so the whole desk shares one look. */
 	boolean terminalOffers()
 	{
-		return config.terminalOffers();
+		return config.terminalOffers() || config.terminalDesk();
 	}
 
 	/** Master switch for the wraparound terminal desk panels (radar/dips/movers,
@@ -1097,7 +1098,7 @@ public class PriceCheckPlugin extends Plugin
 
 	boolean geOffersPanelVisible()
 	{
-		if ((!config.geOffersPanel() && !config.terminalOffers()) || !marketDataOk() || !isGrandExchangeOpen())
+		if ((!config.geOffersPanel() && !config.terminalOffers() && !config.terminalDesk()) || !marketDataOk() || !isGrandExchangeOpen())
 		{
 			return false;
 		}

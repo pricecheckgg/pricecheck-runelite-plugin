@@ -98,7 +98,7 @@ public final class TerminalDeskPreview
 		g.setFont(TerminalKit.monoB(13)); g.setColor(TerminalKit.DIM);
 		g.drawString("GRAND EXCHANGE  ( the live game window )", geX + 16, geY + geH / 2);
 
-		draw(g, geX, geY - 36, () -> TerminalStatusOverlay.paintBar(g, geW, 30, 71_792_312L, 3, 405, "23:10:59"));
+		draw(g, geX, geY - 36, () -> TerminalStatusOverlay.paintBar(g, geW, 30, 71_792_312L, 3, 405, "23:10:59", 11_100_000L));
 
 		final int heldH = 32 + held.size() * 18 + 6;
 		draw(g, geX, geY - 36 - heldH - 4, () -> TerminalHeldOverlay.paintHeld(g, geW, held));

@@ -124,7 +124,7 @@ class GeItemCardOverlay extends Overlay
 		tfChipHits = tfHits;
 		// Market data is a Trader Pro surface; the server refuses it for free
 		// keys and the cards stay fully dark rather than rendering shells.
-		if (!config.geItemCard() || !plugin.isGrandExchangeOpen() || !plugin.marketDataOk())
+		if ((!config.geItemCard() && !plugin.terminalDesk()) || !plugin.isGrandExchangeOpen() || !plugin.marketDataOk())
 		{
 			plugin.noteViewedItem(0);
 			return null;
@@ -162,7 +162,8 @@ class GeItemCardOverlay extends Overlay
 			setupQty = 0;
 		}
 
-		final int wantW = config.terminalCard() ? GeItemInfoPainter.TERM_W : GeItemInfoPainter.W_FULL;
+		final boolean deskCard = config.terminalCard() || plugin.terminalDesk();
+		final int wantW = deskCard ? GeItemInfoPainter.TERM_W : GeItemInfoPainter.W_FULL;
 		final int[] anchor = anchorFor(wantW);
 		if (slotIdx >= 0)
 		{
@@ -171,7 +172,7 @@ class GeItemCardOverlay extends Overlay
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
 			addViewOutcome(c, offers, slotIdx);
 			c.rangeRow = plugin.viewRangeFor(geId);
-			final boolean wantTerm = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
+			final boolean wantTerm = deskCard && anchor[2] >= GeItemInfoPainter.TERM_W;
 			final int termBudget = wantTerm ? termMaxHeight(anchor) : 0;
 			// Not enough vertical room for even the terminal card's fixed content (a
 			// short window): fall back to the classic card so we never overdraw the
@@ -268,7 +269,7 @@ class GeItemCardOverlay extends Overlay
 				applyOutcome(c, sellSide, entered, qty, geId, "", skip);
 			}
 			c.rangeRow = plugin.viewRangeFor(geId);
-			final boolean wantTerm = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
+			final boolean wantTerm = deskCard && anchor[2] >= GeItemInfoPainter.TERM_W;
 			final int termBudget = wantTerm ? termMaxHeight(anchor) : 0;
 			// Not enough vertical room for even the terminal card's fixed content (a
 			// short window): fall back to the classic card so we never overdraw the
