@@ -62,6 +62,10 @@ public final class TerminalCardPreview
 		c.nowTs = t0 + n * 300L;
 		c.rangeRow = new long[]{1_072_000, c.nowTs - 3600, 1_012_000, c.nowTs - 7200};
 		c.fillPct = 71;
+		// Buy-limit cells: 5 of 8 bought, earliest buy 90m ago -> resets in ~2h30m.
+		c.limitTotal = 8;
+		c.limitBought = 5;
+		c.limitResetMs = (c.nowTs - 90 * 60) * 1000L + 4L * 60 * 60 * 1000;
 		final List<GeItemInfoPainter.Print> prints = new ArrayList<>();
 		prints.add(new GeItemInfoPainter.Print(c.nowTs - 5400, 1_041_000, false));
 		prints.add(new GeItemInfoPainter.Print(c.nowTs - 3600, 1_043_500, false, true, true));  // your buy
@@ -90,9 +94,11 @@ public final class TerminalCardPreview
 		g.fillRect(0, 0, w * 2 + pad * 3, hGuess + pad * 2);
 		g.translate(pad, pad);
 		final java.awt.Dimension d1 = GeItemInfoPainter.paintTerminal(g, c, w);
-		// right card: trades view
+		// right card: trades view + a tight height cap to exercise the chat-box
+		// clamp (tape truncates, header shows "+N older").
 		c.tradesChartN = 10;
 		c.chartLabel = "10";
+		c.maxHeight = 520;
 		g.translate(w + pad, 0);
 		GeItemInfoPainter.paintTerminal(g, c, w);
 		g.dispose();

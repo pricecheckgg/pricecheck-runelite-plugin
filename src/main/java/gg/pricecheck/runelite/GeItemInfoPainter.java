@@ -66,6 +66,13 @@ final class GeItemInfoPainter
 		// view label reuses chartLabel (+ tradesChartN>0 for a trades view).
 		long[] rangeRow;
 		int fillPct = -1;          // measured odds at the board's prices, -1 unknown
+		// Buy-limit read (terminal card LIMIT/RESET cells). total -1 = no published limit.
+		long limitBought = -1;
+		long limitTotal = -1;
+		long limitResetMs = 0;     // epoch ms the 4h window's earliest buy rolls off
+		// Hard ceiling for the terminal card's drawn height (canvas px), 0 = unbounded.
+		// The card clamps its trade tape so it never draws over the chat input box.
+		int maxHeight = 0;
 		String outcomeText;        // bottom line, prebuilt by the caller
 		Color outcomeColor;
 		String outcomeText2;       // whole-offer line under it (qty math)
@@ -173,6 +180,26 @@ final class GeItemInfoPainter
 		return (v >= 0 ? "+" : "-") + String.format("%.1f%%", Math.abs(v));
 	}
 
+	/** Compact "time until" for the RESET cell: 2h04m / 43m / 58s / ready. */
+	private static String fmtCountdown(long ms)
+	{
+		if (ms <= 0)
+		{
+			return "ready";
+		}
+		final long s = ms / 1000;
+		final long h = s / 3600, m = (s % 3600) / 60;
+		if (h > 0)
+		{
+			return h + "h" + String.format("%02d", m) + "m";
+		}
+		if (m > 0)
+		{
+			return m + "m";
+		}
+		return Math.max(1, s) + "s";
+	}
+
 	/** Spell out the terse side letter for the terminal verdict: "S OK" -> "SELL OK". */
 	private static String expandVerdict(String s)
 	{
@@ -211,13 +238,23 @@ final class GeItemInfoPainter
 		final double d1h = seriesDelta(s, 12);
 		final double d24 = seriesDelta(s, 288);
 		final double ofi = ofiOf(s);
-		final int tapeRows = Math.min(c.prints != null ? c.prints.size() : 0, Math.max(1, c.tradeDepth));
+		final int availTape = Math.min(c.prints != null ? c.prints.size() : 0, Math.max(1, c.tradeDepth));
 		final boolean holding = c.lotQty > 0;
 
 		// ── height (matches the section y-progression below) ──
 		final int gridH = 5 * 26;
 		final int chartH = 132;
-		int h = 46 + gridH + 30 + (chartH + 8) + (40 + tapeRows * 17) + (holding ? 20 : 0) + 16;
+		// Everything except the variable-length trade tape.
+		final int fixedH = 46 + gridH + 30 + (chartH + 8) + 40 + (holding ? 20 : 0) + 16;
+		int tapeRows = availTape;
+		// Clamp the tape so the card never runs down over the chat input box; the
+		// hidden rows are still summarised in the tape header.
+		if (c.maxHeight > 0 && fixedH + tapeRows * 17 > c.maxHeight)
+		{
+			tapeRows = Math.max(1, (c.maxHeight - fixedH) / 17);
+		}
+		final int hiddenRows = availTape - tapeRows;
+		final int h = fixedH + tapeRows * 17;
 
 		// ── panel ──
 		g.setColor(TerminalKit.PANEL); g.fillRect(0, 0, w, h);
@@ -252,8 +289,29 @@ final class GeItemInfoPainter
 			Math.abs(ofi) < 1 ? "balanced" : signPct(ofi).replace("+", "+").replace("%", "%") + (ofi >= 0 ? " SELL" : " BUY"),
 			Math.abs(ofi) < 1 ? TerminalKit.LABEL : ofi >= 0 ? TerminalKit.RED : TerminalKit.GREEN);
 		y += 26;
-		TerminalKit.cell(g, c0, colW, y, "LIMIT", "-", TerminalKit.DIM);
-		TerminalKit.cell(g, c1, colW, y, "RESET", "-", TerminalKit.DIM);
+		final long limTotal = c.limitTotal;
+		if (limTotal <= 0)
+		{
+			TerminalKit.cell(g, c0, colW, y, "LIMIT", "-", TerminalKit.DIM);
+			TerminalKit.cell(g, c1, colW, y, "RESET", "-", TerminalKit.DIM);
+		}
+		else
+		{
+			final long bought = Math.max(0, c.limitBought);
+			final boolean capped = bought >= limTotal;
+			final Color lc = capped ? TerminalKit.RED : bought > 0 ? TerminalKit.AMBER : TerminalKit.GREEN;
+			TerminalKit.cell(g, c0, colW, y, "LIMIT", TerminalKit.commas(bought) + "/" + TerminalKit.commas(limTotal), lc);
+			if (bought > 0 && c.limitResetMs > 0)
+			{
+				final long left = c.limitResetMs - c.nowTs * 1000L;
+				TerminalKit.cell(g, c1, colW, y, "RESET", fmtCountdown(left),
+					left <= 0 ? TerminalKit.GREEN : capped ? TerminalKit.RED : TerminalKit.AMBER);
+			}
+			else
+			{
+				TerminalKit.cell(g, c1, colW, y, "RESET", "-", TerminalKit.DIM);
+			}
+		}
 		TerminalKit.cell(g, c2, colW, y, "FILL", c.fillPct >= 0 ? c.fillPct + "%" : "-", TerminalKit.AMBER);
 		y += 26;
 
@@ -301,7 +359,7 @@ final class GeItemInfoPainter
 		y += 8;
 
 		// 4. tape
-		y = paintTermTape(g, c, L, R, y, tapeRows);
+		y = paintTermTape(g, c, L, R, y, tapeRows, hiddenRows);
 
 		// 5. position
 		if (holding)
@@ -385,7 +443,7 @@ final class GeItemInfoPainter
 		return y + hh;
 	}
 
-	private static int paintTermTape(Graphics2D g, Context c, int L, int R, int y, int tapeRows)
+	private static int paintTermTape(Graphics2D g, Context c, int L, int R, int y, int tapeRows, int hiddenRows)
 	{
 		g.setColor(TerminalKit.GRID); g.drawLine(L, y - 4, R, y - 4);
 		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
@@ -400,6 +458,12 @@ final class GeItemInfoPainter
 		g.setColor(TerminalKit.GREEN); g.drawString("▲" + nBuy, cx, y + 7);
 		final int aw = g.getFontMetrics().stringWidth("▲" + nBuy);
 		g.setColor(TerminalKit.RED); g.drawString("▼" + (tapeRows - nBuy), cx + aw + 10, y + 7);
+		// When the tape was clamped to clear the chat box, say how many are hidden.
+		if (hiddenRows > 0)
+		{
+			g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.DIM);
+			TerminalKit.rt(g, "+" + hiddenRows + " older", R, y + 7);
+		}
 		y += 13;
 		g.setFont(TerminalKit.mono(8)); g.setColor(TerminalKit.DIM);
 		TerminalKit.rt(g, "PRICE", L + 128, y); g.drawString("Δ VS YOU", L + 144, y); TerminalKit.rt(g, "AGE", R, y);

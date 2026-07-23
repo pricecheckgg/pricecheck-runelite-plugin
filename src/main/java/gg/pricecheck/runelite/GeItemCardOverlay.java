@@ -172,6 +172,7 @@ class GeItemCardOverlay extends Overlay
 			addViewOutcome(c, offers, slotIdx);
 			c.rangeRow = plugin.viewRangeFor(geId);
 			final boolean term = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
+			c.maxHeight = term ? termMaxHeight(anchor) : 0;
 			paintAt(g, anchor[0], anchor[1], () -> term
 				? GeItemInfoPainter.paintTerminal(g, c, anchor[2])
 				: GeItemInfoPainter.paint(g, c, anchor[2]));
@@ -263,6 +264,7 @@ class GeItemCardOverlay extends Overlay
 			}
 			c.rangeRow = plugin.viewRangeFor(geId);
 			final boolean term = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
+			c.maxHeight = term ? termMaxHeight(anchor) : 0;
 			paintAt(g, anchor[0], anchor[1], () -> term
 				? GeItemInfoPainter.paintTerminal(g, c, anchor[2])
 				: GeItemInfoPainter.paint(g, c, anchor[2]));
@@ -477,6 +479,13 @@ class GeItemCardOverlay extends Overlay
 		c.nowTs = System.currentTimeMillis() / 1000L;
 		c.tradeDepth = plugin.overlayTradeDepth();
 		c.prints = plugin.cardPrintsFor(geId);
+		final long[] lim = plugin.buyLimitInfo(geId);
+		if (lim != null)
+		{
+			c.limitBought = lim[0];
+			c.limitTotal = lim[1];
+			c.limitResetMs = lim[2];
+		}
 		final long[] holding = plugin.holdingFor(geId);
 		if (holding != null)
 		{
@@ -937,6 +946,26 @@ class GeItemCardOverlay extends Overlay
 
 	/** {x, y, width}: the card takes wantW where the chosen side has room and
 	 *  steps down to the compact width otherwise, never covering the GE. */
+	/** How tall the terminal card may draw before it would cover the chat input.
+	 *  Full canvas below the anchor, but clamped to sit above the chat box whenever
+	 *  the card's column overlaps it in x. The painter clamps its tape to fit. */
+	private int termMaxHeight(int[] anchor)
+	{
+		final int topY = anchor[1];
+		int budget = client.getCanvasHeight() - topY - 8;
+		final Rectangle cb = plugin.chatboxBounds();
+		if (cb != null)
+		{
+			final int cardL = anchor[0], cardR = anchor[0] + anchor[2];
+			final boolean overlapsX = cardL < cb.x + cb.width && cardR > cb.x;
+			if (overlapsX)
+			{
+				budget = Math.min(budget, cb.y - topY - 6);
+			}
+		}
+		return Math.max(0, budget);
+	}
+
 	private int[] anchorFor(int wantW)
 	{
 		final Rectangle b = geBounds();

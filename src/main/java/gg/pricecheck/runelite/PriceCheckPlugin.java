@@ -158,6 +158,7 @@ public class PriceCheckPlugin extends Plugin
 	// key is present. lastLoginTick marks the login burst window so aggregated
 	// offline fills are flagged instead of trusted as instant.
 	private FlipLogEngine flipLog;
+	private BuyLimitTracker buyLimits;
 	private ScheduledFuture<?> flipSyncTask;
 	private volatile int lastLoginTick = -10;
 	// GE chatbox integrations: click-to-fill prices + search suggestions.
@@ -325,6 +326,7 @@ public class PriceCheckPlugin extends Plugin
 			return t;
 		});
 		flipLog = new FlipLogEngine(gson, net.runelite.client.RuneLite.RUNELITE_DIR);
+		buyLimits = new BuyLimitTracker(gson, configManager);
 		clientThread.invokeLater(() ->
 		{
 			flipLog.setAccount(client.getAccountHash());
@@ -851,6 +853,11 @@ public class PriceCheckPlugin extends Plugin
 			flipLog.onOffer(event.getSlot(), event.getOffer(), client.getGameState(),
 				client.getTickCount(), lastLoginTick, name);
 		}
+		if (buyLimits != null && event.getOffer() != null)
+		{
+			buyLimits.setAccount(client.getAccountHash());
+			buyLimits.onOffer(event.getSlot(), event.getOffer(), System.currentTimeMillis());
+		}
 		if (config.contributeData())
 		{
 			// Relog/world-hop burst: the client blanks every slot with EMPTY and
@@ -890,6 +897,15 @@ public class PriceCheckPlugin extends Plugin
 		return w != null ? w.getBounds() : null;
 	}
 
+	/** Bounds of the chat box (162:0) in canvas px, or null when it isn't shown.
+	 *  The terminal item card reads this to keep its trade tape from running down
+	 *  over the chat input line. Called on the client thread from the overlay. */
+	java.awt.Rectangle chatboxBounds()
+	{
+		final net.runelite.api.widgets.Widget w = client.getWidget(162, 0);
+		return w != null && !w.isHidden() ? w.getBounds() : null;
+	}
+
 	/**
 	 * The single, order-independent gate for the right-of-GE active-offers board.
 	 * On only when the board is enabled, market data is live, the GE grid
@@ -914,6 +930,18 @@ public class PriceCheckPlugin extends Plugin
 	boolean terminalOffers()
 	{
 		return config.terminalOffers();
+	}
+
+	/** Buy-limit read for the terminal card: {boughtIn4h, total, resetEpochMs}.
+	 *  total -1 when the item has no published limit or no live data. */
+	long[] buyLimitInfo(int geId)
+	{
+		final FlipData fd = liveFor(geId);
+		final long total = (fd != null && fd.getLimit() != null) ? fd.getLimit() : -1L;
+		final long now = System.currentTimeMillis();
+		final long bought = buyLimits != null ? buyLimits.boughtIn4h(geId, now) : 0L;
+		final long reset = buyLimits != null ? buyLimits.resetAt(geId, now) : 0L;
+		return new long[]{bought, total, reset};
 	}
 
 	/** How many recent trades the GE overlays show: Active 10, Advanced 20,
