@@ -148,6 +148,7 @@ public class PriceCheckPlugin extends Plugin
 	private TerminalHeldOverlay terminalHeldOverlay;
 	private TerminalFillsOverlay terminalFillsOverlay;
 	private TerminalTickerOverlay terminalTickerOverlay;
+	private TerminalWatchlistOverlay terminalWatchlistOverlay;
 	private ScheduledFuture<?> panelTask;
 	private ScheduledFuture<?> advisorTask;
 	private ScheduledFuture<?> telemetryTask;
@@ -333,6 +334,8 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(terminalFillsOverlay);
 		terminalTickerOverlay = new TerminalTickerOverlay(client, this);
 		overlayManager.add(terminalTickerOverlay);
+		terminalWatchlistOverlay = new TerminalWatchlistOverlay(client, this);
+		overlayManager.add(terminalWatchlistOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->
 		{
@@ -637,6 +640,11 @@ public class PriceCheckPlugin extends Plugin
 		{
 			overlayManager.remove(terminalTickerOverlay);
 			terminalTickerOverlay = null;
+		}
+		if (terminalWatchlistOverlay != null)
+		{
+			overlayManager.remove(terminalWatchlistOverlay);
+			terminalWatchlistOverlay = null;
 		}
 		for (int i = 0; i < SLOTS; i++)
 		{
@@ -1897,6 +1905,9 @@ public class PriceCheckPlugin extends Plugin
 	private volatile int sessionBottomY = -1;
 	private volatile int sessionX = -1;
 	private volatile int sessionW = -1;
+	// Canvas y of the held panel's top edge this frame (-1 = not shown), so the
+	// watchlist can fill the gap above it.
+	private volatile int heldTopY = -1;
 	private volatile List<FlipLogEngine.Flip> recentFlips = Collections.emptyList();
 
 	/** Aggregated holding for one item: {qty, totalCost, earliestOpenedAtMs},
@@ -1959,6 +1970,25 @@ public class PriceCheckPlugin extends Plugin
 	int sessionW()
 	{
 		return sessionW;
+	}
+
+	/** Your tracked items (watch targets + held positions) for the watchlist panel;
+	 *  empty until the tracked poll lands. */
+	java.util.Collection<TrackedItem> trackedItems()
+	{
+		return trackedById.values();
+	}
+
+	/** The held panel publishes its top edge so the watchlist fills the gap above
+	 *  it exactly (-1 when the held panel isn't shown). */
+	void noteHeldTop(int y)
+	{
+		heldTopY = y;
+	}
+
+	int heldTopY()
+	{
+		return heldTopY;
 	}
 
 	/** Exact FIFO cost of {@code qty} units of an item, taken from the raw

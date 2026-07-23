@@ -53,6 +53,7 @@ class TerminalHeldOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D g)
 	{
+		plugin.noteHeldTop(-1);
 		if (!plugin.terminalDesk() || !plugin.isGrandExchangeOpen())
 		{
 			return null;
@@ -89,6 +90,7 @@ class TerminalHeldOverlay extends Overlay
 		{
 			return null;   // no room above the GE
 		}
+		plugin.noteHeldTop(y);
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);

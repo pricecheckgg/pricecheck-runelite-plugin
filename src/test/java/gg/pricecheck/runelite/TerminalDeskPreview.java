@@ -102,7 +102,20 @@ public final class TerminalDeskPreview
 		draw(g, geX, geY - 36, () -> TerminalStatusOverlay.paintBar(g, geW, 30, 71_792_312L, 3, 405, "23:10:59", 11_100_000L));
 
 		final int heldH = 32 + held.size() * 18 + 6;
-		draw(g, geX, geY - 36 - heldH - 4, () -> TerminalHeldOverlay.paintHeld(g, geW, held, -16_380_000L, 0));
+		final int heldTop = geY - 36 - heldH - 4;
+		draw(g, geX, heldTop, () -> TerminalHeldOverlay.paintHeld(g, geW, held, -16_380_000L, 0));
+
+		// Watchlist fills the top box, above the held panel.
+		final List<TerminalWatchlistOverlay.Watch> watch = new ArrayList<>();
+		watch.add(new TerminalWatchlistOverlay.Watch("Twisted bow", 1_200_000_000L, 2));
+		watch.add(new TerminalWatchlistOverlay.Watch("Masori body", 53_100_000L, 1));
+		watch.add(new TerminalWatchlistOverlay.Watch("Elysian spirit shield", 515_000_000L, 0));
+		final List<TerminalWatchlistOverlay.Pick> picks = new ArrayList<>();
+		picks.add(new TerminalWatchlistOverlay.Pick("Dragon claws", 167_500_000L, 1_900_000L));
+		picks.add(new TerminalWatchlistOverlay.Pick("Zaryte crossbow", 37_400_000L, 910_000L));
+		picks.add(new TerminalWatchlistOverlay.Pick("Voidwaker", 88_400_000L, 870_000L));
+		final int wlH = heldTop - 4 - 8;
+		draw(g, geX, 8, () -> TerminalWatchlistOverlay.paintWatchlist(g, geW, wlH, watch, picks));
 
 		draw(g, geX - TerminalRadarOverlay.W - 8, 8,
 			() -> TerminalRadarOverlay.paintColumn(g, TerminalRadarOverlay.W, Hc - 16, flips, catches));
