@@ -63,12 +63,26 @@ class TerminalHeldOverlay extends Overlay
 		{
 			return null;
 		}
-		final List<Row> rows = buildRows(s.openLots);
-		if (rows.isEmpty())
+		final List<Row> all = buildRows(s.openLots);
+		if (all.isEmpty())
 		{
 			return null;
 		}
-		final int h = 32 + rows.size() * ROW + 6;
+		// Net unrealised P&L across ALL priced positions (not just the shown rows).
+		long net = 0;
+		boolean anyLive = false;
+		for (final Row r : all)
+		{
+			if (r.live)
+			{
+				net += r.uPnl;
+				anyLive = true;
+			}
+		}
+		final int shown = Math.min(all.size(), MAX_ROWS);
+		final List<Row> rows = all.subList(0, shown);
+		final int hidden = all.size() - shown;
+		final int h = 32 + shown * ROW + 6;
 		final int x = ge.x;
 		final int y = ge.y - STATUS_BAND - h - 4;
 		if (y < 6)
@@ -81,7 +95,7 @@ class TerminalHeldOverlay extends Overlay
 		g.translate(x, y);
 		try
 		{
-			paintHeld(g, ge.width, rows);
+			paintHeld(g, ge.width, rows, anyLive ? net : Long.MIN_VALUE, hidden);
 		}
 		finally
 		{
@@ -127,20 +141,29 @@ class TerminalHeldOverlay extends Overlay
 			final boolean has = sell > 0;
 			final long uPnl = has ? qty * GeTax.net(unit, sell) : 0;
 			rows.add(new Row(names.getOrDefault(e.getKey(), "#" + e.getKey()), qty, unit, uPnl, has));
-			if (rows.size() >= MAX_ROWS)
-			{
-				break;
-			}
 		}
 		return rows;
 	}
 
-	/** Pure drawing (0,0-origin) so the preview harness can render it headless. */
-	static void paintHeld(Graphics2D g, int w, List<Row> rows)
+	/** Pure drawing (0,0-origin) so the preview harness can render it headless. net
+	 *  = aggregate unrealised P&L (Long.MIN_VALUE to hide), hidden = positions past
+	 *  the shown rows. */
+	static void paintHeld(Graphics2D g, int w, List<Row> rows, long net, int hidden)
 	{
 		TerminalKit.hints(g);
 		final int h = 32 + rows.size() * ROW + 6;
 		int cy = TerminalKit.panel(g, 0, 0, w, h, "HELD  ·  YOUR POSITIONS");
+		// Net unrealised P&L across all positions, right-aligned on the title strip.
+		if (net != Long.MIN_VALUE)
+		{
+			g.setFont(TerminalKit.monoB(11));
+			g.setColor(net >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+			final String v = (net >= 0 ? "+" : "-") + TerminalKit.gp(Math.abs(net));
+			TerminalKit.rt(g, v, w - 8, 13);
+			final int vw = g.getFontMetrics().stringWidth(v);
+			g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
+			TerminalKit.rt(g, hidden > 0 ? "+" + hidden + " more  NET" : "NET", w - 8 - vw - 6, 13);
+		}
 		final FontMetrics fm = g.getFontMetrics();
 		for (final Row r : rows)
 		{

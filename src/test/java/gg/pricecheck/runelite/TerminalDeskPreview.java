@@ -102,7 +102,7 @@ public final class TerminalDeskPreview
 		draw(g, geX, geY - 36, () -> TerminalStatusOverlay.paintBar(g, geW, 30, 71_792_312L, 3, 405, "23:10:59", 11_100_000L));
 
 		final int heldH = 32 + held.size() * 18 + 6;
-		draw(g, geX, geY - 36 - heldH - 4, () -> TerminalHeldOverlay.paintHeld(g, geW, held));
+		draw(g, geX, geY - 36 - heldH - 4, () -> TerminalHeldOverlay.paintHeld(g, geW, held, -16_380_000L, 0));
 
 		draw(g, geX - TerminalRadarOverlay.W - 8, 8,
 			() -> TerminalRadarOverlay.paintColumn(g, TerminalRadarOverlay.W, Hc - 16, flips, catches));
