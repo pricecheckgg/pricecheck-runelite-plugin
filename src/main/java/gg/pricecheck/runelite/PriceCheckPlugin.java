@@ -904,7 +904,10 @@ public class PriceCheckPlugin extends Plugin
 	 *  geOffersPanelVisible() layers the docked-overview conditions on top. */
 	boolean geOffersPanelEnabled()
 	{
-		return config.geOffersPanel() && marketDataOk();
+		// Either toggle shows the board: geOffersPanel = classic, terminalOffers =
+		// the terminal blotter skin. terminalOffers works on its own (no need to
+		// also enable the classic board).
+		return (config.geOffersPanel() || config.terminalOffers()) && marketDataOk();
 	}
 
 	/** Draw the active-offers board in the Bloomberg-terminal blotter style. */
@@ -937,7 +940,7 @@ public class PriceCheckPlugin extends Plugin
 
 	boolean geOffersPanelVisible()
 	{
-		if (!config.geOffersPanel() || !marketDataOk() || !isGrandExchangeOpen())
+		if ((!config.geOffersPanel() && !config.terminalOffers()) || !marketDataOk() || !isGrandExchangeOpen())
 		{
 			return false;
 		}

@@ -283,7 +283,7 @@ public interface PriceCheckConfig extends Config
 	@ConfigItem(
 		keyName = "terminalOffers",
 		name = "GE: terminal offers blotter",
-		description = "Draw the active-offers board in the Bloomberg-terminal blotter style (amber-on-black, one row per offer with side, quantity, price, closeness, verdict and running P&L). Requires the active offers board to be on. Part of the terminal desk.",
+		description = "Show your active offers as a Bloomberg-terminal blotter docked to the right of the Grand Exchange (amber-on-black, one row per offer with side, quantity, price, closeness, verdict and running P&L). Works on its own. Trader Pro. Part of the terminal desk.",
 		position = 20
 	)
 	default boolean terminalOffers()
