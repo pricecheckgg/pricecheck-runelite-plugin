@@ -162,7 +162,8 @@ class GeItemCardOverlay extends Overlay
 			setupQty = 0;
 		}
 
-		final int[] anchor = anchorFor(GeItemInfoPainter.W_FULL);
+		final int wantW = config.terminalCard() ? GeItemInfoPainter.TERM_W : GeItemInfoPainter.W_FULL;
+		final int[] anchor = anchorFor(wantW);
 		if (slotIdx >= 0)
 		{
 			final int geId = offers[slotIdx].getItemId();
@@ -170,7 +171,10 @@ class GeItemCardOverlay extends Overlay
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
 			addViewOutcome(c, offers, slotIdx);
 			c.rangeRow = plugin.viewRangeFor(geId);
-			paintAt(g, anchor[0], anchor[1], () -> GeItemInfoPainter.paint(g, c, anchor[2]));
+			final boolean term = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
+			paintAt(g, anchor[0], anchor[1], () -> term
+				? GeItemInfoPainter.paintTerminal(g, c, anchor[2])
+				: GeItemInfoPainter.paint(g, c, anchor[2]));
 			notePill(anchor[0], anchor[1], c.chartLabel, tfFm);
 			if (c.chartLabel != null)
 			{
@@ -258,7 +262,10 @@ class GeItemCardOverlay extends Overlay
 				applyOutcome(c, sellSide, entered, qty, geId, "", skip);
 			}
 			c.rangeRow = plugin.viewRangeFor(geId);
-			paintAt(g, anchor[0], anchor[1], () -> GeItemInfoPainter.paint(g, c, anchor[2]));
+			final boolean term = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
+			paintAt(g, anchor[0], anchor[1], () -> term
+				? GeItemInfoPainter.paintTerminal(g, c, anchor[2])
+				: GeItemInfoPainter.paint(g, c, anchor[2]));
 			notePill(anchor[0], anchor[1], c.chartLabel, tfFm);
 			if (c.chartLabel != null)
 			{

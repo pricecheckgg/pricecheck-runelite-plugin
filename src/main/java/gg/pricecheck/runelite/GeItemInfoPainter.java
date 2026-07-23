@@ -107,6 +107,260 @@ final class GeItemInfoPainter
 	{
 	}
 
+	// ── Terminal (Bloomberg) card ──────────────────────────────────
+	// The approved amber-on-black DES card, fed by the same Context. Classic
+	// paint() below is untouched; the overlay routes here when config.terminalCard()
+	// is on. Grid values are derived from the Context; LIMIT/RESET show "-" until
+	// the buy-limit tracker (Phase 2) feeds them.
+	static final int TERM_W = 430;
+
+	private static long seriesHi(ItemChart.Series s)
+	{
+		if (s == null || s.high == null) { return 0; }
+		long m = 0;
+		for (final long v : s.high) { if (v > m) { m = v; } }
+		return m;
+	}
+
+	private static long seriesLo(ItemChart.Series s)
+	{
+		if (s == null || s.low == null) { return 0; }
+		long m = Long.MAX_VALUE;
+		for (final long v : s.low) { if (v > 0 && v < m) { m = v; } }
+		return m == Long.MAX_VALUE ? 0 : m;
+	}
+
+	private static long seriesVol(ItemChart.Series s)
+	{
+		if (s == null) { return 0; }
+		long v = 0;
+		if (s.hvol != null) { for (final int x : s.hvol) { v += x; } }
+		if (s.lvol != null) { for (final int x : s.lvol) { v += x; } }
+		return v;
+	}
+
+	private static long lastLowOf(ItemChart.Series s)
+	{
+		if (s == null || s.low == null) { return 0; }
+		for (int i = s.low.length - 1; i >= 0; i--) { if (s.low[i] > 0) { return s.low[i]; } }
+		return 0;
+	}
+
+	/** mid-price % change from `back` windows ago to the latest window. */
+	private static double seriesDelta(ItemChart.Series s, int back)
+	{
+		if (s == null || s.high == null || s.low == null || s.high.length == 0) { return 0; }
+		final int n = s.high.length;
+		final int i0 = Math.max(0, n - 1 - Math.max(1, back));
+		final double now = (s.high[n - 1] + s.low[n - 1]) / 2.0;
+		final double then = (s.high[i0] + s.low[i0]) / 2.0;
+		return then > 0 ? (now - then) / then * 100.0 : 0;
+	}
+
+	/** 4h order-flow imbalance from volumes: + = sell pressure. Returns {pctSell, hasData}. */
+	private static double ofiOf(ItemChart.Series s)
+	{
+		if (s == null || s.hvol == null || s.lvol == null) { return 0; }
+		final int n = s.hvol.length;
+		long hv = 0, lv = 0;
+		for (int i = Math.max(0, n - 48); i < n; i++) { hv += s.hvol[i]; lv += s.lvol[i]; }
+		final long t = hv + lv;
+		return t > 0 ? (lv - hv) * 100.0 / t : 0;   // lv = insta-sell prints = sell pressure
+	}
+
+	private static String signPct(double v)
+	{
+		return (v >= 0 ? "+" : "-") + String.format("%.1f%%", Math.abs(v));
+	}
+
+	static Dimension paintTerminal(Graphics2D g, Context c, int w)
+	{
+		TerminalKit.hints(g);
+		final int L = 12, R = w - 12, colW = (R - L - 16) / 3;
+		final int c0 = L, c1 = L + colW + 8, c2 = L + 2 * colW + 16;
+
+		// ── derive grid values from the Context ──
+		final ItemChart.Series s = c.series;
+		final long ask = c.refSell() > 0 ? c.refSell() : seriesHi(s);
+		final long bid = c.refBuy() > 0 ? c.refBuy() : lastLowOf(s);
+		final long spread = (ask > 0 && bid > 0) ? ask - bid : 0;
+		final long net = (ask > 0 && bid > 0) ? GeTax.net(bid, ask) : 0;
+		final long tax = ask > 0 ? Math.min(ask / 50, 5_000_000L) : 0;
+		final double roi = bid > 0 ? net * 100.0 / bid : 0;
+		final long vol24 = seriesVol(s);
+		final long hi = c.rangeRow != null && c.rangeRow[0] > 0 ? c.rangeRow[0] : seriesHi(s);
+		final long lo = c.rangeRow != null && c.rangeRow[2] > 0 ? c.rangeRow[2] : seriesLo(s);
+		final double d1h = seriesDelta(s, 12);
+		final double d24 = seriesDelta(s, 288);
+		final double ofi = ofiOf(s);
+		final int tapeRows = Math.min(c.prints != null ? c.prints.size() : 0, Math.max(1, c.tradeDepth));
+		final boolean holding = c.lotQty > 0;
+
+		// ── height (matches the section y-progression below) ──
+		final int gridH = 5 * 26;
+		final int chartH = 96;
+		int h = 46 + gridH + 30 + (chartH + 8) + (40 + tapeRows * 17) + (holding ? 20 : 0) + 16;
+
+		// ── panel ──
+		g.setColor(TerminalKit.PANEL); g.fillRect(0, 0, w, h);
+		g.setColor(TerminalKit.BORDER); g.setStroke(new BasicStroke(1f)); g.drawRect(0, 0, w, h);
+
+		int y = 22;
+		// 1. header
+		g.setFont(TerminalKit.monoB(13)); g.setColor(TerminalKit.AMBERHI);
+		g.drawString(clip(c.itemName == null ? "" : c.itemName.toUpperCase(), g.getFontMetrics(), R - 96 - L), L, y);
+		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
+		TerminalKit.rt(g, "LIVE", R, y);
+		y += 6;
+		g.setColor(TerminalKit.GRID); g.drawLine(L, y, R, y);
+		y += 18;
+
+		// 2. quote grid
+		TerminalKit.cell(g, c0, colW, y, "BID", bid > 0 ? TerminalKit.commas(bid) : "-", TerminalKit.AMBER);
+		TerminalKit.cell(g, c1, colW, y, "ASK", ask > 0 ? TerminalKit.commas(ask) : "-", TerminalKit.AMBER);
+		TerminalKit.cell(g, c2, colW, y, "SPRD", spread > 0 ? TerminalKit.commas(spread) : "-", TerminalKit.AMBER);
+		y += 26;
+		TerminalKit.cell(g, c0, colW, y, "NET/EA", (net >= 0 ? "+" : "") + TerminalKit.commas(net), net >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+		TerminalKit.cell(g, c1, colW, y, "ROI", signPct(roi), roi >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+		TerminalKit.cell(g, c2, colW, y, "TAX", TerminalKit.commas(tax), TerminalKit.LABEL);
+		y += 26;
+		TerminalKit.cell(g, c0, colW, y, "Δ1H", signPct(d1h), d1h >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+		TerminalKit.cell(g, c1, colW, y, "Δ24H", signPct(d24), d24 >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+		TerminalKit.cell(g, c2, colW, y, "VOL 24H", vol24 > 0 ? TerminalKit.gp(vol24) : "-", TerminalKit.AMBER);
+		y += 26;
+		TerminalKit.cell(g, c0, colW, y, "HI", hi > 0 ? TerminalKit.commas(hi) : "-", TerminalKit.AMBER);
+		TerminalKit.cell(g, c1, colW, y, "LO", lo > 0 ? TerminalKit.commas(lo) : "-", TerminalKit.AMBER);
+		TerminalKit.cell(g, c2, colW, y, "OFI",
+			Math.abs(ofi) < 1 ? "balanced" : signPct(ofi).replace("+", "+").replace("%", "%") + (ofi >= 0 ? " SELL" : " BUY"),
+			Math.abs(ofi) < 1 ? TerminalKit.LABEL : ofi >= 0 ? TerminalKit.RED : TerminalKit.GREEN);
+		y += 26;
+		TerminalKit.cell(g, c0, colW, y, "LIMIT", "-", TerminalKit.DIM);
+		TerminalKit.cell(g, c1, colW, y, "RESET", "-", TerminalKit.DIM);
+		TerminalKit.cell(g, c2, colW, y, "FILL", c.fillPct >= 0 ? c.fillPct + "%" : "-", TerminalKit.AMBER);
+		y += 26;
+
+		// verdict cells
+		final int halfW = (R - L) / 2 - 4;
+		g.setColor(new Color(0x2a, 0x1e, 0x14));
+		g.fillRect(L, y, halfW, 20); g.fillRect(L + halfW + 8, y, halfW, 20);
+		g.setFont(TerminalKit.monoB(11));
+		if (c.stateText != null) { g.setColor(c.stateColor != null ? c.stateColor : TerminalKit.AMBER); g.drawString(clip(c.stateText, g.getFontMetrics(), halfW - 12), L + 8, y + 14); }
+		if (c.stateText2 != null) { g.setColor(c.stateColor2 != null ? c.stateColor2 : TerminalKit.AMBER); g.drawString(clip(c.stateText2, g.getFontMetrics(), halfW - 12), L + halfW + 16, y + 14); }
+		y += 30;
+
+		// 3. band chart from series
+		y = paintTermChart(g, s, L, y, R - L, chartH, c.refSell());
+		y += 8;
+
+		// 4. tape
+		y = paintTermTape(g, c, L, R, y, tapeRows);
+
+		// 5. position
+		if (holding)
+		{
+			final long unit = c.lotCost / c.lotQty;
+			final long edge = lastHighOf(s);
+			final long pnl = edge > 0 ? c.lotQty * GeTax.net(unit, edge) : 0;
+			g.setColor(TerminalKit.GRID); g.drawLine(L, y - 6, R, y - 6);
+			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); g.drawString("POS", L, y + 6);
+			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.AMBER);
+			g.drawString(c.lotQty + " @ " + Fmt.compact(unit), L + 30, y + 6);
+			if (edge > 0)
+			{
+				g.setColor(TerminalKit.LABEL); g.setFont(TerminalKit.mono(10)); g.drawString("uP&L", L + 150, y + 6);
+				g.setFont(TerminalKit.monoB(11)); g.setColor(pnl >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+				g.drawString((pnl >= 0 ? "+" : "") + Fmt.compact(pnl), L + 188, y + 6);
+			}
+			y += 20;
+		}
+
+		// 6. footer
+		g.setColor(TerminalKit.GRID); g.drawLine(L, y - 4, R, y - 4);
+		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.DIM);
+		if (c.outcomeText != null) { g.drawString(clip(c.outcomeText, g.getFontMetrics(), R - L), L, y + 8); }
+
+		return new Dimension(w, h);
+	}
+
+	private static int paintTermChart(Graphics2D g, ItemChart.Series s, int x, int y, int w, int hh, long yourSell)
+	{
+		final long hi = seriesHi(s), lo = seriesLo(s);
+		if (s == null || s.high == null || s.high.length < 2 || hi <= lo)
+		{
+			g.setColor(TerminalKit.DIM); g.setFont(TerminalKit.mono(9));
+			g.drawString("building the corridor...", x, y + hh / 2);
+			return y + hh;
+		}
+		final double pad = (hi - lo) * 0.08 + 1;
+		final double top = hi + pad, bot = lo - pad, span = top - bot;
+		final int cw = w - 46, n = s.high.length;
+		g.setColor(TerminalKit.GRID);
+		for (int i = 0; i <= 3; i++) { final int gy = y + i * hh / 3; g.drawLine(x, gy, x + cw, gy); }
+		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
+		for (int i = 0; i < 4; i++) { g.drawString(TerminalKit.gp((long) (top - i * span / 3)), x + cw + 4, y + i * hh / 3 + 3); }
+		final Path2D hiP = new Path2D.Float(), loP = new Path2D.Float();
+		for (int i = 0; i < n; i++)
+		{
+			final int px = x + (int) (i * (cw - 1.0) / (n - 1));
+			final int hy = y + (int) ((top - s.high[i]) / span * hh);
+			final int ly = y + (int) ((top - (s.low[i] > 0 ? s.low[i] : s.high[i])) / span * hh);
+			if (i == 0) { hiP.moveTo(px, hy); loP.moveTo(px, ly); } else { hiP.lineTo(px, hy); loP.lineTo(px, ly); }
+		}
+		g.setStroke(new BasicStroke(1.3f));
+		g.setColor(TerminalKit.GREEN); g.draw(hiP);
+		g.setColor(TerminalKit.RED); g.draw(loP);
+		if (yourSell > 0 && yourSell <= top && yourSell >= bot)
+		{
+			g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, new float[]{3f, 3f}, 0f));
+			g.setColor(TerminalKit.AMBER);
+			final int sy = y + (int) ((top - yourSell) / span * hh);
+			g.drawLine(x, sy, x + cw, sy);
+			g.setStroke(new BasicStroke(1f));
+		}
+		return y + hh;
+	}
+
+	private static int paintTermTape(Graphics2D g, Context c, int L, int R, int y, int tapeRows)
+	{
+		g.setColor(TerminalKit.GRID); g.drawLine(L, y - 4, R, y - 4);
+		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
+		g.drawString("TIME & SALES", L, y + 7);
+		int nBuy = 0;
+		for (int i = 0; i < tapeRows; i++) { if (c.prints.get(c.prints.size() - 1 - i).buySide) { nBuy++; } }
+		g.setColor(TerminalKit.GREEN); TerminalKit.rt(g, "▲" + nBuy, R - 26, y + 7);
+		g.setColor(TerminalKit.RED); TerminalKit.rt(g, "▼" + (tapeRows - nBuy), R, y + 7);
+		y += 13;
+		g.setFont(TerminalKit.mono(8)); g.setColor(TerminalKit.DIM);
+		TerminalKit.rt(g, "PRICE", L + 128, y); g.drawString("Δ VS YOU", L + 144, y); TerminalKit.rt(g, "AGE", R, y);
+		y += 19;
+		for (int i = 0; i < tapeRows; i++)
+		{
+			final Print p = c.prints.get(c.prints.size() - 1 - i);
+			final int ry = y + i * 17;
+			final boolean you = p.yours;
+			final boolean up = p.buySide;
+			final Color side = you ? TerminalKit.AMBERHI : up ? TerminalKit.GREEN : TerminalKit.RED;
+			g.setFont(TerminalKit.monoB(11)); g.setColor(side);
+			g.drawString(you ? "◆" : up ? "▲" : "▼", L, ry);
+			g.setFont(TerminalKit.monoB(12)); g.setColor(side);
+			TerminalKit.rt(g, Fmt.full(p.price), L + 128, ry);
+			g.setFont(TerminalKit.mono(11));
+			String tag; Color tc;
+			if (you) { tag = p.yoursBuy ? "YOU BOUGHT" : "YOU SOLD"; tc = TerminalKit.AMBER; }
+			else
+			{
+				final long ref = p.buySide ? (c.refSell() > 0 ? c.refSell() : c.refBuy()) : (c.refBuy() > 0 ? c.refBuy() : c.refSell());
+				tag = ref > 0 ? (p.price >= ref ? "+" : "-") + Fmt.compact(Math.abs(p.price - ref)) : "";
+				tc = TerminalKit.LABEL;
+			}
+			g.setColor(tc); g.drawString(tag, L + 144, ry);
+			final long ago = Math.max(0, c.nowTs - p.ts);
+			final String age = ago < 60 ? ago + "s" : ago < 5400 ? (ago / 60) + "m" : (ago / 3600) + "h";
+			g.setColor(TerminalKit.DIM); TerminalKit.rt(g, age, R, ry);
+		}
+		return y + tapeRows * 17 + 8;
+	}
+
 	static Dimension paint(Graphics2D g, Context c)
 	{
 		return paint(g, c, W_FULL);

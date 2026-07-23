@@ -268,4 +268,15 @@ public interface PriceCheckConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+		keyName = "terminalCard",
+		name = "GE: terminal item card",
+		description = "Draw the item evidence card in the Bloomberg-terminal style: an amber-on-black quote grid (bid/ask/spread/margin/ROI/tax/change/volume/range/order-flow), the corridor chart, a time-and-sales tape, and your position. Needs room to the side of the GE for the wider card; falls back to the classic card when there isn't. Part of the terminal desk.",
+		position = 19
+	)
+	default boolean terminalCard()
+	{
+		return false;
+	}
 }
