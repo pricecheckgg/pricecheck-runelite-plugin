@@ -170,7 +170,7 @@ public interface PriceCheckConfig extends Config
 	@ConfigItem(
 		keyName = "gePriceButtons",
 		name = "GE: click-to-fill prices",
-		description = "When setting an offer price, show clickable PriceCheck lines (our live buy/sell for that item, plus your break-even floor when selling a tracked position). One click fills the price; you press Enter.",
+		description = "When setting an offer price, show clickable PriceCheck lines (our live buy/sell for that item, plus your break-even floor when selling a tracked position). On the quantity box of a buy offer, show your remaining 4h buy limit. One click fills the value; you press Enter.",
 		position = 8
 	)
 	default boolean gePriceButtons()
@@ -180,8 +180,8 @@ public interface PriceCheckConfig extends Config
 
 	@ConfigItem(
 		keyName = "geAutofillHotkey",
-		name = "GE: autofill price hotkey",
-		description = "Press this while a GE buy or sell price box is open to fill PriceCheck's recommended price for that item. You still press Enter to place the offer. Unbound by default.",
+		name = "GE: autofill hotkey",
+		description = "Press this while a GE buy or sell price box is open to fill PriceCheck's recommended price for that item; press it on the quantity box of a buy offer to fill your remaining 4h buy limit. You still press Enter to place the offer. Unbound by default.",
 		position = 9
 	)
 	default Keybind geAutofillHotkey()

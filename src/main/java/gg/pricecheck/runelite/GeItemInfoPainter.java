@@ -180,26 +180,6 @@ final class GeItemInfoPainter
 		return (v >= 0 ? "+" : "-") + String.format("%.1f%%", Math.abs(v));
 	}
 
-	/** Compact "time until" for the RESET cell: 2h04m / 43m / 58s / ready. */
-	private static String fmtCountdown(long ms)
-	{
-		if (ms <= 0)
-		{
-			return "ready";
-		}
-		final long s = ms / 1000;
-		final long h = s / 3600, m = (s % 3600) / 60;
-		if (h > 0)
-		{
-			return h + "h" + String.format("%02d", m) + "m";
-		}
-		if (m > 0)
-		{
-			return m + "m";
-		}
-		return Math.max(1, s) + "s";
-	}
-
 	/** Spell out the terse side letter for the terminal verdict: "S OK" -> "SELL OK". */
 	private static String expandVerdict(String s)
 	{
@@ -216,6 +196,15 @@ final class GeItemInfoPainter
 			return "BUY " + s.substring(2);
 		}
 		return s;
+	}
+
+	/** The terminal card's height minus the variable trade tape - a hard floor the
+	 *  tape clamp cannot go below. The overlay uses this to fall back to the classic
+	 *  card when there isn't even this much vertical room (short windows). */
+	static int terminalFixedHeight(Context c)
+	{
+		final int gridH = 5 * 26, chartH = 132;
+		return 46 + gridH + 30 + (chartH + 8) + 40 + (c.lotQty > 0 ? 20 : 0) + 16;
 	}
 
 	static Dimension paintTerminal(Graphics2D g, Context c, int w)
@@ -242,16 +231,15 @@ final class GeItemInfoPainter
 		final boolean holding = c.lotQty > 0;
 
 		// ── height (matches the section y-progression below) ──
-		final int gridH = 5 * 26;
 		final int chartH = 132;
 		// Everything except the variable-length trade tape.
-		final int fixedH = 46 + gridH + 30 + (chartH + 8) + 40 + (holding ? 20 : 0) + 16;
+		final int fixedH = terminalFixedHeight(c);
 		int tapeRows = availTape;
-		// Clamp the tape so the card never runs down over the chat input box; the
-		// hidden rows are still summarised in the tape header.
+		// Clamp the tape so the card never runs down over the chat input box; never
+		// demand more rows than exist (empty prints -> 0 rows, never get(-1)).
 		if (c.maxHeight > 0 && fixedH + tapeRows * 17 > c.maxHeight)
 		{
-			tapeRows = Math.max(1, (c.maxHeight - fixedH) / 17);
+			tapeRows = Math.max(0, Math.min(availTape, (c.maxHeight - fixedH) / 17));
 		}
 		final int hiddenRows = availTape - tapeRows;
 		final int h = fixedH + tapeRows * 17;
@@ -304,7 +292,7 @@ final class GeItemInfoPainter
 			if (bought > 0 && c.limitResetMs > 0)
 			{
 				final long left = c.limitResetMs - c.nowTs * 1000L;
-				TerminalKit.cell(g, c1, colW, y, "RESET", fmtCountdown(left),
+				TerminalKit.cell(g, c1, colW, y, "RESET", left <= 0 ? "ready" : Fmt.duration(left),
 					left <= 0 ? TerminalKit.GREEN : capped ? TerminalKit.RED : TerminalKit.AMBER);
 			}
 			else
@@ -445,6 +433,8 @@ final class GeItemInfoPainter
 
 	private static int paintTermTape(Graphics2D g, Context c, int L, int R, int y, int tapeRows, int hiddenRows)
 	{
+		// Never read past the list, whatever the caller passed (empty prints -> 0 rows).
+		tapeRows = Math.max(0, Math.min(tapeRows, c.prints == null ? 0 : c.prints.size()));
 		g.setColor(TerminalKit.GRID); g.drawLine(L, y - 4, R, y - 4);
 		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
 		g.drawString("TIME & SALES", L, y + 7);

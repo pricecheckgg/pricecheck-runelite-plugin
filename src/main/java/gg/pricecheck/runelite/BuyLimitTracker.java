@@ -1,37 +1,54 @@
 package gg.pricecheck.runelite;
 
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.client.config.ConfigManager;
 
 /**
- * Tracks the player's own GE buy-fill quantity per item over the trailing 4h
- * window. OSRS buy limits reset 4h after your FIRST buy in a window, so this lets
- * the terminal card show LIMIT remaining + a RESET countdown (and later, cap an
- * autofilled buy to what's left). Client-side only: fed the live GE offers, it
- * records the increase in bought quantity as a buy fill. Persisted per account via
- * ConfigManager so the 4h window survives a client restart.
+ * Tracks the player's own GE buy-fill quantity per item over the current 4h buy
+ * window, so the terminal card can show LIMIT remaining + a RESET countdown and
+ * the quantity autofill can cap a buy to what's left.
+ *
+ * Window model (matches the game, and RuneLite's own GE limit tracker): the 4h
+ * timer starts at your FIRST buy of an item and every buy inside that window
+ * counts; once 4h pass from that first buy the counter resets fully to zero and
+ * the next buy opens a fresh window. A fixed window anchored at the first buy,
+ * NOT a rolling per-fill window.
+ *
+ * Counting: a GE offer's quantitySold is cumulative for that offer, so a fill is
+ * the GROWTH in quantitySold. We keep a per-slot cursor (the item + last counted
+ * quantitySold) and only add the growth to the item's window.
+ *
+ * Login / world-hop / restart safety: the client blanks every slot to EMPTY and
+ * replays the live offers after a login or hop. We must not re-count a replayed
+ * offer. So the cursor is PERSISTED and is NOT cleared on an EMPTY/non-buy event
+ * - a replayed offer arrives with the same item and the same quantitySold, so its
+ * growth is zero. A genuinely new offer is recognised by its item changing or its
+ * quantitySold dropping below the cursor (a fresh offer restarts at zero), which
+ * reseeds the cursor and counts nothing on first sight. All state is per account.
  */
 class BuyLimitTracker
 {
 	static final long WINDOW_MS = 4L * 60 * 60 * 1000;
 	private static final int SLOTS = 8;
 	private static final String KEY = "buylimit";
-	private static final Type MAP_TYPE = new TypeToken<Map<Integer, List<long[]>>>() { }.getType();
+
+	/** Persisted snapshot: windows + per-slot cursor, all for one account. */
+	private static final class Snapshot
+	{
+		Map<Integer, long[]> byItem;   // geId -> {windowStartMs, boughtInWindow}
+		int[] slotItem;                // per slot: item the cursor is bound to
+		long[] slotSold;               // per slot: last counted quantitySold
+	}
 
 	private final Gson gson;
 	private final ConfigManager configManager;
-	// geId -> list of {qty, atMs} buy fills within (or recently within) the window.
-	private final Map<Integer, List<long[]>> byItem = new HashMap<>();
-	private final long[] lastBought = new long[SLOTS];   // per slot: last quantitySold seen on a buy
-	private final int[] lastItem = new int[SLOTS];
+	private final Map<Integer, long[]> byItem = new HashMap<>();
+	private final long[] slotSold = new long[SLOTS];
+	private final int[] slotItem = new int[SLOTS];
 	private long account = -1;
 
 	BuyLimitTracker(Gson gson, ConfigManager configManager)
@@ -47,6 +64,11 @@ class BuyLimitTracker
 			|| s == GrandExchangeOfferState.CANCELLED_BUY;
 	}
 
+	private static boolean expired(long[] w, long nowMs)
+	{
+		return w == null || nowMs >= w[0] + WINDOW_MS;
+	}
+
 	synchronized void setAccount(long acc)
 	{
 		if (acc == account || acc == -1)
@@ -57,8 +79,8 @@ class BuyLimitTracker
 		byItem.clear();
 		for (int i = 0; i < SLOTS; i++)
 		{
-			lastBought[i] = 0;
-			lastItem[i] = 0;
+			slotSold[i] = 0;
+			slotItem[i] = 0;
 		}
 		load();
 	}
@@ -73,62 +95,53 @@ class BuyLimitTracker
 		final int itemId = o.getItemId();
 		if (!isBuy(o.getState()) || itemId <= 0)
 		{
-			lastItem[slot] = 0;
-			lastBought[slot] = 0;
+			// EMPTY blank, a sell, or a collected slot. Leave the cursor alone: a
+			// login/hop replays live offers right after blanking every slot, and
+			// clearing here would make the replay look like fresh fills.
 			return;
 		}
-		if (lastItem[slot] != itemId)
-		{
-			lastItem[slot] = itemId;
-			lastBought[slot] = 0;
-		}
 		final long sold = o.getQuantitySold();
-		final long delta = sold - lastBought[slot];
-		lastBought[slot] = sold;
-		if (delta > 0)
+		if (slotItem[slot] != itemId || sold < slotSold[slot])
 		{
-			byItem.computeIfAbsent(itemId, k -> new ArrayList<>()).add(new long[]{delta, nowMs});
+			// A different item now occupies this slot, or quantitySold dropped (the
+			// old offer was collected/cancelled and a new one of the same item
+			// started): a new offer. Seed the cursor to its current progress and
+			// count nothing on first sight - a fresh offer starts at zero, and any
+			// pre-existing fill was already counted in the session that saw it.
+			slotItem[slot] = itemId;
+			slotSold[slot] = sold;
 			save();
+			return;
 		}
+		final long delta = sold - slotSold[slot];
+		slotSold[slot] = sold;
+		if (delta <= 0)
+		{
+			return;
+		}
+		long[] w = byItem.get(itemId);
+		if (expired(w, nowMs))
+		{
+			// First buy of a new window: anchor it here and start counting.
+			w = new long[]{nowMs, 0};
+			byItem.put(itemId, w);
+		}
+		w[1] += delta;
+		save();
 	}
 
-	private void prune(List<long[]> l, long nowMs)
-	{
-		l.removeIf(e -> nowMs - e[1] > WINDOW_MS);
-	}
-
-	/** Units of this item bought within the last 4h. */
+	/** Units of this item bought within the current 4h window (0 once it resets). */
 	synchronized long boughtIn4h(int geId, long nowMs)
 	{
-		final List<long[]> l = byItem.get(geId);
-		if (l == null)
-		{
-			return 0;
-		}
-		prune(l, nowMs);
-		long s = 0;
-		for (final long[] e : l)
-		{
-			s += e[0];
-		}
-		return s;
+		final long[] w = byItem.get(geId);
+		return expired(w, nowMs) ? 0 : w[1];
 	}
 
-	/** Epoch ms when the window's earliest buy rolls off (limit starts freeing), 0 if none. */
+	/** Epoch ms when the current window resets the limit to zero, 0 if none active. */
 	synchronized long resetAt(int geId, long nowMs)
 	{
-		final List<long[]> l = byItem.get(geId);
-		if (l == null)
-		{
-			return 0;
-		}
-		prune(l, nowMs);
-		long earliest = Long.MAX_VALUE;
-		for (final long[] e : l)
-		{
-			earliest = Math.min(earliest, e[1]);
-		}
-		return earliest == Long.MAX_VALUE ? 0 : earliest + WINDOW_MS;
+		final long[] w = byItem.get(geId);
+		return expired(w, nowMs) ? 0 : w[0] + WINDOW_MS;
 	}
 
 	private void load()
@@ -136,16 +149,31 @@ class BuyLimitTracker
 		try
 		{
 			final String json = configManager.getConfiguration(PriceCheckConfig.GROUP, KEY + "_" + account);
-			if (json != null && !json.isEmpty())
+			if (json == null || json.isEmpty())
 			{
-				final Map<Integer, List<long[]>> m = gson.fromJson(json, MAP_TYPE);
-				if (m != null)
+				return;
+			}
+			final Snapshot snap = gson.fromJson(json, Snapshot.class);
+			if (snap == null)
+			{
+				return;
+			}
+			final long now = System.currentTimeMillis();
+			if (snap.byItem != null)
+			{
+				snap.byItem.forEach((k, v) ->
 				{
-					final long now = System.currentTimeMillis();
-					m.forEach((k, v) -> prune(v, now));
-					m.entrySet().removeIf(e -> e.getValue().isEmpty());
-					byItem.putAll(m);
-				}
+					if (v != null && v.length == 2 && !expired(v, now))
+					{
+						byItem.put(k, v);
+					}
+				});
+			}
+			if (snap.slotItem != null && snap.slotSold != null
+				&& snap.slotItem.length == SLOTS && snap.slotSold.length == SLOTS)
+			{
+				System.arraycopy(snap.slotItem, 0, slotItem, 0, SLOTS);
+				System.arraycopy(snap.slotSold, 0, slotSold, 0, SLOTS);
 			}
 		}
 		catch (RuntimeException ignored)
@@ -158,9 +186,12 @@ class BuyLimitTracker
 		try
 		{
 			final long now = System.currentTimeMillis();
-			byItem.values().forEach(l -> prune(l, now));
-			byItem.entrySet().removeIf(e -> e.getValue().isEmpty());
-			configManager.setConfiguration(PriceCheckConfig.GROUP, KEY + "_" + account, gson.toJson(byItem, MAP_TYPE));
+			byItem.entrySet().removeIf(e -> expired(e.getValue(), now));
+			final Snapshot snap = new Snapshot();
+			snap.byItem = byItem;
+			snap.slotItem = slotItem;
+			snap.slotSold = slotSold;
+			configManager.setConfiguration(PriceCheckConfig.GROUP, KEY + "_" + account, gson.toJson(snap));
 		}
 		catch (RuntimeException ignored)
 		{

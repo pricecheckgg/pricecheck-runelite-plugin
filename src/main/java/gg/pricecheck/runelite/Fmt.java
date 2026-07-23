@@ -22,6 +22,23 @@ final class Fmt
 		return String.format(Locale.ROOT, "%,d", n);
 	}
 
+	/** Compact time-remaining: 2h04m / 43m / 58s. Sub-second floors to 1s; the
+	 *  "already elapsed" case is the caller's to label (e.g. "ready"). */
+	static String duration(long ms)
+	{
+		final long s = Math.max(0, ms) / 1000;
+		final long h = s / 3600, m = (s % 3600) / 60;
+		if (h > 0)
+		{
+			return h + "h" + String.format(Locale.ROOT, "%02d", m) + "m";
+		}
+		if (m > 0)
+		{
+			return m + "m";
+		}
+		return Math.max(1, s) + "s";
+	}
+
 	/** Parse a gp amount the way players type it: 25m, 1.2b, 800k, 25,000,000.
 	 *  Returns -1 when it isn't one. */
 	static long parseGp(String s)

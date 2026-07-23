@@ -111,7 +111,18 @@ class GeChatboxHelper
 		{
 			return;
 		}
-		clientThread.invokeLater(this::injectPriceLines);
+		clientThread.invokeLater(this::injectGeInput);
+	}
+
+	private static final String PRICE_PROMPT = "Set a price for each item:";
+
+	/** A GE-setup numeric box is open: the price box (matched by its prompt) or,
+	 *  by elimination, the quantity box. Each injector self-guards, so only the
+	 *  matching one draws. */
+	private void injectGeInput()
+	{
+		injectPriceLines();
+		injectQtyLine();
 	}
 
 	private static final java.util.regex.Pattern TRADED_PAT =
@@ -127,7 +138,7 @@ class GeChatboxHelper
 		final Widget prompt = client.getWidget(InterfaceID.Chatbox.MES_TEXT);
 		final Widget setup = client.getWidget(InterfaceID.GeOffers.SETUP);
 		if (parent == null || prompt == null || setup == null
-			|| !"Set a price for each item:".equals(prompt.getText()))
+			|| !PRICE_PROMPT.equals(prompt.getText()))
 		{
 			return;
 		}
@@ -216,7 +227,12 @@ class GeChatboxHelper
 		return 0;
 	}
 
-	private void addLine(Widget parent, int x, int y, int width, String label, long price)
+	private void addLine(Widget parent, int x, int y, int width, String label, long value)
+	{
+		addLine(parent, x, y, width, label, value, "Set price");
+	}
+
+	private void addLine(Widget parent, int x, int y, int width, String label, long value, String action)
 	{
 		final Widget w = parent.createChild(-1, WidgetType.TEXT);
 		w.setText(label);
@@ -228,11 +244,71 @@ class GeChatboxHelper
 		w.setOriginalHeight(15);
 		w.setXTextAlignment(WidgetTextAlignment.LEFT);
 		w.setHasListener(true);
-		w.setAction(0, "Set price");
-		w.setOnOpListener((JavaScriptCallback) ev -> fillInput(price));
+		w.setAction(0, action);
+		w.setOnOpListener((JavaScriptCallback) ev -> fillInput(value));
 		w.setOnMouseRepeatListener((JavaScriptCallback) ev -> w.setTextColor(INK_HOVER));
 		w.setOnMouseLeaveListener((JavaScriptCallback) ev -> w.setTextColor(INK));
 		w.revalidate();
+	}
+
+	/** A non-clickable info line (e.g. "limit reached"); dark ink, no listener. */
+	private void addNote(Widget parent, int x, int y, int width, String label)
+	{
+		final Widget w = parent.createChild(-1, WidgetType.TEXT);
+		w.setText(label);
+		w.setTextColor(INK);
+		w.setFontId(FontID.VERDANA_11_BOLD);
+		w.setOriginalX(x);
+		w.setOriginalY(y);
+		w.setOriginalWidth(width);
+		w.setOriginalHeight(15);
+		w.setXTextAlignment(WidgetTextAlignment.LEFT);
+		w.revalidate();
+	}
+
+	/** Clickable "buy limit: N left" in the GE quantity box on a buy offer, so one
+	 *  click fills your remaining 4h buy limit (you still press Enter). When the
+	 *  limit is spent it shows a non-clickable note with the reset countdown. Only
+	 *  the quantity box reaches here (the price box is matched first); buy side and
+	 *  a published limit are both required. */
+	private void injectQtyLine()
+	{
+		final Widget parent = client.getWidget(InterfaceID.Chatbox.MES_LAYER);
+		final Widget prompt = client.getWidget(InterfaceID.Chatbox.MES_TEXT);
+		final Widget setup = client.getWidget(InterfaceID.GeOffers.SETUP);
+		if (parent == null || prompt == null || setup == null || PRICE_PROMPT.equals(prompt.getText()))
+		{
+			return;
+		}
+		final Widget side = setup.getChild(SETUP_SIDE_CHILD);
+		if (side == null || !"Buy offer".equals(side.getText()))
+		{
+			return;   // buy limits only bind when buying
+		}
+		final int itemId = client.getVarpValue(VarPlayerID.TRADINGPOST_SEARCH);
+		if (itemId <= 0)
+		{
+			return;
+		}
+		final long[] lim = plugin.buyLimitInfo(itemId);
+		if (lim == null || lim[1] <= 0)
+		{
+			return;   // no published buy limit for this item: nothing to cap
+		}
+		final long total = lim[1];
+		final long bought = Math.max(0, lim[0]);
+		final long remaining = Math.max(0, total - bought);
+		if (remaining > 0)
+		{
+			addLine(parent, 10, 3, 300,
+				"buy limit: " + Fmt.full(remaining) + " left of " + Fmt.full(total), remaining, "Set quantity");
+		}
+		else
+		{
+			final long left = lim[2] > 0 ? lim[2] - System.currentTimeMillis() : 0;
+			addNote(parent, 10, 3, 300,
+				"4h buy limit reached" + (left > 0 ? " - resets in " + Fmt.duration(left) : ""));
+		}
 	}
 
 	// Pre-fill only: write the digits into the input buffer + its on-screen echo
@@ -248,24 +324,24 @@ class GeChatboxHelper
 	}
 
 	/**
-	 * Hotkey entry: if a GE buy/sell price box is open for an item we have a
-	 * live price for, pre-fill our recommended price for that side - the exact
-	 * same value and pre-fill-only behaviour as clicking the top price line, so
-	 * the player still presses Enter to place the offer. Client thread only.
-	 * Returns true when it filled something (the key did work), false otherwise.
+	 * Hotkey entry: pre-fill the context-appropriate value into an open GE input,
+	 * pre-fill-only (the player still presses Enter), client thread only.
+	 *   - price box: our recommended price for that side.
+	 *   - quantity box on a buy: your remaining 4h buy limit, so one press never
+	 *     queues more than you can actually buy.
+	 * Returns true when it filled something, false otherwise.
 	 */
-	boolean fillRecommendedPrice()
+	boolean fillRecommended()
 	{
 		if (client.getVarcIntValue(VARC_INPUT_TYPE) != INPUT_TYPE_NUMERIC)
 		{
-			return false;   // no numeric input open: not a price box
+			return false;   // no numeric input open
 		}
 		final Widget prompt = client.getWidget(InterfaceID.Chatbox.MES_TEXT);
 		final Widget setup = client.getWidget(InterfaceID.GeOffers.SETUP);
-		if (prompt == null || setup == null
-			|| !"Set a price for each item:".equals(prompt.getText()))
+		if (prompt == null || setup == null)
 		{
-			return false;
+			return false;   // not a GE offer-setup input
 		}
 		final Widget side = setup.getChild(SETUP_SIDE_CHILD);
 		final boolean isBuy = side != null && "Buy offer".equals(side.getText());
@@ -279,13 +355,33 @@ class GeChatboxHelper
 		{
 			return false;
 		}
-		final FlipData live = plugin.viewFor(itemId);
-		final long price = live == null ? -1 : (isBuy ? live.getBuy() : live.getSell());
-		if (price <= 0)
+		if (PRICE_PROMPT.equals(prompt.getText()))
 		{
-			return false;   // no live data yet: fill nothing rather than a wrong price
+			final FlipData live = plugin.viewFor(itemId);
+			final long price = live == null ? -1 : (isBuy ? live.getBuy() : live.getSell());
+			if (price <= 0)
+			{
+				return false;   // no live data yet: fill nothing rather than a wrong price
+			}
+			fillInput(price);
+			return true;
 		}
-		fillInput(price);
+		// Quantity box (by elimination). Only the buy side has a limit to cap.
+		if (!isBuy)
+		{
+			return false;
+		}
+		final long[] lim = plugin.buyLimitInfo(itemId);
+		if (lim == null || lim[1] <= 0)
+		{
+			return false;   // no published limit
+		}
+		final long remaining = Math.max(0, lim[1] - Math.max(0, lim[0]));
+		if (remaining <= 0)
+		{
+			return false;   // limit spent: don't fill 0
+		}
+		fillInput(remaining);
 		return true;
 	}
 

@@ -134,8 +134,8 @@ public class PriceCheckPlugin extends Plugin
 					return;
 				}
 				// Block-body Runnable (not the BooleanSupplier overload): fire
-				// once, never retry-until-true when no price box is open.
-				clientThread.invoke(() -> { g.fillRecommendedPrice(); });
+				// once, never retry-until-true when no GE input box is open.
+				clientThread.invoke(() -> { g.fillRecommended(); });
 			}
 		};
 	private OfferAdvisorSlotOverlay slotOverlay;
@@ -936,6 +936,12 @@ public class PriceCheckPlugin extends Plugin
 	 *  total -1 when the item has no published limit or no live data. */
 	long[] buyLimitInfo(int geId)
 	{
+		if (buyLimits != null)
+		{
+			// Make sure this account's window is loaded before the first read,
+			// even if no offer has changed yet this session.
+			buyLimits.setAccount(client.getAccountHash());
+		}
 		final FlipData fd = liveFor(geId);
 		final long total = (fd != null && fd.getLimit() != null) ? fd.getLimit() : -1L;
 		final long now = System.currentTimeMillis();

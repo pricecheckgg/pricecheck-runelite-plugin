@@ -171,8 +171,13 @@ class GeItemCardOverlay extends Overlay
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
 			addViewOutcome(c, offers, slotIdx);
 			c.rangeRow = plugin.viewRangeFor(geId);
-			final boolean term = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
-			c.maxHeight = term ? termMaxHeight(anchor) : 0;
+			final boolean wantTerm = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
+			final int termBudget = wantTerm ? termMaxHeight(anchor) : 0;
+			// Not enough vertical room for even the terminal card's fixed content (a
+			// short window): fall back to the classic card so we never overdraw the
+			// chat input. Normal windows leave plenty of room, so term stays on.
+			final boolean term = wantTerm && termBudget >= GeItemInfoPainter.terminalFixedHeight(c);
+			c.maxHeight = term ? termBudget : 0;
 			paintAt(g, anchor[0], anchor[1], () -> term
 				? GeItemInfoPainter.paintTerminal(g, c, anchor[2])
 				: GeItemInfoPainter.paint(g, c, anchor[2]));
@@ -263,8 +268,13 @@ class GeItemCardOverlay extends Overlay
 				applyOutcome(c, sellSide, entered, qty, geId, "", skip);
 			}
 			c.rangeRow = plugin.viewRangeFor(geId);
-			final boolean term = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
-			c.maxHeight = term ? termMaxHeight(anchor) : 0;
+			final boolean wantTerm = config.terminalCard() && anchor[2] >= GeItemInfoPainter.TERM_W;
+			final int termBudget = wantTerm ? termMaxHeight(anchor) : 0;
+			// Not enough vertical room for even the terminal card's fixed content (a
+			// short window): fall back to the classic card so we never overdraw the
+			// chat input. Normal windows leave plenty of room, so term stays on.
+			final boolean term = wantTerm && termBudget >= GeItemInfoPainter.terminalFixedHeight(c);
+			c.maxHeight = term ? termBudget : 0;
 			paintAt(g, anchor[0], anchor[1], () -> term
 				? GeItemInfoPainter.paintTerminal(g, c, anchor[2])
 				: GeItemInfoPainter.paint(g, c, anchor[2]));
