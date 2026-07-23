@@ -20,16 +20,19 @@ public final class TerminalStatusPreview
 	{
 		System.setProperty("java.awt.headless", "true");
 		final String out = args.length > 0 ? args[0] : "/tmp/termbar.png";
-		final int w = 640, h = 30, pad = 16, s = 2;
-		final BufferedImage img = new BufferedImage((w + pad * 2) * s, (h + pad * 2) * s, BufferedImage.TYPE_INT_RGB);
+		final int h = 30, pad = 16, s = 2;
+		// wide = GE overview window; narrow = single-offer status window (the tight case)
+		final int wide = 660, narrow = 460;
+		final BufferedImage img = new BufferedImage((wide + pad * 2) * s, (h * 2 + pad * 3) * s, BufferedImage.TYPE_INT_RGB);
 		final Graphics2D g = img.createGraphics();
 		g.scale(s, s);
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-		// dark "game" backdrop so the bar reads as an overlay
 		g.setColor(new Color(0x14, 0x12, 0x0d));
-		g.fillRect(0, 0, w + pad * 2, h + pad * 2);
+		g.fillRect(0, 0, wide + pad * 2, h * 2 + pad * 3);
 		g.translate(pad, pad);
-		TerminalStatusOverlay.paintBar(g, w, h, 4_266_644_991L, 4, 302, "20:14:07");
+		TerminalStatusOverlay.paintBar(g, wide, h, 4_266_644_991L, 4, 302, "20:14:07");
+		g.translate(0, h + pad);
+		TerminalStatusOverlay.paintBar(g, narrow, h, 64_139_323L, 4, 465, "20:59:24");
 		g.dispose();
 		ImageIO.write(img, "png", new File(out));
 		System.out.println("wrote " + out);

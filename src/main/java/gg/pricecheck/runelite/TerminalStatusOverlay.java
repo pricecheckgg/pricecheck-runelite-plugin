@@ -88,7 +88,10 @@ class TerminalStatusOverlay extends Overlay
 		return null;
 	}
 
-	/** Pure drawing (0,0-origin, w x h) so the preview harness can render it headless. */
+	/** Pure drawing (0,0-origin, w x h) so the preview harness can render it headless.
+	 *  Fully metrics-driven and self-clamping: fields are only drawn if they fit
+	 *  before the right-pinned LIVE/clock block, so it never overlaps on a narrow
+	 *  (single-offer) GE window — it just shows fewer fields. */
 	static void paintBar(Graphics2D g, int w, int h, long cash, int slots, int world, String clock)
 	{
 		TerminalKit.hints(g);
@@ -105,38 +108,48 @@ class TerminalStatusOverlay extends Overlay
 		g.setFont(TerminalKit.mono(9));
 		g.setColor(TerminalKit.DIM);
 		g.drawString("ENGINE", 12 + brandW + 8, 20);
+		final int engineW = g.getFontMetrics().stringWidth("ENGINE");
 
-		// field group
-		int fx = 12 + brandW + 66;
-		fx = field(g, fx, "CASH", TerminalKit.commas(cash), TerminalKit.AMBER);
-		fx = field(g, fx, "SLOTS", slots + "/8", slots >= 8 ? TerminalKit.RED : TerminalKit.AMBER);
-		fx = field(g, fx, "WORLD", Integer.toString(world), TerminalKit.AMBER);
-
-		// right: LIVE + clock
+		// RIGHT block first: clock (right-pinned) + LIVE label + dot. Compute its
+		// left edge so the flowing fields on the left can stop before it.
 		g.setFont(TerminalKit.monoB(12));
 		final int clockW = g.getFontMetrics().stringWidth(clock);
-		final int liveX = w - 12 - clockW - 52;
-		g.setColor(TerminalKit.GREEN);
-		g.fillOval(liveX, 9, 6, 6);
-		g.setFont(TerminalKit.mono(10));
-		g.setColor(TerminalKit.LABEL);
-		g.drawString("LIVE", liveX + 11, 19);
-		g.setFont(TerminalKit.monoB(12));
 		g.setColor(TerminalKit.AMBER);
-		TerminalKit.rt(g, clock, w - 12, 20);
+		g.drawString(clock, w - 12 - clockW, 20);
+		g.setFont(TerminalKit.mono(10));
+		final int liveW = g.getFontMetrics().stringWidth("LIVE");
+		final int liveX = w - 12 - clockW - 10 - liveW;
+		g.setColor(TerminalKit.LABEL);
+		g.drawString("LIVE", liveX, 19);
+		g.setColor(TerminalKit.GREEN);
+		g.fillOval(liveX - 11, 9, 6, 6);
+		final int rEdge = liveX - 11 - 14;   // fields must end before here
+
+		// LEFT fields, left-flowing, clamped so they never cross rEdge.
+		int fx = 12 + brandW + 8 + engineW + 22;
+		fx = field(g, fx, rEdge, "CASH", TerminalKit.commas(cash), TerminalKit.AMBER);
+		fx = field(g, fx, rEdge, "SLOTS", slots + "/8", slots >= 8 ? TerminalKit.RED : TerminalKit.AMBER);
+		fx = field(g, fx, rEdge, "WORLD", Integer.toString(world), TerminalKit.AMBER);
 	}
 
-	private static int field(Graphics2D g, int x, String label, String value, Color vc)
+	private static int field(Graphics2D g, int x, int rEdge, String label, String value, Color vc)
 	{
+		g.setFont(TerminalKit.mono(9));
+		final int lw = g.getFontMetrics().stringWidth(label);
+		g.setFont(TerminalKit.monoB(13));
+		final int vw = g.getFontMetrics().stringWidth(value);
+		final int fieldW = Math.max(lw, vw);
+		if (x + fieldW > rEdge)
+		{
+			return x;   // no room on this window width — skip, never overlap
+		}
 		g.setFont(TerminalKit.mono(9));
 		g.setColor(TerminalKit.LABEL);
 		g.drawString(label, x, 12);
-		final int lw = g.getFontMetrics().stringWidth(label);
 		g.setFont(TerminalKit.monoB(13));
 		g.setColor(vc);
 		g.drawString(value, x, 25);
-		final int vw = g.getFontMetrics().stringWidth(value);
-		return x + Math.max(vw, lw) + 26;
+		return x + fieldW + 22;
 	}
 
 	private long cash()
