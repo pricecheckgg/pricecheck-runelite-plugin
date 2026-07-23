@@ -290,4 +290,15 @@ public interface PriceCheckConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+		keyName = "terminalDesk",
+		name = "GE: terminal desk panels",
+		description = "Dock the full Bloomberg-style desk around the Grand Exchange: an opportunity radar, fresh dips and top movers to the left; your held positions above; session flow, recent fills and a price ticker around it. Uses the live board (Trader Pro) plus your own flip log. Panels that need room quietly hide when there isn't any. Part of the terminal desk.",
+		position = 21
+	)
+	default boolean terminalDesk()
+	{
+		return false;
+	}
 }

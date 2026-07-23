@@ -143,6 +143,7 @@ public class PriceCheckPlugin extends Plugin
 	private GeItemCardOverlay geCardOverlay;
 	private GeOffersPanelOverlay offersPanelOverlay;
 	private TerminalStatusOverlay terminalStatusOverlay;
+	private TerminalRadarOverlay terminalRadarOverlay;
 	private ScheduledFuture<?> panelTask;
 	private ScheduledFuture<?> advisorTask;
 	private ScheduledFuture<?> telemetryTask;
@@ -318,6 +319,8 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(offersPanelOverlay);
 		terminalStatusOverlay = new TerminalStatusOverlay(client, this, config);
 		overlayManager.add(terminalStatusOverlay);
+		terminalRadarOverlay = new TerminalRadarOverlay(client, this);
+		overlayManager.add(terminalRadarOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->
 		{
@@ -597,6 +600,11 @@ public class PriceCheckPlugin extends Plugin
 		{
 			overlayManager.remove(terminalStatusOverlay);
 			terminalStatusOverlay = null;
+		}
+		if (terminalRadarOverlay != null)
+		{
+			overlayManager.remove(terminalRadarOverlay);
+			terminalRadarOverlay = null;
 		}
 		for (int i = 0; i < SLOTS; i++)
 		{
@@ -930,6 +938,28 @@ public class PriceCheckPlugin extends Plugin
 	boolean terminalOffers()
 	{
 		return config.terminalOffers();
+	}
+
+	/** Master switch for the wraparound terminal desk panels (radar/dips/movers,
+	 *  held strip, session, recent fills, ticker). */
+	boolean terminalDesk()
+	{
+		return config.terminalDesk();
+	}
+
+	/** The ranked flip board for the desk panels (radar / movers / ticker); empty
+	 *  until live market data has landed. */
+	List<FlipData> boardFlips()
+	{
+		final PriceCheckApiClient.FlipsResult r = lastGoodFlips;
+		return r != null && r.flips != null ? r.flips : Collections.emptyList();
+	}
+
+	/** Live dump movers for the fresh-dips panel; empty until market data lands. */
+	List<CatchData> boardCatches()
+	{
+		final PriceCheckApiClient.FlipsResult r = lastGoodFlips;
+		return r != null && r.catches != null ? r.catches : Collections.emptyList();
 	}
 
 	/** Buy-limit read for the terminal card: {boughtIn4h, total, resetEpochMs}.
