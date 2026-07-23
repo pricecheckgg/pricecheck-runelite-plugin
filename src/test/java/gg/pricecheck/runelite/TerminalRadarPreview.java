@@ -26,13 +26,16 @@ public final class TerminalRadarPreview
 		return f;
 	}
 
-	private static CatchData dip(String name, double pct, int mins)
+	private static CatchData dip(String name, double pct, int mins, String state)
 	{
 		final CatchData c = new CatchData();
 		c.setName(name);
 		c.setPctMove(pct);
 		c.setMinutesRunning(mins);
 		c.setDir("down");
+		c.setState(state);
+		c.setCatchable("catchable".equals(state));
+		c.setKnife("knife".equals(state));
 		return c;
 	}
 
@@ -56,10 +59,10 @@ public final class TerminalRadarPreview
 		flips.add(flip("Ghrazi rapier", 96_000, 590_000, 0.6));
 
 		final List<CatchData> catches = new ArrayList<>();
-		catches.add(dip("Sanguinesti staff", -4.1, 12));
-		catches.add(dip("Kodai wand", -3.6, 8));
-		catches.add(dip("Harmonised orb", -2.9, 5));
-		catches.add(dip("Dinh's bulwark", -2.4, 3));
+		catches.add(dip("Sanguinesti staff", -4.1, 12, "knife"));
+		catches.add(dip("Kodai wand", -3.6, 8, "catchable"));
+		catches.add(dip("Harmonised orb", -2.9, 5, "watch"));
+		catches.add(dip("Dinh's bulwark", -2.4, 3, "catchable"));
 
 		final int w = TerminalRadarOverlay.W, pad = 16, sc = 2, availH = 760;
 		final BufferedImage img = new BufferedImage((w + pad * 2) * sc, (availH + pad * 2) * sc, BufferedImage.TYPE_INT_RGB);

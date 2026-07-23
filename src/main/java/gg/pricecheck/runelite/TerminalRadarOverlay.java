@@ -105,7 +105,9 @@ class TerminalRadarOverlay extends Overlay
 				dips.add(c);
 			}
 		}
-		dips.sort(Comparator.comparingDouble(CatchData::getPctMove));   // most negative first
+		// Actionable first (the engine's catchable reads), then sharpest drop.
+		dips.sort(Comparator.comparing((CatchData c) -> !c.isCatchable())
+			.thenComparingDouble(CatchData::getPctMove));
 
 		// Top movers: board rows rising the hardest.
 		final List<FlipData> gainers = new ArrayList<>();
@@ -188,16 +190,29 @@ class TerminalRadarOverlay extends Overlay
 		{
 			final CatchData c = dips.get(i);
 			final int ry = cy + i * LIST_ROW;
-			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.RED);
+			// State drives the colour: green = the engine says catchable, red = still
+			// falling (a knife, skip), dim = watch/recovering.
+			final boolean catchable = c.isCatchable();
+			final boolean knife = c.isKnife();
+			final Color sc = catchable ? TerminalKit.GREEN : knife ? TerminalKit.RED : TerminalKit.DIM;
+			g.setFont(TerminalKit.monoB(11)); g.setColor(sc);
 			g.drawString("▼", 8, ry);
 			g.setFont(TerminalKit.mono(11)); g.setColor(TerminalKit.AMBER);
-			g.drawString(clip(c.getName() == null ? "?" : c.getName(), fm, 150), 24, ry);
+			g.drawString(clip(c.getName() == null ? "?" : c.getName(), fm, 118), 24, ry);
 			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.RED);
-			TerminalKit.rt(g, String.format("%.1f%%", c.getPctMove()), w - 62, ry);
-			g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.DIM);
-			TerminalKit.rt(g, age(c.getMinutesRunning()), w - 10, ry);
+			TerminalKit.rt(g, String.format("%.1f%%", c.getPctMove()), w - 66, ry);
+			g.setFont(TerminalKit.monoB(9)); g.setColor(sc);
+			TerminalKit.rt(g, stateLabel(c), w - 10, ry);
 		}
 		return y + h;
+	}
+
+	private static String stateLabel(CatchData c)
+	{
+		if (c.isCatchable()) { return "CATCH"; }
+		if (c.isKnife()) { return "KNIFE"; }
+		final String s = c.getState();
+		return s == null || s.isEmpty() ? "WATCH" : s.toUpperCase();
 	}
 
 	private static int paintGainers(Graphics2D g, int w, int y, List<FlipData> gainers, int rows)
@@ -230,13 +245,6 @@ class TerminalRadarOverlay extends Overlay
 	private static String name(FlipData f)
 	{
 		return f.getName() == null ? ("#" + f.getGeId()) : f.getName();
-	}
-
-	private static String age(int minutes)
-	{
-		if (minutes <= 0) { return "now"; }
-		if (minutes < 60) { return minutes + "m"; }
-		return (minutes / 60) + "h";
 	}
 
 	private static String clip(String s, FontMetrics fm, int maxW)
