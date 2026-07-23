@@ -84,6 +84,7 @@ public interface PriceCheckConfig extends Config
 		name = "Plugin key",
 		description = "Your PriceCheck plugin key (starts with pck_). Generate it free at pricecheck.gg (Discord login). "
 			+ "Requests made with a key send your IP address to PriceCheck's servers, which are not controlled or verified by the RuneLite Developers. "
+			+ "While a PriceCheck trial is active on your key, an anonymous per-account identifier (never your RSN) is sent once per game account to bind the trial to it. "
 			+ "Your RSN and game credentials are never sent.",
 		secret = true,
 		position = 1
@@ -144,8 +145,8 @@ public interface PriceCheckConfig extends Config
 	@ConfigItem(
 		keyName = "contributeData",
 		name = "Contribute market data",
-		description = "Report your own GE offer fills to PriceCheck toward a measured fill-time model. Only offer details (item, price, quantity, fill progress) are sent, never your RSN or anything about your account.",
-		warning = "Enabling this submits your Grand Exchange offer details (item, price, quantity, fill progress) and your IP address "
+		description = "Report your own GE offer fills to PriceCheck toward a measured fill-time model. Only offer details (the item, your price and quantity, how much has filled, which GE slot, and the time) are sent, never your RSN or anything about your account.",
+		warning = "Enabling this submits your Grand Exchange offer details (the item, your price and quantity, how much has filled, which GE slot, and the time it happened) and your IP address "
 			+ "to PriceCheck's servers, which are not controlled or verified by the RuneLite Developers. Continue?",
 		position = 6
 	)
