@@ -207,6 +207,51 @@ final class GeItemInfoPainter
 		return 46 + gridH + 30 + (chartH + 8) + 40 + (c.lotQty > 0 ? 20 : 0) + 16;
 	}
 
+	/** A compact graph card for the overview grid (one per GE offer item): the item
+	 *  name + your offer verdict on a thin header, then the corridor chart with your
+	 *  offer line marked. Draws at 0,0 over w x h. */
+	static void paintMiniGraph(Graphics2D g, Context c, int w, int h)
+	{
+		TerminalKit.hints(g);
+		g.setColor(TerminalKit.PANEL); g.fillRect(0, 0, w, h);
+		g.setColor(TerminalKit.BORDER); g.setStroke(new BasicStroke(1f)); g.drawRect(0, 0, w, h);
+		g.setColor(TerminalKit.TITLEBG); g.fillRect(1, 1, w - 2, 15);
+
+		// header: the after-tax margin (right) first so the name can clip before it
+		final long ask = c.refSell() > 0 ? c.refSell() : seriesHi(c.series);
+		final long bid = c.refBuy() > 0 ? c.refBuy() : lastLowOf(c.series);
+		final long netEa = (ask > 0 && bid > 0) ? GeTax.net(bid, ask) : 0;
+		int vW = 0;
+		if (netEa != 0)
+		{
+			final String marg = (netEa >= 0 ? "+" : "") + TerminalKit.gp(netEa);
+			g.setFont(TerminalKit.monoB(10));
+			vW = g.getFontMetrics().stringWidth(marg) + 8;
+			g.setColor(netEa >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+			TerminalKit.rt(g, marg, w - 5, 12);
+		}
+		g.setFont(TerminalKit.monoB(10)); g.setColor(TerminalKit.AMBERHI);
+		g.drawString(clip(c.itemName == null ? "" : c.itemName, g.getFontMetrics(), w - 8 - vW), 6, 12);
+
+		// chart: the classic corridor renderer in its pixel font (AA off, restored)
+		final int chartY = 18, chartH = h - chartY - 3;
+		final java.awt.Font f0 = g.getFont();
+		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+		g.setFont(net.runelite.client.ui.FontManager.getRunescapeSmallFont());
+		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+		final FontMetrics cfm = g.getFontMetrics();
+		if (c.tradesChartN > 0)
+		{
+			paintTradesChart(g, c, 4, chartY, w - 8, chartH, cfm);
+		}
+		else
+		{
+			paintChart(g, c, 4, chartY, w - 8, chartH, cfm, true);
+		}
+		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa != null ? taa : RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+		g.setFont(f0);
+	}
+
 	static Dimension paintTerminal(Graphics2D g, Context c, int w)
 	{
 		TerminalKit.hints(g);

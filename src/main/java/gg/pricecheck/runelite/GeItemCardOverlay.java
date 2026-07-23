@@ -301,46 +301,53 @@ class GeItemCardOverlay extends Overlay
 		// panel - "where my offer is" on the overview, next to the GE.
 		if (plugin.terminalDesk())
 		{
-			int geId = 0;
+			plugin.noteViewedItem(0);
+			final java.util.LinkedHashSet<Integer> items = new java.util.LinkedHashSet<>();
 			if (offers != null)
 			{
 				for (final GrandExchangeOffer o : offers)
 				{
 					if (o != null && o.getState() != GrandExchangeOfferState.EMPTY && o.getItemId() > 0)
 					{
-						geId = o.getItemId();
-						break;
+						items.add(o.getItemId());
 					}
 				}
 			}
 			final Rectangle ge = geBounds();
-			final int cw = GeItemInfoPainter.TERM_W;
-			if (geId <= 0 || ge == null || ge.x + ge.width + 8 + cw > client.getCanvasWidth() - 4)
+			if (items.isEmpty() || ge == null)
 			{
-				plugin.noteViewedItem(0);
 				return null;
 			}
+			// A compact graph card per distinct offer item, gridded on the right
+			// beneath the recent-flips panel - "where each offer is" on the overview.
+			final int miniW = 190, gap = 6, miniH = 92;
 			final int rx = ge.x + ge.width + 8;
-			final int fb = plugin.fillsBottomY();
-			final int ry = fb > 0 ? fb + 8 : 8;
-			final int[] rAnchor = {rx, ry, cw};
-			final int budget = termMaxHeight(rAnchor);
-			final int gId = geId;
-			final GeItemInfoPainter.Context c = buildContext(gId, offers, true);
-			c.rangeRow = plugin.viewRangeFor(gId);
-			if (budget < GeItemInfoPainter.terminalFixedHeight(c))
+			final int availW = client.getCanvasWidth() - 4 - rx;
+			if (availW < miniW)
 			{
-				plugin.noteViewedItem(0);
-				return null;   // not enough room below the right column
+				return null;   // no room to the right
 			}
-			plugin.noteViewedItem(gId);   // fetch this item's series for the chart
-			c.maxHeight = budget;
-			paintAt(g, rx, ry, () -> GeItemInfoPainter.paintTerminal(g, c, cw));
-			notePill(rx, ry, c.chartLabel, tfFm, true);
-			if (c.chartLabel != null)
+			final int cols = Math.min(2, Math.max(1, (availW + gap) / (miniW + gap)));
+			final int fb = plugin.fillsBottomY();
+			final int top = fb > 0 ? fb + 8 : 8;
+			final int floor = client.getCanvasHeight() - 8;
+			int i = 0;
+			for (final int itemId : items)
 			{
-				if (shiftDown) { drawTfChips(g, rx, ry, tfFm, true); }
-				else { drawShiftHint(g, rx, ry, tfFm, true); }
+				final int cx = rx + (i % cols) * (miniW + gap);
+				final int cyy = top + (i / cols) * (miniH + gap);
+				if (cyy + miniH > floor)
+				{
+					break;   // out of vertical room
+				}
+				final GeItemInfoPainter.Context c = buildContext(itemId, offers, true);
+				c.rangeRow = plugin.viewRangeFor(itemId);
+				paintAt(g, cx, cyy, () ->
+				{
+					GeItemInfoPainter.paintMiniGraph(g, c, miniW, miniH);
+					return new java.awt.Dimension(miniW, miniH);
+				});
+				i++;
 			}
 			return null;
 		}
