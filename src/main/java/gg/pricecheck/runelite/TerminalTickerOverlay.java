@@ -4,6 +4,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Shape;
 import java.util.List;
@@ -47,7 +48,18 @@ class TerminalTickerOverlay extends Overlay
 			return null;
 		}
 		final int w = client.getCanvasWidth();
-		final int y = client.getCanvasHeight() - H;
+		// Sit at the very bottom, but lift above the chat box so the tape never
+		// covers the chat input line.
+		int y = client.getCanvasHeight() - H;
+		final Rectangle cb = plugin.chatboxBounds();
+		if (cb != null && cb.height > 0)
+		{
+			y = Math.min(y, cb.y - H);
+		}
+		if (y < 0)
+		{
+			return null;
+		}
 		final int offset = (int) (System.currentTimeMillis() / SCROLL_MS_PER_PX);
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
