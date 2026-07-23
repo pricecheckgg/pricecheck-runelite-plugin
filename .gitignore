@@ -3,3 +3,15 @@ build/
 .idea/
 *.iml
 .DS_Store
+
+# never stage secrets or local config into this public repo
+.env
+.env.*
+local.properties
+*.keystore
+*.jks
+*.p12
+*.pem
+secring.*
+*.gpg
+*.local

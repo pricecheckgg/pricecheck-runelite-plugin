@@ -1,0 +1,20 @@
+PriceCheck Flipping
+Copyright (c) 2026 PriceCheck.gg
+
+The source code in this repository is licensed under the BSD 2-Clause License
+(see LICENSE). That grant covers the CODE ONLY.
+
+The following are reserved and are NOT licensed under it:
+
+  - The name "PriceCheck" and the PriceCheck wordmark.
+  - The logo and icon (icon.png and the icons under src/main/resources/).
+  - The screenshots and images under docs/.
+  - The pricecheck.gg and flipping.pricecheck.gg domains, and the hosted
+    PriceCheck service and its API.
+
+Forks and derivative works must remove this branding and choose a distinct
+name and icon. Using the PriceCheck name, wordmark, or artwork to identify a
+different plugin or service is not permitted.
+
+Not affiliated with Jagex Ltd. RuneScape and Old School RuneScape are
+trademarks of Jagex Ltd.
