@@ -15,7 +15,7 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * The desk's LEFT column: three stacked terminal panels docked to the left of the
+ * The desk's left column: three stacked terminal panels docked to the left of the
  * Grand Exchange window - OPPORTUNITY RADAR (top flips by EV/hr), FRESH DIPS (live
  * dump movers) and TOP MOVERS (biggest gainers). All three read the live ranked
  * board (Trader Pro), so the column only shows when market data is live and there

@@ -12,7 +12,7 @@ import javax.imageio.ImageIO;
 
 /**
  * Dev-only design mockup: the WHOLE Grand Exchange screen re-skinned as a
- * Bloomberg "trading desk" — the GE window in the centre, terminal panels docked
+ * Bloomberg "trading desk" - the GE window in the centre, terminal panels docked
  * on every side (status bar, opportunity radar, held-watch strip, positions
  * blotter, session/flow strip, ticker). Uses the owner's live 4-offer scene.
  * Standalone (no plugin dep). Args: [outputPath]. Never shipped (test source).
@@ -188,7 +188,7 @@ public final class BloombergDeskPreview
 				g.setColor(RED); rt(g, dips[i][1], lX + 300, ry);
 				g.setFont(mono(9)); g.setColor(DIM); rt(g, dips[i][2], lX + lW - 10, ry);
 			}
-			// TOP MOVERS (gainers) — fills the rest of the column
+			// TOP MOVERS (gainers) - fills the rest of the column
 			int gy = my + 160;
 			int g0 = panel(g, lX, gy, lW, botY - gy - 2, "TOP MOVERS  ·  GAINERS");
 			final String[][] gains = {

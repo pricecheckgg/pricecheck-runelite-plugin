@@ -8,7 +8,7 @@ import lombok.Data;
  * served as the {@code movers} sibling array on GET /api/plugin/flips. Field
  * names match the server's trimmed shape so Gson maps them directly.
  *
- * Honesty contract: pReversion, target and expHoldMin are trial-measured ONLY
+ * Honesty contract: pReversion, target and expHoldMin are trial-measured only
  * when {@code measured} is true; otherwise they are conservative estimates and
  * the surfaces say so. pReversion is a Wilson LOWER-bounded historical base
  * rate (only ever discounted by live flow, never inflated). target is an

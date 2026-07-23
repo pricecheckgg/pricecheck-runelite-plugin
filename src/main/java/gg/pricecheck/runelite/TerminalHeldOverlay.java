@@ -14,7 +14,7 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * The desk's HELD panel, docked ABOVE the Grand Exchange window: the positions you
+ * The desk's HELD panel, docked above the Grand Exchange window: the positions you
  * are sitting on (open lots from your flip log) with cost basis and live unrealised
  * P&L at the current board price. Distinct from the blotter, which lists active
  * offers. Opt-in via config.terminalDesk(); look from TerminalKit.

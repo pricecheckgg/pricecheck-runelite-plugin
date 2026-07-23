@@ -11,9 +11,9 @@ import java.awt.geom.Path2D;
 import java.util.List;
 
 /**
- * The GE-anchored item intelligence card: painted to the LEFT of the open
+ * The GE-anchored item intelligence card: painted to the left of the open
  * Grand Exchange offer interface while an item is selected. A tight window of
- * the traded corridor with YOUR offer drawn on it, the live prints the plugin
+ * the traded corridor with your offer drawn on it, the live prints the plugin
  * has observed arriving (each poll where the insta price moved is a print),
  * and the measured read: fill odds at your price, after-tax outcome. Pure
  * painter over plain data so the headless harness renders it; the overlay
@@ -360,7 +360,7 @@ final class GeItemInfoPainter
 		if (two) { g.setColor(c.stateColor2 != null ? c.stateColor2 : TerminalKit.AMBER); g.drawString(clip(expandVerdict(c.stateText2), g.getFontMetrics(), halfW - 12), L + halfW + 16, y + 14); }
 		y += 30;
 
-		// 3. chart — reuse the polished classic renderer (filled corridor OR the
+		// 3. chart - reuse the polished classic renderer (filled corridor OR the
 		//    last-N-trades chart, with volume, your-offer guides and print markers),
 		//    drawn in the pixel font it was tuned for; then the mono timeframe tag.
 		final int chartY = y;

@@ -3,12 +3,12 @@ package gg.pricecheck.runelite;
 import java.awt.Color;
 
 /**
- * The brain. Turns one active GE offer + the live market into an EXACT
- * instruction: keep it, or move it by a precise amount, or kill it. Pure logic -
- * no client or network calls: so it's deterministic and unit-testable.
+ * Turns one active GE offer plus the live market into an exact instruction: keep
+ * it, move it by a precise amount, or cancel it. Pure logic, no client or network
+ * calls, so it is deterministic and unit-testable.
  *
- * Market reference (matches the server): to BUY you place at FlipData.buy and to
- * SELL at FlipData.sell. The server's prices are already positioned so an offer
+ * Market reference (matches the server): to buy you place at FlipData.buy and to
+ * sell at FlipData.sell. The server's prices are already positioned so an offer
  * at them heads the queue. Margins are post-GE-tax.
  */
 final class OfferAdvisor
@@ -56,16 +56,16 @@ final class OfferAdvisor
 		}
 		final long marketMargin = live.getProfit(); // net(marketBuy, marketSell), post-tax
 
-		// The ONE thing that turns a patient offer into a real problem: the item is
-		// dropping against its own 1h average, so the spread is closing and waiting
-		// only gets worse. A thin or briefly-inverted spread on a STABLE item is not
-		// this - it reopens, and the offer still fills - so we hold it rather than
-		// tell the user to cancel or to cut the price and lose value.
+		// The one condition that turns a patient offer into a real problem: the item
+		// is dropping against its own 1h average, so the spread is closing and waiting
+		// only makes it worse. A thin or briefly-inverted spread on a stable item is
+		// not that: it reopens and the offer still fills, so we hold rather than tell
+		// the user to cancel or cut the price and lose value.
 		final boolean falling = live.isFallingKnife() || live.getTrendPct() <= -2.0D;
 
 		if (offer.isBuying())
 		{
-			// An offer that has already transacted is demonstrably filling.
+			// An offer that has already transacted is filling.
 			final boolean filling = offer.getSoldQty() > 0;
 			final long yourMargin = GeTax.net(yourPrice, marketSell);
 
@@ -76,8 +76,8 @@ final class OfferAdvisor
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
 					"Bid at/above the sell price - " + signed(yourMargin) + " if it fills, lower it", "BID TOO HIGH", RED);
 			}
-			// Genuinely dead: the price is falling AND there is no margin left, so
-			// the spread will not reopen soon. This is the only cancel-a-buy state.
+			// Dead: the price is falling and there is no margin left, so the spread
+			// will not reopen soon. This is the only cancel-a-buy state.
 			if (falling && marketMargin <= 0)
 			{
 				return new OfferAdvice(slot, name, side, OfferAdvice.Kind.DEAD,
@@ -90,7 +90,7 @@ final class OfferAdvisor
 					"Price falling " + pct(Math.abs(live.getTrendPct())) + " - margin closing, watch it",
 					"FALLING " + pct(Math.abs(live.getTrendPct())), AMBER);
 			}
-			// Spread thin or briefly gone but the item is NOT falling: the buy still
+			// Spread thin or briefly gone but the item is not falling: the buy still
 			// fills and the spread reopens. Hold it. Do not tell the user to cancel a
 			// buy that will fill.
 			if (marketMargin <= 0)

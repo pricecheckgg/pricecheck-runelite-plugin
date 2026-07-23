@@ -11,7 +11,7 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * The desk's SESSION · FLOW strip, docked to the BOTTOM edge of the Grand Exchange
+ * The desk's SESSION · FLOW strip, docked to the bottom edge of the Grand Exchange
  * window: this session's realised profit, gp/hr, flips, win rate, tax paid and
  * average ROI - all from your own flip log (no server call, works for free keys).
  * Opt-in via config.terminalDesk(); look from TerminalKit.

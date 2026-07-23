@@ -38,7 +38,7 @@ final class TerminalKit
 	static Font mono(int s)  { return new Font(Font.MONOSPACED, Font.PLAIN, s); }
 	static Font monoB(int s) { return new Font(Font.MONOSPACED, Font.BOLD, s); }
 
-	/** Enable shape + TEXT antialiasing — required for the mono font to read clean. */
+	/** Enable shape + TEXT antialiasing - required for the mono font to read clean. */
 	static void hints(Graphics2D g)
 	{
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -89,10 +89,10 @@ final class TerminalKit
 		g.setStroke(new BasicStroke(1.2f)); g.setColor(c); g.draw(p);
 	}
 
-	/** 4,266,644,991 — grouped, for the full cash readout. */
+	/** 4,266,644,991 - grouped, for the full cash readout. */
 	static String commas(long v) { return String.format("%,d", v); }
 
-	/** 4.27b / 805m / 41.0k — compact gp for tight columns. */
+	/** 4.27b / 805m / 41.0k - compact gp for tight columns. */
 	static String gp(long v)
 	{
 		final long a = Math.abs(v);

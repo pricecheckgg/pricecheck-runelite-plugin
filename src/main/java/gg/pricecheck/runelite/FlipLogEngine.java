@@ -19,11 +19,11 @@ import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
 
 /**
- * The FREE flip log: an exact, crash-proof ledger of every Grand Exchange fill,
+ * The free flip log: an exact, crash-proof ledger of every Grand Exchange fill,
  * matched into flips. Design goals, each aimed at a documented weakness in the
  * incumbent trackers:
  *
- *  - EXACT gp. Fills are deltas of the client's cumulative spent/quantity
+ *  - Exact gp. Fills are deltas of the client's cumulative spent/quantity
  *    counters against a persisted per-slot snapshot (the same method RuneLite
  *    itself uses for its trade submissions), so partial fills and price
  *    improvement are real coins, never an averaged int. All math is long.

@@ -18,7 +18,7 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * Terminal status bar — a thin Bloomberg command strip docked to the TOP edge of
+ * Terminal status bar - a thin Bloomberg command strip docked to the top edge of
  * the Grand Exchange window: brand, cash, used offer slots, world, and a live
  * clock. Opt-in via config.terminalStatusBar(). Uses only client-readable state
  * (no server call), so it works for free keys too. First panel of the terminal
@@ -58,7 +58,7 @@ class TerminalStatusOverlay extends Overlay
 		}
 
 		// The status bar is a fixed-height header, not a data panel: it does NOT
-		// follow overlayScale() (Large/big mode) — scaling it up shrinks the fit
+		// follow overlayScale() (Large/big mode) - scaling it up shrinks the fit
 		// width and squeezes out fields. It always spans the GE width at 1:1.
 		final double scale = 1.0;
 		final int h = (int) Math.round(BAR_H * scale);
@@ -96,7 +96,7 @@ class TerminalStatusOverlay extends Overlay
 	/** Pure drawing (0,0-origin, w x h) so the preview harness can render it headless.
 	 *  Fully metrics-driven and self-clamping: fields are only drawn if they fit
 	 *  before the right-pinned LIVE/clock block, so it never overlaps on a narrow
-	 *  (single-offer) GE window — it just shows fewer fields. */
+	 *  (single-offer) GE window - it just shows fewer fields. */
 	static void paintBar(Graphics2D g, int w, int h, long cash, int slots, int world, String clock, long pnlToday)
 	{
 		TerminalKit.hints(g);
@@ -152,7 +152,7 @@ class TerminalStatusOverlay extends Overlay
 		final int fieldW = Math.max(lw, vw);
 		if (x + fieldW > rEdge)
 		{
-			return x;   // no room on this window width — skip, never overlap
+			return x;   // no room on this window width - skip, never overlap
 		}
 		g.setFont(TerminalKit.mono(9));
 		g.setColor(TerminalKit.LABEL);

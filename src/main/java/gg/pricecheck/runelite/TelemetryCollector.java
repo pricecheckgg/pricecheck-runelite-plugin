@@ -9,7 +9,7 @@ import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
 
 /**
- * Collects the player's OWN Grand Exchange offer lifecycle events (placed,
+ * Collects the player's own Grand Exchange offer lifecycle events (placed,
  * partial fill, completed, cancelled) for batched reporting to PriceCheck.
  * These fills carry something our live price feed can't observe on its own:
  * how long offers at a given price actually take to fill. Submissions are

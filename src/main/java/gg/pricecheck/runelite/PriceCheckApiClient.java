@@ -20,7 +20,7 @@ import okhttp3.Response;
 
 /**
  * The only network surface. Calls the gated data API with the user's plugin key
- * as a Bearer token. The server re-checks the subscription LIVE on every request,
+ * as a Bearer token. The server re-checks the subscription live on every request,
  * so a lapsed sub returns 403 here and the panel goes empty: there is no local
  * gate to bypass.
  */

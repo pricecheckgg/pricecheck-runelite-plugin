@@ -15,8 +15,8 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
  * The desk's ORDER ticket, docked to the right of the Grand Exchange while you set
- * up an offer: a crystal-clear, live profit read of the offer you're typing (your
- * price vs the resale/cost reference, margin after tax, and total profit for the
+ * up an offer: a live profit read of the offer you're typing (your price vs the
+ * resale/cost reference, margin after tax, and total profit for the
  * quantity), with your own trade log for the item beneath it - each sale tagged
  * with the profit it made. Replaces the classic "Your trades" log. Opt-in via
  * config.terminalDesk(); look from TerminalKit.

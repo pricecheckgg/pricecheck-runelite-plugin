@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
 
-/** Dev-only: renders TerminalWatchlistOverlay.paintWatchlist — left: a few favs +
+/** Dev-only: renders TerminalWatchlistOverlay.paintWatchlist - left: a few favs +
  *  picks (content-sized); right: many favs paged (page 1/2). Args: [outputPath]. */
 public final class TerminalWatchlistPreview
 {
