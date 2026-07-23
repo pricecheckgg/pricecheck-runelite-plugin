@@ -153,7 +153,12 @@ class PriceCheckPanel extends PluginPanel
 		final java.util.List<MaterialTab> tabs = new ArrayList<>();
 		tabs.add(flipsTab);
 		tabs.add(logTab);
-		tabs.add(planTab);
+		// Plan tab (slot planner) disabled pending testing; view is still built so
+		// nothing else breaks, it just isn't given a tab. See PLANNER_ENABLED.
+		if (PriceCheckPlugin.PLANNER_ENABLED)
+		{
+			tabs.add(planTab);
+		}
 		if (config.showCatches())
 		{
 			tabs.add(catchTab);

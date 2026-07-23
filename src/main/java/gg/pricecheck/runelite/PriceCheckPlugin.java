@@ -43,6 +43,9 @@ public class PriceCheckPlugin extends Plugin
 	public static final String VERSION = "0.5.1";
 
 	private static final int SLOTS = 8;
+	// Slot planner (Plan tab + auto-capital). Disabled pending further testing; the
+	// code is kept intact, just not surfaced. Flip to true to re-enable.
+	static final boolean PLANNER_ENABLED = false;
 	private static final int PANEL_REFRESH_SECONDS = 6;
 	private static final int ADVISOR_REFRESH_SECONDS = 2;
 	// A transient network blip (timeout / 5xx / dropped poll) returns AuthState.ERROR,

@@ -154,6 +154,11 @@ public interface PriceCheckConfig extends Config
 		return false;
 	}
 
+	// Planner: auto-detect capital. The slot planner is disabled pending testing
+	// (see PriceCheckPlugin.PLANNER_ENABLED), so this toggle is hidden from settings
+	// - the method stays so all callers compile and nothing submits capital. Restore
+	// the @ConfigItem below to re-surface it when the planner comes back.
+	/*
 	@ConfigItem(
 		keyName = "autoCapital",
 		name = "Planner: auto-detect capital",
@@ -162,6 +167,7 @@ public interface PriceCheckConfig extends Config
 			+ "to PriceCheck's servers, which are not controlled or verified by the RuneLite Developers. Continue?",
 		position = 7
 	)
+	*/
 	default boolean autoCapital()
 	{
 		return false;
