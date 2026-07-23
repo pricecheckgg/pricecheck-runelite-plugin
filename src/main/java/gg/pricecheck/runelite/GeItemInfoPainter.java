@@ -241,11 +241,14 @@ final class GeItemInfoPainter
 
 		// verdict cells
 		final int halfW = (R - L) / 2 - 4;
+		final boolean two = c.stateText2 != null;
+		final int box1W = two ? halfW : R - L;   // one verdict spans the full width
 		g.setColor(new Color(0x2a, 0x1e, 0x14));
-		g.fillRect(L, y, halfW, 20); g.fillRect(L + halfW + 8, y, halfW, 20);
+		if (c.stateText != null) { g.fillRect(L, y, box1W, 20); }
+		if (two) { g.fillRect(L + halfW + 8, y, halfW, 20); }
 		g.setFont(TerminalKit.monoB(11));
-		if (c.stateText != null) { g.setColor(c.stateColor != null ? c.stateColor : TerminalKit.AMBER); g.drawString(clip(c.stateText, g.getFontMetrics(), halfW - 12), L + 8, y + 14); }
-		if (c.stateText2 != null) { g.setColor(c.stateColor2 != null ? c.stateColor2 : TerminalKit.AMBER); g.drawString(clip(c.stateText2, g.getFontMetrics(), halfW - 12), L + halfW + 16, y + 14); }
+		if (c.stateText != null) { g.setColor(c.stateColor != null ? c.stateColor : TerminalKit.AMBER); g.drawString(clip(c.stateText, g.getFontMetrics(), box1W - 12), L + 8, y + 14); }
+		if (two) { g.setColor(c.stateColor2 != null ? c.stateColor2 : TerminalKit.AMBER); g.drawString(clip(c.stateText2, g.getFontMetrics(), halfW - 12), L + halfW + 16, y + 14); }
 		y += 30;
 
 		// 3. band chart from series
@@ -298,17 +301,34 @@ final class GeItemInfoPainter
 		for (int i = 0; i <= 3; i++) { final int gy = y + i * hh / 3; g.drawLine(x, gy, x + cw, gy); }
 		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
 		for (int i = 0; i < 4; i++) { g.drawString(TerminalKit.gp((long) (top - i * span / 3)), x + cw + 4, y + i * hh / 3 + 3); }
+		// Gap-aware: real series have quiet windows with 0 high/low. Skip them and
+		// start a new segment across the gap, so a missing point never streaks a
+		// line off to a garbage coordinate.
 		final Path2D hiP = new Path2D.Float(), loP = new Path2D.Float();
+		boolean startHi = true, startLo = true;
 		for (int i = 0; i < n; i++)
 		{
 			final int px = x + (int) (i * (cw - 1.0) / (n - 1));
-			final int hy = y + (int) ((top - s.high[i]) / span * hh);
-			final int ly = y + (int) ((top - (s.low[i] > 0 ? s.low[i] : s.high[i])) / span * hh);
-			if (i == 0) { hiP.moveTo(px, hy); loP.moveTo(px, ly); } else { hiP.lineTo(px, hy); loP.lineTo(px, ly); }
+			if (s.high[i] > 0)
+			{
+				final int hy = y + (int) ((top - s.high[i]) / span * hh);
+				if (startHi) { hiP.moveTo(px, hy); startHi = false; } else { hiP.lineTo(px, hy); }
+			}
+			else { startHi = true; }
+			if (s.low[i] > 0)
+			{
+				final int ly = y + (int) ((top - s.low[i]) / span * hh);
+				if (startLo) { loP.moveTo(px, ly); startLo = false; } else { loP.lineTo(px, ly); }
+			}
+			else { startLo = true; }
 		}
+		// Clip to the chart box so nothing can ever draw outside the card.
+		final java.awt.Shape oldClip = g.getClip();
+		g.clipRect(x, y - 2, cw + 2, hh + 4);
 		g.setStroke(new BasicStroke(1.3f));
 		g.setColor(TerminalKit.GREEN); g.draw(hiP);
 		g.setColor(TerminalKit.RED); g.draw(loP);
+		g.setClip(oldClip);
 		if (yourSell > 0 && yourSell <= top && yourSell >= bot)
 		{
 			g.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1f, new float[]{3f, 3f}, 0f));

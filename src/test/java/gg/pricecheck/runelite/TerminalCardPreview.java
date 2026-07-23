@@ -42,6 +42,12 @@ public final class TerminalCardPreview
 			s.hvol[i] = 1 + (i * 7) % 4;
 			s.lvol[i] = 1 + (i * 5) % 3 + (i > 40 ? 3 : 0);
 		}
+		// Quiet windows (0 high/low) like the real feed, to prove the chart gap fix.
+		for (final int gap : new int[]{11, 12, 34, 55, 56})
+		{
+			s.high[gap] = 0;
+			s.low[gap] = 0;
+		}
 
 		final GeItemInfoPainter.Context c = new GeItemInfoPainter.Context();
 		c.itemName = "Tumeken's shadow (uncharged)";
