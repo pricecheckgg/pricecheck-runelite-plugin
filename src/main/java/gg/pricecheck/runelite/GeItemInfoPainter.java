@@ -499,10 +499,10 @@ final class GeItemInfoPainter
 			g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.DIM);
 			TerminalKit.rt(g, "+" + hiddenRows + " older", R, y + 7);
 		}
-		y += 13;
+		y += 18;   // more room below the counts so the sub-header can't overlap them
 		g.setFont(TerminalKit.mono(8)); g.setColor(TerminalKit.DIM);
 		TerminalKit.rt(g, "PRICE", L + 128, y); g.drawString("Δ VS YOU", L + 144, y); TerminalKit.rt(g, "AGE", R, y);
-		y += 19;
+		y += 14;   // (18 + 14 keeps the header a constant 32px, matching the height calc)
 		for (int i = 0; i < tapeRows; i++)
 		{
 			final Print p = c.prints.get(c.prints.size() - 1 - i);
@@ -515,15 +515,21 @@ final class GeItemInfoPainter
 			g.setFont(TerminalKit.monoB(12)); g.setColor(side);
 			TerminalKit.rt(g, Fmt.full(p.price), L + 128, ry);
 			g.setFont(TerminalKit.mono(11));
-			String tag; Color tc;
-			if (you) { tag = p.yoursBuy ? "YOU BOUGHT" : "YOU SOLD"; tc = TerminalKit.AMBER; }
+			if (you)
+			{
+				// Nice little badge on your own orders so they pop in the tape.
+				final String tag = p.yoursBuy ? "YOU BOUGHT" : "YOU SOLD";
+				final int tw = g.getFontMetrics().stringWidth(tag);
+				g.setColor(new Color(0x33, 0x28, 0x10)); g.fillRect(L + 142, ry - 9, tw + 8, 13);
+				g.setColor(TerminalKit.BORDER); g.drawRect(L + 142, ry - 9, tw + 8, 13);
+				g.setColor(TerminalKit.AMBERHI); g.drawString(tag, L + 146, ry);
+			}
 			else
 			{
 				final long ref = p.buySide ? (c.refSell() > 0 ? c.refSell() : c.refBuy()) : (c.refBuy() > 0 ? c.refBuy() : c.refSell());
-				tag = ref > 0 ? (p.price >= ref ? "+" : "-") + Fmt.compact(Math.abs(p.price - ref)) : "";
-				tc = TerminalKit.LABEL;
+				final String tag = ref > 0 ? (p.price >= ref ? "+" : "-") + Fmt.compact(Math.abs(p.price - ref)) : "";
+				g.setColor(TerminalKit.LABEL); g.drawString(tag, L + 144, ry);
 			}
-			g.setColor(tc); g.drawString(tag, L + 144, ry);
 			final long ago = Math.max(0, c.nowTs - p.ts);
 			final String age = ago < 60 ? ago + "s" : ago < 5400 ? (ago / 60) + "m" : (ago / 3600) + "h";
 			g.setColor(TerminalKit.DIM); TerminalKit.rt(g, age, R, ry);
