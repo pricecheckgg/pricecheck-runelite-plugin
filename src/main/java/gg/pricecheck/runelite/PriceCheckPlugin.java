@@ -44,7 +44,7 @@ public class PriceCheckPlugin extends Plugin
 
 	private static final int SLOTS = 8;
 	private static final int PANEL_REFRESH_SECONDS = 6;
-	private static final int ADVISOR_REFRESH_SECONDS = 3;
+	private static final int ADVISOR_REFRESH_SECONDS = 2;
 	// A transient network blip (timeout / 5xx / dropped poll) returns AuthState.ERROR,
 	// which is NOT a lapsed key. Hold the last-good overlays through this window
 	// instead of flickering them all off on a single missed panel poll. Only a
