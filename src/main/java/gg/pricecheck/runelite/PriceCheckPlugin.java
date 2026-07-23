@@ -149,6 +149,7 @@ public class PriceCheckPlugin extends Plugin
 	private TerminalFillsOverlay terminalFillsOverlay;
 	private TerminalTickerOverlay terminalTickerOverlay;
 	private TerminalWatchlistOverlay terminalWatchlistOverlay;
+	private TerminalOrderOverlay terminalOrderOverlay;
 	private ScheduledFuture<?> panelTask;
 	private ScheduledFuture<?> advisorTask;
 	private ScheduledFuture<?> telemetryTask;
@@ -336,6 +337,8 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(terminalTickerOverlay);
 		terminalWatchlistOverlay = new TerminalWatchlistOverlay(client, this);
 		overlayManager.add(terminalWatchlistOverlay);
+		terminalOrderOverlay = new TerminalOrderOverlay(client, this);
+		overlayManager.add(terminalOrderOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->
 		{
@@ -645,6 +648,11 @@ public class PriceCheckPlugin extends Plugin
 		{
 			overlayManager.remove(terminalWatchlistOverlay);
 			terminalWatchlistOverlay = null;
+		}
+		if (terminalOrderOverlay != null)
+		{
+			overlayManager.remove(terminalOrderOverlay);
+			terminalOrderOverlay = null;
 		}
 		for (int i = 0; i < SLOTS; i++)
 		{
@@ -987,6 +995,21 @@ public class PriceCheckPlugin extends Plugin
 	boolean terminalDesk()
 	{
 		return config.terminalDesk();
+	}
+
+	/** True while the offer set-up panel (465:15 or 465:26) is on screen - the state
+	 *  the terminal ORDER ticket wants; the blotter yields the right dock to it. */
+	boolean setupScreenOpen()
+	{
+		for (final int child : new int[]{15, 26})
+		{
+			final net.runelite.api.widgets.Widget w = client.getWidget(465, child);
+			if (w != null && !w.isHidden())
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** True when the GE grid OVERVIEW is on screen: no offer slot selected and no

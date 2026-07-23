@@ -94,6 +94,11 @@ class GeOffersPanelOverlay extends Overlay
 		{
 			return null;
 		}
+		// During offer set-up the terminal ORDER ticket owns the right dock.
+		if (plugin.terminalDesk() && plugin.setupScreenOpen())
+		{
+			return null;
+		}
 		final List<Row> rows = buildRows();
 		if (rows.isEmpty())
 		{

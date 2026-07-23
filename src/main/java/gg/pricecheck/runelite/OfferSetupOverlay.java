@@ -97,6 +97,12 @@ class OfferSetupOverlay extends Overlay
 			}
 		}
 
+		// The terminal desk draws its own ORDER panel (ticket + trade log) to the
+		// right of the GE, so the classic "Your trades" log stands down for it.
+		if (plugin.terminalDesk())
+		{
+			return null;
+		}
 		if (!config.geItemCard() || !plugin.marketDataOk())
 		{
 			return null;
