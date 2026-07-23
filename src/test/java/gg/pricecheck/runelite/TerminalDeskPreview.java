@@ -121,7 +121,8 @@ public final class TerminalDeskPreview
 		final int fN = Math.min(s.recent.size(), 8);
 		draw(g, bx, 248 + 8, () -> TerminalFillsOverlay.paintFills(g, TerminalFillsOverlay.W, s.recent, fN, now));
 
-		draw(g, 0, Hc - TerminalTickerOverlay.H, () -> TerminalTickerOverlay.paintTicker(g, W, flips, 0));
+		// Ticker snaps directly under the session strip (session bottom = geY+geH+4+56).
+		draw(g, geX, geY + geH + 4 + 56 + 4, () -> TerminalTickerOverlay.paintTicker(g, geW, flips, 0));
 
 		g.dispose();
 		ImageIO.write(img, "png", new File(out));

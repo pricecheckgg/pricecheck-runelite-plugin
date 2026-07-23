@@ -35,6 +35,7 @@ class TerminalSessionOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D g)
 	{
+		plugin.noteSessionStrip(-1, -1, -1);
 		if (!plugin.terminalDesk() || !plugin.isGrandExchangeOpen())
 		{
 			return null;
@@ -47,13 +48,12 @@ class TerminalSessionOverlay extends Overlay
 		}
 		final int x = ge.x;
 		final int y = ge.y + ge.height + GAP;
-		// No room below the GE without crossing the chat box (or the ticker lifted
-		// above it) -> stand down rather than cover the chat input.
+		// Stand down rather than cover the chat input.
 		int bottomLimit = client.getCanvasHeight() - 4;
 		final Rectangle cb = plugin.chatboxBounds();
 		if (cb != null && cb.height > 0)
 		{
-			bottomLimit = Math.min(bottomLimit, cb.y - TerminalTickerOverlay.H);
+			bottomLimit = Math.min(bottomLimit, cb.y - 4);
 		}
 		if (y + H > bottomLimit)
 		{
@@ -73,6 +73,8 @@ class TerminalSessionOverlay extends Overlay
 			if (aa != null) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, aa); }
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}
+		// Publish the footprint so the ticker snaps directly beneath the strip.
+		plugin.noteSessionStrip(x, y + H, ge.width);
 		return new Dimension(ge.width, H);
 	}
 

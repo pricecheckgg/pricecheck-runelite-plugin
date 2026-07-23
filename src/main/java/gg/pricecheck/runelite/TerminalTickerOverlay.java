@@ -47,16 +47,36 @@ class TerminalTickerOverlay extends Overlay
 		{
 			return null;
 		}
-		final int w = client.getCanvasWidth();
-		// Sit at the very bottom, but lift above the chat box so the tape never
-		// covers the chat input line.
-		int y = client.getCanvasHeight() - H;
+		// Snap directly under the session strip so the centre column reads as one
+		// stack (Held / status / GE / Session / Ticker), at the same x and width.
+		// Fall back to just below the GE when the session strip isn't shown.
+		final int sb = plugin.sessionBottomY();
+		final int x, w, y;
+		if (sb > 0 && plugin.sessionX() >= 0 && plugin.sessionW() > 0)
+		{
+			x = plugin.sessionX();
+			w = plugin.sessionW();
+			y = sb + 4;
+		}
+		else
+		{
+			final Rectangle ge = plugin.geGridBounds();
+			if (ge == null)
+			{
+				return null;
+			}
+			x = ge.x;
+			w = ge.width;
+			y = ge.y + ge.height + 4;
+		}
+		// Never poke into the chat box.
+		int floor = client.getCanvasHeight() - 4;
 		final Rectangle cb = plugin.chatboxBounds();
 		if (cb != null && cb.height > 0)
 		{
-			y = Math.min(y, cb.y - H);
+			floor = Math.min(floor, cb.y - 4);
 		}
-		if (y < 0)
+		if (y + H > floor)
 		{
 			return null;
 		}
@@ -66,14 +86,14 @@ class TerminalTickerOverlay extends Overlay
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
-		g.translate(0, y);
+		g.translate(x, y);
 		try
 		{
 			paintTicker(g, w, flips, offset);
 		}
 		finally
 		{
-			g.translate(0, -y);
+			g.translate(-x, -y);
 			if (aa != null) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, aa); }
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}

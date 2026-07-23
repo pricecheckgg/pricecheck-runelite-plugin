@@ -1892,6 +1892,11 @@ public class PriceCheckPlugin extends Plugin
 	// Canvas y of the offers blotter's bottom edge this frame (-1 when it isn't
 	// docked right of the GE), so the recent-flips panel can stack right under it.
 	private volatile int blotterBottomY = -1;
+	// Canvas x/bottom of the session strip this frame (-1 = not shown), so the
+	// ticker can snap directly beneath it into one centre column.
+	private volatile int sessionBottomY = -1;
+	private volatile int sessionX = -1;
+	private volatile int sessionW = -1;
 	private volatile List<FlipLogEngine.Flip> recentFlips = Collections.emptyList();
 
 	/** Aggregated holding for one item: {qty, totalCost, earliestOpenedAtMs},
@@ -1930,6 +1935,30 @@ public class PriceCheckPlugin extends Plugin
 	int blotterBottomY()
 	{
 		return blotterBottomY;
+	}
+
+	/** The session strip publishes its footprint each frame so the ticker snaps
+	 *  directly beneath it (x/width = -1 when the strip isn't shown). */
+	void noteSessionStrip(int x, int bottomY, int width)
+	{
+		sessionX = x;
+		sessionBottomY = bottomY;
+		sessionW = width;
+	}
+
+	int sessionBottomY()
+	{
+		return sessionBottomY;
+	}
+
+	int sessionX()
+	{
+		return sessionX;
+	}
+
+	int sessionW()
+	{
+		return sessionW;
 	}
 
 	/** Exact FIFO cost of {@code qty} units of an item, taken from the raw
