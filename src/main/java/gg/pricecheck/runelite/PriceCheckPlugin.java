@@ -142,6 +142,7 @@ public class PriceCheckPlugin extends Plugin
 	private OfferSetupOverlay setupOverlay;
 	private GeItemCardOverlay geCardOverlay;
 	private GeOffersPanelOverlay offersPanelOverlay;
+	private TerminalStatusOverlay terminalStatusOverlay;
 	private ScheduledFuture<?> panelTask;
 	private ScheduledFuture<?> advisorTask;
 	private ScheduledFuture<?> telemetryTask;
@@ -314,6 +315,8 @@ public class PriceCheckPlugin extends Plugin
 		overlayManager.add(geCardOverlay);
 		offersPanelOverlay = new GeOffersPanelOverlay(client, this, configManager);
 		overlayManager.add(offersPanelOverlay);
+		terminalStatusOverlay = new TerminalStatusOverlay(client, this, config);
+		overlayManager.add(terminalStatusOverlay);
 
 		poller = Executors.newSingleThreadScheduledExecutor(r ->
 		{
@@ -587,6 +590,11 @@ public class PriceCheckPlugin extends Plugin
 		{
 			overlayManager.remove(offersPanelOverlay);
 			offersPanelOverlay = null;
+		}
+		if (terminalStatusOverlay != null)
+		{
+			overlayManager.remove(terminalStatusOverlay);
+			terminalStatusOverlay = null;
 		}
 		for (int i = 0; i < SLOTS; i++)
 		{

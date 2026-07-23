@@ -257,4 +257,15 @@ public interface PriceCheckConfig extends Config
 	{
 		return OverlayMode.ACTIVE;
 	}
+
+	@ConfigItem(
+		keyName = "terminalStatusBar",
+		name = "GE: terminal status bar",
+		description = "Dock a Bloomberg-style status strip to the top of the open Grand Exchange window: your cash, used offer slots, current world, and a live clock. First piece of the terminal desk. Uses only on-screen game state, nothing is sent.",
+		position = 18
+	)
+	default boolean terminalStatusBar()
+	{
+		return false;
+	}
 }
