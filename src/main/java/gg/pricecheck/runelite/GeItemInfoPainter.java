@@ -173,6 +173,24 @@ final class GeItemInfoPainter
 		return (v >= 0 ? "+" : "-") + String.format("%.1f%%", Math.abs(v));
 	}
 
+	/** Spell out the terse side letter for the terminal verdict: "S OK" -> "SELL OK". */
+	private static String expandVerdict(String s)
+	{
+		if (s == null)
+		{
+			return null;
+		}
+		if (s.startsWith("S "))
+		{
+			return "SELL " + s.substring(2);
+		}
+		if (s.startsWith("B "))
+		{
+			return "BUY " + s.substring(2);
+		}
+		return s;
+	}
+
 	static Dimension paintTerminal(Graphics2D g, Context c, int w)
 	{
 		TerminalKit.hints(g);
@@ -247,8 +265,8 @@ final class GeItemInfoPainter
 		if (c.stateText != null) { g.fillRect(L, y, box1W, 20); }
 		if (two) { g.fillRect(L + halfW + 8, y, halfW, 20); }
 		g.setFont(TerminalKit.monoB(11));
-		if (c.stateText != null) { g.setColor(c.stateColor != null ? c.stateColor : TerminalKit.AMBER); g.drawString(clip(c.stateText, g.getFontMetrics(), box1W - 12), L + 8, y + 14); }
-		if (two) { g.setColor(c.stateColor2 != null ? c.stateColor2 : TerminalKit.AMBER); g.drawString(clip(c.stateText2, g.getFontMetrics(), halfW - 12), L + halfW + 16, y + 14); }
+		if (c.stateText != null) { g.setColor(c.stateColor != null ? c.stateColor : TerminalKit.AMBER); g.drawString(clip(expandVerdict(c.stateText), g.getFontMetrics(), box1W - 12), L + 8, y + 14); }
+		if (two) { g.setColor(c.stateColor2 != null ? c.stateColor2 : TerminalKit.AMBER); g.drawString(clip(expandVerdict(c.stateText2), g.getFontMetrics(), halfW - 12), L + halfW + 16, y + 14); }
 		y += 30;
 
 		// 3. chart — reuse the polished classic renderer (filled corridor OR the
@@ -372,10 +390,16 @@ final class GeItemInfoPainter
 		g.setColor(TerminalKit.GRID); g.drawLine(L, y - 4, R, y - 4);
 		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
 		g.drawString("TIME & SALES", L, y + 7);
+		final int titleW = g.getFontMetrics().stringWidth("TIME & SALES");
 		int nBuy = 0;
 		for (int i = 0; i < tapeRows; i++) { if (c.prints.get(c.prints.size() - 1 - i).buySide) { nBuy++; } }
-		g.setColor(TerminalKit.GREEN); TerminalKit.rt(g, "▲" + nBuy, R - 26, y + 7);
-		g.setColor(TerminalKit.RED); TerminalKit.rt(g, "▼" + (tapeRows - nBuy), R, y + 7);
+		// Counts sit right after the title (not top-right) so they don't smash into
+		// the AGE column sub-header below.
+		g.setFont(TerminalKit.monoB(9));
+		final int cx = L + titleW + 12;
+		g.setColor(TerminalKit.GREEN); g.drawString("▲" + nBuy, cx, y + 7);
+		final int aw = g.getFontMetrics().stringWidth("▲" + nBuy);
+		g.setColor(TerminalKit.RED); g.drawString("▼" + (tapeRows - nBuy), cx + aw + 10, y + 7);
 		y += 13;
 		g.setFont(TerminalKit.mono(8)); g.setColor(TerminalKit.DIM);
 		TerminalKit.rt(g, "PRICE", L + 128, y); g.drawString("Δ VS YOU", L + 144, y); TerminalKit.rt(g, "AGE", R, y);
