@@ -47,9 +47,17 @@ class TerminalSessionOverlay extends Overlay
 		}
 		final int x = ge.x;
 		final int y = ge.y + ge.height + GAP;
-		if (y + H > client.getCanvasHeight() - 4)
+		// No room below the GE without crossing the chat box (or the ticker lifted
+		// above it) -> stand down rather than cover the chat input.
+		int bottomLimit = client.getCanvasHeight() - 4;
+		final Rectangle cb = plugin.chatboxBounds();
+		if (cb != null && cb.height > 0)
 		{
-			return null;   // no room below the GE
+			bottomLimit = Math.min(bottomLimit, cb.y - TerminalTickerOverlay.H);
+		}
+		if (y + H > bottomLimit)
+		{
+			return null;
 		}
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);

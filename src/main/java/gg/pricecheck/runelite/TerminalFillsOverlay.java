@@ -54,8 +54,15 @@ class TerminalFillsOverlay extends Overlay
 			return null;   // no room to the right
 		}
 		// Bottom-anchored above the ticker; capped so it never rises over the GE top
-		// (where the blotter lives), keeping the two right-column panels apart.
-		final int floorY = client.getCanvasHeight() - TerminalTickerOverlay.H - 8;
+		// (where the blotter lives), keeping the two right-column panels apart. The
+		// floor also clears the chat box (and the ticker lifted above it) so a tall
+		// panel can't overwrite the chat input.
+		int floorY = client.getCanvasHeight() - TerminalTickerOverlay.H - 8;
+		final Rectangle cb = plugin.chatboxBounds();
+		if (cb != null && cb.height > 0)
+		{
+			floorY = Math.min(floorY, cb.y - TerminalTickerOverlay.H - 8);
+		}
 		final int maxH = floorY - ge.y;
 		int rowN = Math.min(s.recent.size(), MAX_ROWS);
 		while (rowN > 0 && 32 + rowN * ROW + 6 > maxH)

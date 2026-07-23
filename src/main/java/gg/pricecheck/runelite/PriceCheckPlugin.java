@@ -1015,18 +1015,44 @@ public class PriceCheckPlugin extends Plugin
 	}
 
 	/** The ranked flip board for the desk panels (radar / movers / ticker); empty
-	 *  until live market data has landed. */
+	 *  until live market data has landed. Null entries (a JSON null in the array)
+	 *  are stripped so the panels can iterate without per-row null guards. */
 	List<FlipData> boardFlips()
 	{
 		final PriceCheckApiClient.FlipsResult r = lastGoodFlips;
-		return r != null && r.flips != null ? r.flips : Collections.emptyList();
+		if (r == null || r.flips == null)
+		{
+			return Collections.emptyList();
+		}
+		final List<FlipData> out = new ArrayList<>(r.flips.size());
+		for (final FlipData f : r.flips)
+		{
+			if (f != null)
+			{
+				out.add(f);
+			}
+		}
+		return out;
 	}
 
-	/** Live dump movers for the fresh-dips panel; empty until market data lands. */
+	/** Live dump movers for the fresh-dips panel; empty until market data lands.
+	 *  Null entries are stripped (see boardFlips). */
 	List<CatchData> boardCatches()
 	{
 		final PriceCheckApiClient.FlipsResult r = lastGoodFlips;
-		return r != null && r.catches != null ? r.catches : Collections.emptyList();
+		if (r == null || r.catches == null)
+		{
+			return Collections.emptyList();
+		}
+		final List<CatchData> out = new ArrayList<>(r.catches.size());
+		for (final CatchData c : r.catches)
+		{
+			if (c != null)
+			{
+				out.add(c);
+			}
+		}
+		return out;
 	}
 
 	/** Buy-limit read for the terminal card: {boughtIn4h, total, resetEpochMs}.
