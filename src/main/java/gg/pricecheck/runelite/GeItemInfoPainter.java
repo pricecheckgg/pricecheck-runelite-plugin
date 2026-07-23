@@ -184,9 +184,9 @@ final class GeItemInfoPainter
 		final long ask = c.refSell() > 0 ? c.refSell() : seriesHi(s);
 		final long bid = c.refBuy() > 0 ? c.refBuy() : lastLowOf(s);
 		final long spread = (ask > 0 && bid > 0) ? ask - bid : 0;
-		final long net = (ask > 0 && bid > 0) ? GeTax.net(bid, ask) : 0;
+		final long netEa = (ask > 0 && bid > 0) ? GeTax.net(bid, ask) : 0;
 		final long tax = ask > 0 ? Math.min(ask / 50, 5_000_000L) : 0;
-		final double roi = bid > 0 ? net * 100.0 / bid : 0;
+		final double roi = bid > 0 ? netEa * 100.0 / bid : 0;
 		final long vol24 = seriesVol(s);
 		final long hi = c.rangeRow != null && c.rangeRow[0] > 0 ? c.rangeRow[0] : seriesHi(s);
 		final long lo = c.rangeRow != null && c.rangeRow[2] > 0 ? c.rangeRow[2] : seriesLo(s);
@@ -198,7 +198,7 @@ final class GeItemInfoPainter
 
 		// ── height (matches the section y-progression below) ──
 		final int gridH = 5 * 26;
-		final int chartH = 96;
+		final int chartH = 132;
 		int h = 46 + gridH + 30 + (chartH + 8) + (40 + tapeRows * 17) + (holding ? 20 : 0) + 16;
 
 		// ── panel ──
@@ -220,7 +220,7 @@ final class GeItemInfoPainter
 		TerminalKit.cell(g, c1, colW, y, "ASK", ask > 0 ? TerminalKit.commas(ask) : "-", TerminalKit.AMBER);
 		TerminalKit.cell(g, c2, colW, y, "SPRD", spread > 0 ? TerminalKit.commas(spread) : "-", TerminalKit.AMBER);
 		y += 26;
-		TerminalKit.cell(g, c0, colW, y, "NET/EA", (net >= 0 ? "+" : "") + TerminalKit.commas(net), net >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
+		TerminalKit.cell(g, c0, colW, y, "NET/EA", (netEa >= 0 ? "+" : "") + TerminalKit.commas(netEa), netEa >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
 		TerminalKit.cell(g, c1, colW, y, "ROI", signPct(roi), roi >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
 		TerminalKit.cell(g, c2, colW, y, "TAX", TerminalKit.commas(tax), TerminalKit.LABEL);
 		y += 26;
@@ -251,9 +251,26 @@ final class GeItemInfoPainter
 		if (two) { g.setColor(c.stateColor2 != null ? c.stateColor2 : TerminalKit.AMBER); g.drawString(clip(c.stateText2, g.getFontMetrics(), halfW - 12), L + halfW + 16, y + 14); }
 		y += 30;
 
-		// 3. band chart + timeframe tag (click-to-cycle) drawn over the chart top-left
+		// 3. chart — reuse the polished classic renderer (filled corridor OR the
+		//    last-N-trades chart, with volume, your-offer guides and print markers),
+		//    drawn in the pixel font it was tuned for; then the mono timeframe tag.
 		final int chartY = y;
-		y = paintTermChart(g, s, L, chartY, R - L, chartH, c.refSell());
+		final java.awt.Font cardFont = g.getFont();
+		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+		g.setFont(net.runelite.client.ui.FontManager.getRunescapeSmallFont());
+		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+		final FontMetrics cfm = g.getFontMetrics();
+		if (c.tradesChartN > 0)
+		{
+			paintTradesChart(g, c, L, chartY, R - L, chartH, cfm);
+		}
+		else
+		{
+			paintChart(g, c, L, chartY, R - L, chartH, cfm, false);
+		}
+		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa != null ? taa : RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+		g.setFont(cardFont);
+		y = chartY + chartH;
 		if (c.chartLabel != null && !c.chartLabel.isEmpty())
 		{
 			final String tag = c.chartLabel + (c.tradesChartN > 0 ? " trades" : " price");

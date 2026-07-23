@@ -80,19 +80,23 @@ public final class TerminalCardPreview
 		c.outcomeColor = TerminalKit.GREEN;
 
 		final int w = GeItemInfoPainter.TERM_W, pad = 16, sc = 2;
-		final int hGuess = 700;
-		final BufferedImage img = new BufferedImage((w + pad * 2) * sc, (hGuess + pad * 2) * sc, BufferedImage.TYPE_INT_RGB);
+		final int hGuess = 620;
+		// Two cards side by side: LEFT = corridor (24h), RIGHT = last-10-trades view.
+		final BufferedImage img = new BufferedImage((w * 2 + pad * 3) * sc, (hGuess + pad * 2) * sc, BufferedImage.TYPE_INT_RGB);
 		final Graphics2D g = img.createGraphics();
 		g.scale(sc, sc);
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 		g.setColor(new Color(0x14, 0x12, 0x0d));
-		g.fillRect(0, 0, w + pad * 2, hGuess + pad * 2);
+		g.fillRect(0, 0, w * 2 + pad * 3, hGuess + pad * 2);
 		g.translate(pad, pad);
-		final java.awt.Dimension d = GeItemInfoPainter.paintTerminal(g, c, w);
+		final java.awt.Dimension d1 = GeItemInfoPainter.paintTerminal(g, c, w);
+		// right card: trades view
+		c.tradesChartN = 10;
+		c.chartLabel = "10";
+		g.translate(w + pad, 0);
+		GeItemInfoPainter.paintTerminal(g, c, w);
 		g.dispose();
-		// crop to the actual card height
-		final BufferedImage crop = img.getSubimage(0, 0, (w + pad * 2) * sc, Math.min((d.height + pad * 2) * sc, img.getHeight()));
-		ImageIO.write(crop, "png", new File(out));
-		System.out.println("wrote " + out + " (card " + d.width + "x" + d.height + ")");
+		ImageIO.write(img, "png", new File(out));
+		System.out.println("wrote " + out + " (card " + d1.width + "x" + d1.height + ")");
 	}
 }
