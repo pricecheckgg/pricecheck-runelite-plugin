@@ -57,7 +57,10 @@ class TerminalStatusOverlay extends Overlay
 			return null;
 		}
 
-		final double scale = plugin.overlayScale();
+		// The status bar is a fixed-height header, not a data panel: it does NOT
+		// follow overlayScale() (Large/big mode) — scaling it up shrinks the fit
+		// width and squeezes out fields. It always spans the GE width at 1:1.
+		final double scale = 1.0;
 		final int h = (int) Math.round(BAR_H * scale);
 		final int w = ge.width;                       // span the GE width
 		final int x = ge.x;
