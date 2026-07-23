@@ -60,7 +60,9 @@ class TerminalTickerOverlay extends Overlay
 		{
 			return null;
 		}
-		final int offset = (int) (System.currentTimeMillis() / SCROLL_MS_PER_PX);
+		// Keep the scroll phase as a long; paintTicker reduces it modulo the strip
+		// width (casting the raw ms/px to int overflows and slings the tape off-screen).
+		final long offset = System.currentTimeMillis() / SCROLL_MS_PER_PX;
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
@@ -80,7 +82,7 @@ class TerminalTickerOverlay extends Overlay
 
 	/** Pure drawing (0,0-origin). offset scrolls the tape leftward (0 = static, for
 	 *  the headless preview). Draws the strip twice for a seamless wrap. */
-	static void paintTicker(Graphics2D g, int w, List<FlipData> flips, int offset)
+	static void paintTicker(Graphics2D g, int w, List<FlipData> flips, long offset)
 	{
 		TerminalKit.hints(g);
 		g.setColor(TerminalKit.PANEL); g.fillRect(0, 0, w, H);
@@ -102,7 +104,7 @@ class TerminalTickerOverlay extends Overlay
 		}
 		else
 		{
-			final int start = -(offset % contentW);
+			final int start = -(int) Math.floorMod(offset, (long) contentW);
 			drawStrip(g, fm, flips, n, start);
 			drawStrip(g, fm, flips, n, start + contentW);
 		}
