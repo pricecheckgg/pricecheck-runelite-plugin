@@ -138,7 +138,9 @@ class TerminalHeldOverlay extends Overlay
 				continue;
 			}
 			final long unit = cost / qty;
-			final FlipData live = plugin.liveFor(e.getKey());
+			// uP&L is a live-market value: only when market data is live (Trader Pro),
+			// so a lapsed key can't read a stale mark. Your position itself is free.
+			final FlipData live = plugin.marketDataOk() ? plugin.liveFor(e.getKey()) : null;
 			final long sell = live != null ? live.getSell() : 0;
 			final boolean has = sell > 0;
 			final long uPnl = has ? qty * GeTax.net(unit, sell) : 0;
