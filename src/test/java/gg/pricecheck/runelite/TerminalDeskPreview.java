@@ -114,8 +114,9 @@ public final class TerminalDeskPreview
 		picks.add(new TerminalWatchlistOverlay.Pick("Dragon claws", 167_500_000L, 1_900_000L));
 		picks.add(new TerminalWatchlistOverlay.Pick("Zaryte crossbow", 37_400_000L, 910_000L));
 		picks.add(new TerminalWatchlistOverlay.Pick("Voidwaker", 88_400_000L, 870_000L));
-		final int wlH = heldTop - 4 - 8;
-		draw(g, geX, 8, () -> TerminalWatchlistOverlay.paintWatchlist(g, geW, wlH, watch, picks));
+		// Content-sized, bottom-anchored flush against the held panel.
+		final int wlH = 32 + watch.size() * 16 + 20 + picks.size() * 16 + 6;
+		draw(g, geX, heldTop - 4 - wlH, () -> TerminalWatchlistOverlay.paintWatchlist(g, geW, wlH, watch, picks, 0, 1));
 
 		draw(g, geX - TerminalRadarOverlay.W - 8, 8,
 			() -> TerminalRadarOverlay.paintColumn(g, TerminalRadarOverlay.W, Hc - 16, flips, catches));
