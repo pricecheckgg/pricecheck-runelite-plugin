@@ -1931,6 +1931,9 @@ public class PriceCheckPlugin extends Plugin
 	// Canvas y of the held panel's top edge this frame (-1 = not shown), so the
 	// watchlist can fill the gap above it.
 	private volatile int heldTopY = -1;
+	// Canvas y of the recent-flips panel's bottom this frame (-1 = not shown), so
+	// the overview evidence card stacks beneath it in the right column.
+	private volatile int fillsBottomY = -1;
 	private volatile List<FlipLogEngine.Flip> recentFlips = Collections.emptyList();
 
 	/** Aggregated holding for one item: {qty, totalCost, earliestOpenedAtMs},
@@ -2012,6 +2015,18 @@ public class PriceCheckPlugin extends Plugin
 	int heldTopY()
 	{
 		return heldTopY;
+	}
+
+	/** The recent-flips panel publishes its bottom edge so the overview evidence
+	 *  card stacks beneath it (-1 when it isn't shown). */
+	void noteFillsBottom(int y)
+	{
+		fillsBottomY = y;
+	}
+
+	int fillsBottomY()
+	{
+		return fillsBottomY;
 	}
 
 	/** Exact FIFO cost of {@code qty} units of an item, taken from the raw

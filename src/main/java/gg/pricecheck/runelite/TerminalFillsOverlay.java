@@ -38,6 +38,7 @@ class TerminalFillsOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D g)
 	{
+		plugin.noteFillsBottom(-1);
 		if (!plugin.terminalDesk() || !plugin.isGrandExchangeOpen())
 		{
 			return null;
@@ -90,6 +91,7 @@ class TerminalFillsOverlay extends Overlay
 			if (aa != null) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, aa); }
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}
+		plugin.noteFillsBottom(y + h);
 		return new Dimension(W, h);
 	}
 

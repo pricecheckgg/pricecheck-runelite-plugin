@@ -295,13 +295,56 @@ class GeItemCardOverlay extends Overlay
 		}
 
 		// Main grid: one card per distinct item across your offers.
-		plugin.noteViewedItem(0);
-		// The terminal desk owns the space around the GE (radar left, blotter right,
-		// held/session/fills), so the classic overview mini-cards stand down for it.
+		// With the desk on, the classic mini-card grid is replaced by a single
+		// terminal evidence card (corridor chart + your offer line + verdict) for
+		// your primary active offer, docked on the right beneath the recent-flips
+		// panel - "where my offer is" on the overview, next to the GE.
 		if (plugin.terminalDesk())
 		{
+			int geId = 0;
+			if (offers != null)
+			{
+				for (final GrandExchangeOffer o : offers)
+				{
+					if (o != null && o.getState() != GrandExchangeOfferState.EMPTY && o.getItemId() > 0)
+					{
+						geId = o.getItemId();
+						break;
+					}
+				}
+			}
+			final Rectangle ge = geBounds();
+			final int cw = GeItemInfoPainter.TERM_W;
+			if (geId <= 0 || ge == null || ge.x + ge.width + 8 + cw > client.getCanvasWidth() - 4)
+			{
+				plugin.noteViewedItem(0);
+				return null;
+			}
+			final int rx = ge.x + ge.width + 8;
+			final int fb = plugin.fillsBottomY();
+			final int ry = fb > 0 ? fb + 8 : 8;
+			final int[] rAnchor = {rx, ry, cw};
+			final int budget = termMaxHeight(rAnchor);
+			final int gId = geId;
+			final GeItemInfoPainter.Context c = buildContext(gId, offers, true);
+			c.rangeRow = plugin.viewRangeFor(gId);
+			if (budget < GeItemInfoPainter.terminalFixedHeight(c))
+			{
+				plugin.noteViewedItem(0);
+				return null;   // not enough room below the right column
+			}
+			plugin.noteViewedItem(gId);   // fetch this item's series for the chart
+			c.maxHeight = budget;
+			paintAt(g, rx, ry, () -> GeItemInfoPainter.paintTerminal(g, c, cw));
+			notePill(rx, ry, c.chartLabel, tfFm, true);
+			if (c.chartLabel != null)
+			{
+				if (shiftDown) { drawTfChips(g, rx, ry, tfFm, true); }
+				else { drawShiftHint(g, rx, ry, tfFm, true); }
+			}
 			return null;
 		}
+		plugin.noteViewedItem(0);
 		if (offers == null)
 		{
 			return null;
