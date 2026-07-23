@@ -23,7 +23,7 @@ import net.runelite.client.ui.overlay.OverlayPosition;
  */
 class TerminalOrderOverlay extends Overlay
 {
-	static final int W = 300;
+	static final int W = 292;   // match the recent-flips / blotter column width
 	private static final int GE_GROUP = 465;
 	private static final int[] SETUP_PANELS = { 15, 26 };
 	private static final int COINS_ITEM = 995;
@@ -89,7 +89,10 @@ class TerminalOrderOverlay extends Overlay
 		final long[][] trades = plugin.ownTradesFor(t.geId, MAX_LOG);
 		final int logN = trades == null ? 0 : Math.min(trades.length, MAX_LOG);
 		final int h = TICKET_H + (logN > 0 ? 24 + logN * LOG_ROW : 0);
-		final int y = 8;
+		// Sit directly beneath the recent-flips ("closed swaps") panel so the right
+		// column reads Recent Flips -> Order ticket; top-align if it isn't shown.
+		final int fb = plugin.fillsBottomY();
+		final int y = fb > 0 ? fb + 8 : 8;
 		final long nowSec = System.currentTimeMillis() / 1000L;
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);

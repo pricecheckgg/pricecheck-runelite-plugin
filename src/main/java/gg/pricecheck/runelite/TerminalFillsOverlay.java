@@ -55,9 +55,10 @@ class TerminalFillsOverlay extends Overlay
 			return null;   // no room to the right
 		}
 		// Stack directly under the blotter to form one tight right column; if the
-		// blotter isn't docked right this frame, top-align with the GE instead.
+		// blotter isn't docked right this frame (e.g. during set-up, where it yields
+		// to the order ticket), top-align so recent-flips leads the column.
 		final int bb = plugin.blotterBottomY();
-		final int y = bb > 0 ? bb + 8 : ge.y;
+		final int y = bb > 0 ? bb + 8 : 8;
 		// Grow downward, but stop above the ticker and the chat box.
 		int floorY = client.getCanvasHeight() - TerminalTickerOverlay.H - 8;
 		final Rectangle cb = plugin.chatboxBounds();
