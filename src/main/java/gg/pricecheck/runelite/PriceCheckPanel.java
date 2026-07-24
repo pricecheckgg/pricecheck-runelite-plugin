@@ -1748,14 +1748,14 @@ class PriceCheckPanel extends PluginPanel
 		v.add(saveKeyBtn);
 		v.add(gap(4));
 
-		final JLabel link = new JLabel("Get a key · flipping.pricecheck.gg");
+		final JLabel link = new JLabel("Free key · Discord login, no RSN");
 		link.setForeground(Palette.SUBTLE);
 		link.setFont(FontManager.getRunescapeSmallFont());
 		link.setAlignmentX(Component.LEFT_ALIGNMENT);
 		link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		link.addMouseListener(new MouseAdapter()
 		{
-			public void mousePressed(MouseEvent e) { LinkBrowser.browse("https://flipping.pricecheck.gg"); }
+			public void mousePressed(MouseEvent e) { LinkBrowser.browse("https://flipping.pricecheck.gg/portfolio"); }
 			public void mouseEntered(MouseEvent e) { link.setForeground(Palette.GOLD); }
 			public void mouseExited(MouseEvent e) { link.setForeground(Palette.SUBTLE); }
 		});

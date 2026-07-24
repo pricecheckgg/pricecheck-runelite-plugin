@@ -1219,6 +1219,7 @@ public class PriceCheckPlugin extends Plugin
 	private final Set<Integer> seriesFetching = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 	// Failed fetches back off so a missing series or a network flap cannot
 	// queue a request per render frame on the single poller thread.
+	private static final long SERIES_FAIL_COOLDOWN_MS = 3_000L;
 	private final Map<Integer, Long> seriesFailedAt = java.util.Collections.synchronizedMap(new java.util.HashMap<>());
 	// The 7d window is a separate, heavier server series (snapshot-backed), only
 	// fetched when the card's timeframe pill asks for it. Its own cache with a
@@ -1446,7 +1447,12 @@ public class PriceCheckPlugin extends Plugin
 			c = seriesCache.get(geId);
 		}
 		final Long failed = seriesFailedAt.get(geId);
-		final boolean coolingDown = failed != null && System.currentTimeMillis() - failed < 45_000L;
+		// A transient series-fetch blip must not blank the card for long. Retry within
+		// a few seconds instead of locking the item out for 45s (which showed as empty
+		// VOL/HI/LO/chart until the user backed out and reopened the item). Previously
+		// viewed items keep their last-good series through a blip; only a fresh item
+		// with no cache goes blank, and now only for ~3s before it self-heals.
+		final boolean coolingDown = failed != null && System.currentTimeMillis() - failed < SERIES_FAIL_COOLDOWN_MS;
 		if (poller != null && !coolingDown && (c == null || System.currentTimeMillis() - c.atMs > 60_000L))
 		{
 			poller.execute(() -> refreshSeries(geId));
