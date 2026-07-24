@@ -75,6 +75,18 @@ public final class TerminalRadarPreview
 		g.fillRect(0, 0, w + pad * 2, availH + pad * 2);
 		g.translate(pad, pad);
 		final int tfIdx = args.length > 1 ? Integer.parseInt(args[1]) : 0;
+		// "flash" mode: two passes so the static image can show flash-on-change.
+		// Seed the tracker with the current values, nudge a few, then render - the
+		// nudged rows flash (green up / red down).
+		if (args.length > 2 && "flash".equals(args[2]))
+		{
+			final BufferedImage warm = new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB);
+			TerminalRadarOverlay.paintColumn(warm.createGraphics(), w, availH, flips, catches, tfIdx, new ArrayList<>());
+			flips.get(5).setTrendPct(flips.get(5).getTrendPct() + 2.0);
+			flips.get(11).setTrendPct(flips.get(11).getTrendPct() + 0.8);
+			flips.get(9).setTrendPct(flips.get(9).getTrendPct() - 2.5);
+			flips.get(3).setTrendPct(flips.get(3).getTrendPct() - 0.9);
+		}
 		TerminalRadarOverlay.paintColumn(g, w, availH, flips, catches, tfIdx, new ArrayList<>());
 		g.dispose();
 		ImageIO.write(img, "png", new File(out));

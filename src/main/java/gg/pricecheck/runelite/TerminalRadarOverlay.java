@@ -8,7 +8,9 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import net.runelite.api.Client;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
@@ -120,6 +122,13 @@ class TerminalRadarOverlay extends Overlay
 	private static final int LIST_ROW = 15;
 	private static final int SUBHEAD = 13;
 
+	// Flash-on-change: per geId {lastTrend, flashUntilMs, dir}. A % that moves
+	// between polls flashes its row (green up / red down) then fades - the live
+	// tape feel. Static so it survives the per-frame repaint; reset on tf switch.
+	private static final long FLASH_MS = 750;
+	private static final Map<Integer, double[]> FLASH = new HashMap<>();
+	private static int lastTfIdx = -1;
+
 	/** Panel height for a section: title strip + optional sub-header + rows + pad. */
 	private static int sectionH(int rows, boolean subhead)
 	{
@@ -130,6 +139,9 @@ class TerminalRadarOverlay extends Overlay
 	static void paintColumn(Graphics2D g, int w, int availH, List<FlipData> flips, List<CatchData> catches, int tfIdx, List<Rectangle> chipOut)
 	{
 		TerminalKit.hints(g);
+		// A timeframe switch changes every value at once - not a market move, so
+		// forget the last-seen values to avoid flashing the whole board.
+		if (tfIdx != lastTfIdx) { FLASH.clear(); lastTfIdx = tfIdx; }
 
 		// Fresh dips: live dumps. Drop only the clearly-dead moves (ended / faded),
 		// data-artifact spikes (a real dip almost never exceeds ~85%), and low-value
@@ -283,6 +295,8 @@ class TerminalRadarOverlay extends Overlay
 		{
 			final FlipData f = gainers.get(i);
 			final int ry = cy + i * LIST_ROW;
+			final Color fb = flashBg(f.getGeId(), trendFor(f, tfIdx));
+			if (fb != null) { g.setColor(fb); g.fillRect(3, ry - 11, w - 6, 14); }
 			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.GREEN);
 			g.drawString("▲", 8, ry);
 			g.setFont(TerminalKit.mono(11)); g.setColor(TerminalKit.AMBER);
@@ -302,6 +316,8 @@ class TerminalRadarOverlay extends Overlay
 		{
 			final FlipData f = losers.get(i);
 			final int ry = cy + i * LIST_ROW;
+			final Color fb = flashBg(f.getGeId(), trendFor(f, tfIdx));
+			if (fb != null) { g.setColor(fb); g.fillRect(3, ry - 11, w - 6, 14); }
 			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.RED);
 			g.drawString("▼", 8, ry);
 			g.setFont(TerminalKit.mono(11)); g.setColor(TerminalKit.AMBER);
@@ -322,6 +338,27 @@ class TerminalRadarOverlay extends Overlay
 			case 2: return f.getTrend7d();
 			default: return f.getTrendPct();
 		}
+	}
+
+	/** Flash background for a row whose % just moved since the last poll, fading
+	 *  over FLASH_MS. Green for an up-tick, red for a down-tick; null when idle.
+	 *  First sight of an item never flashes (no prior value to compare). */
+	private static Color flashBg(int geId, double cur)
+	{
+		if (FLASH.size() > 400) { FLASH.clear(); }
+		final long now = System.currentTimeMillis();
+		final double[] st = FLASH.get(geId);
+		if (st == null) { FLASH.put(geId, new double[]{ cur, 0, 0 }); return null; }
+		if (Math.abs(cur - st[0]) > 0.049)
+		{
+			st[2] = cur > st[0] ? 1 : -1;
+			st[1] = now + FLASH_MS;
+			st[0] = cur;
+		}
+		if (now >= st[1]) { return null; }
+		final double frac = (st[1] - now) / (double) FLASH_MS;   // 1 -> 0
+		final int a = (int) Math.max(0, Math.min(160, 160 * frac));
+		return st[2] > 0 ? new Color(0x2f, 0x86, 0x4a, a) : new Color(0xa8, 0x38, 0x2b, a);
 	}
 
 	/** 1H / 24H / 7D chips in the movers title strip, right-aligned, active one
