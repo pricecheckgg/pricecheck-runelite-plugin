@@ -767,12 +767,17 @@ class GeItemCardOverlay extends Overlay
 		return v >= 0 ? "+" + Fmt.full(v) : Fmt.full(v);
 	}
 
-	private static Dimension paintAt(Graphics2D g, int x, int y, java.util.function.Supplier<Dimension> painter)
+	private Dimension paintAt(Graphics2D g, int x, int y, java.util.function.Supplier<Dimension> painter)
 	{
 		g.translate(x, y);
 		final Dimension d = painter.get();
 		g.translate(-x, -y);
-		return d;
+		final Dimension painted = d;
+		if (painted != null)
+		{
+			plugin.noteDeskRect("card@" + x, x, y, painted.width, painted.height);
+		}
+		return painted;
 	}
 
 	private static long[] append(long[] arr, long v)

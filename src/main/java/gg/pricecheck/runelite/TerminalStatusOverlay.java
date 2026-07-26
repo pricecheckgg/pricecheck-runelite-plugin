@@ -85,7 +85,7 @@ class TerminalStatusOverlay extends Overlay
 			// A fixed desk mode the window cannot hold explains itself instead
 			// of silently downgrading: one amber line under the bar with the
 			// real deficit and the fix.
-			final String notice = plugin.deskFitNotice();
+			final String notice = plugin.deskNotice();
 			if (notice != null)
 			{
 				TerminalKit.hints(g);

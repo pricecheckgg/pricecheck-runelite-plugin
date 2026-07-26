@@ -145,6 +145,11 @@ class GeOffersPanelOverlay extends Overlay
 		g.scale(scale, scale);
 		final Result r = term ? paintTerminal(g, rows, collapsed, shift) : paint(g, rows, collapsed, shift);
 		g.setTransform(save);
+		if (r.size != null)
+		{
+			plugin.noteDeskRect("blotter", x, y,
+				(int) Math.round(r.size.width * scale), (int) Math.round(r.size.height * scale));
+		}
 		if (r.button != null)
 		{
 			toggleBounds = new Rectangle(

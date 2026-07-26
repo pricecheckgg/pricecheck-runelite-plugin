@@ -1075,6 +1075,104 @@ public class PriceCheckPlugin extends Plugin
 		return deskTier().ordinal() >= DeskTier.MINIMAL.ordinal();
 	}
 
+	// ── Desk self-diagnosis ───────────────────────────────────────────
+	// Panels report their painted rectangle every frame; the status bar asks
+	// for a verdict. Two failure smells are detected: desk panels overlapping
+	// EACH OTHER (a layout bug or a forced tier in a too-small window) and a
+	// foreign game interface (collection log, bank, quest panels) sitting on
+	// top of the desk. Either way the user gets one plain line with the fix
+	// instead of a silently broken composition.
+	private static final long DESK_RECT_TTL_MS = 2000;
+	private final java.util.concurrent.ConcurrentHashMap<String, long[]> deskRects = new java.util.concurrent.ConcurrentHashMap<>();
+
+	void noteDeskRect(String key, int x, int y, int w, int h)
+	{
+		deskRects.put(key, new long[]{ x, y, w, h, System.currentTimeMillis() });
+	}
+
+	private java.util.List<java.awt.Rectangle> freshDeskRects()
+	{
+		final long now = System.currentTimeMillis();
+		final java.util.List<java.awt.Rectangle> out = new java.util.ArrayList<>();
+		for (final java.util.Map.Entry<String, long[]> e : deskRects.entrySet())
+		{
+			final long[] v = e.getValue();
+			if (now - v[4] > DESK_RECT_TTL_MS)
+			{
+				deskRects.remove(e.getKey());
+				continue;
+			}
+			out.add(new java.awt.Rectangle((int) v[0], (int) v[1], (int) v[2], (int) v[3]));
+		}
+		return out;
+	}
+
+	/** Client thread. Null when the composition is clean. */
+	String deskCompositionNotice()
+	{
+		final java.util.List<java.awt.Rectangle> rects = freshDeskRects();
+		if (rects.isEmpty())
+		{
+			return null;
+		}
+		// Our own panels colliding: anything beyond a sliver is wrong.
+		for (int i = 0; i < rects.size(); i++)
+		{
+			for (int j = i + 1; j < rects.size(); j++)
+			{
+				final java.awt.Rectangle o = rects.get(i).intersection(rects.get(j));
+				if (o.width > 12 && o.height > 12)
+				{
+					return "desk panels are colliding - widen the client or set desk to Auto";
+				}
+			}
+		}
+		// A foreign game interface over the desk: the GE (465) and the chatbox
+		// (162) are desk neighbours, everything else big on top is a squatter.
+		final net.runelite.api.widgets.Widget[] roots = client.getWidgetRoots();
+		if (roots != null)
+		{
+			for (final net.runelite.api.widgets.Widget root : roots)
+			{
+				if (root == null || root.isHidden())
+				{
+					continue;
+				}
+				final int group = net.runelite.api.widgets.WidgetUtil.componentToInterface(root.getId());
+				if (group == 465 || group == 162)
+				{
+					continue;
+				}
+				final java.awt.Rectangle rb = root.getBounds();
+				if (rb == null || rb.width < 120 || rb.height < 120)
+				{
+					continue;
+				}
+				for (final java.awt.Rectangle d : rects)
+				{
+					final java.awt.Rectangle o = rb.intersection(d);
+					if (o.width > 40 && o.height > 40)
+					{
+						return "another interface is covering the desk - close it or resize the client";
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	/** The one line the status bar shows: an unhonored fixed tier first, a
+	 *  broken composition second, nothing when the desk is clean. */
+	String deskNotice()
+	{
+		final String fit = deskFitNotice();
+		if (fit != null)
+		{
+			return fit;
+		}
+		return deskCompositionNotice();
+	}
+
 	/** One plain line when a FIXED desk mode cannot fit the current window,
 	 *  with the real deficit and the fix. AUTO never complains: silently
 	 *  fitting is what it is for. Null when everything the user asked for is
