@@ -8,10 +8,10 @@ import java.awt.RenderingHints;
 import java.awt.geom.GeneralPath;
 
 /**
- * Shared draw-kit for the "terminal" (Bloomberg-style) Grand Exchange overlays:
+ * Shared draw-kit for the "terminal" (trading-terminal style) Grand Exchange overlays:
  * an amber-on-black palette, a monospace font, and panel / cell / chip / sparkline
- * / right-align primitives. Promoted from the approved BloombergCardPreview and
- * BloombergDeskPreview mocks so every terminal panel reads as one instrument.
+ * / right-align primitives. Promoted from the approved trading-terminalCardPreview and
+ * trading-terminalDeskPreview mocks so every terminal panel reads as one instrument.
  *
  * IMPORTANT: the terminal uses a Monospaced TrueType font, so any panel that draws
  * with it MUST enable text antialiasing via hints(g). The plugin's other overlays

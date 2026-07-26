@@ -37,48 +37,6 @@ public interface PriceCheckConfig extends Config
 		}
 	}
 
-	/** How much the GE overlays show and how large they draw. Overnight is for
-	 *  AFK watching: a deeper trade tape and larger panels you can read from
-	 *  across the room. */
-	enum OverlayMode
-	{
-		ACTIVE(10, false),
-		ADVANCED(20, false),
-		OVERNIGHT(30, true);
-
-		private final int depth;
-		private final boolean big;
-
-		OverlayMode(int depth, boolean big)
-		{
-			this.depth = depth;
-			this.big = big;
-		}
-
-		/** How many recent trades the tape and on-chart prints show. */
-		int tradeDepth()
-		{
-			return depth;
-		}
-
-		/** Overnight draws the hand-painted panels larger for at-a-glance reading. */
-		boolean big()
-		{
-			return big;
-		}
-
-		@Override
-		public String toString()
-		{
-			switch (this)
-			{
-				case ADVANCED: return "Standard (20)";
-				case OVERNIGHT: return "Large (30, big)";
-				default: return "Compact (10)";
-			}
-		}
-	}
-
 	/** The whole GE desk in one control. AUTO measures the space around the
 	 *  open Grand Exchange every frame and shows the biggest layout that fits,
 	 *  so any window size gets a clean desk instead of overlapping panels. The
@@ -124,7 +82,7 @@ public interface PriceCheckConfig extends Config
 	@ConfigItem(
 		keyName = "deskMode",
 		name = "Terminal desk",
-		description = "The Bloomberg-style desk around the open Grand Exchange: status bar, item card with the live chart and tape, "
+		description = "The trading-terminal style desk around the open Grand Exchange: status bar, item card with the live chart and tape, "
 			+ "offers blotter, opportunity radar, held positions, session flow, fills and ticker. "
 			+ "Auto fits the layout to your window size; the fixed tiers cap how much draws; Off hides the desk entirely. "
 			+ "Market data needs Trader ($1/mo) or a trial; the flip log works without.",
@@ -133,19 +91,6 @@ public interface PriceCheckConfig extends Config
 	default DeskMode deskMode()
 	{
 		return DeskMode.AUTO;
-	}
-
-	@ConfigItem(
-		keyName = "overlayMode",
-		name = "Detail level",
-		description = "How deep the trade tape runs and how large the desk draws (size and detail, not a time window: "
-			+ "the chart's own 1h/24h/7d views are picked on the card). Compact keeps the last 10 trades, "
-			+ "Standard 20, Large 30 with bigger panels for at-a-glance watching.",
-		position = 3
-	)
-	default OverlayMode overlayMode()
-	{
-		return OverlayMode.ACTIVE;
 	}
 
 	@ConfigItem(

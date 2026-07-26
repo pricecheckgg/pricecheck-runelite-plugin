@@ -1185,9 +1185,12 @@ public class PriceCheckPlugin extends Plugin
 
 	/** How many recent trades the GE overlays show: Active 10, Advanced 20,
 	 *  Overnight 30. Drives the item card's tape and on-chart prints. */
+	/** Tape depth follows the window instead of a toggle: tall clients get
+	 *  the deep tape automatically, small ones stay readable. */
 	int overlayTradeDepth()
 	{
-		return config.overlayMode().tradeDepth();
+		final int h = client.getCanvasHeight();
+		return h >= 1000 ? 30 : h >= 800 ? 20 : 10;
 	}
 
 	/** Draw scale for the hand-painted panels. Overnight enlarges the advisor
@@ -1195,7 +1198,9 @@ public class PriceCheckPlugin extends Plugin
 	 *  otherwise. */
 	double overlayScale()
 	{
-		return config.overlayMode().big() ? OVERLAY_BIG_SCALE : 1.0;
+		// The zoom toggle is gone: the desk grows by LAYOUT (tier engine), not
+		// by scaling pixels. Kept as a constant so the paint plumbing stands.
+		return 1.0;
 	}
 
 	/** The item the evidence card is currently showing (0 = none), so the docked
@@ -1305,7 +1310,6 @@ public class PriceCheckPlugin extends Plugin
 	private final Set<Integer> series7dFetching = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 	private final Map<Integer, Long> series7dFailedAt = java.util.Collections.synchronizedMap(new java.util.HashMap<>());
 	// Overnight overlay mode draws the panels this much larger than normal.
-	private static final double OVERLAY_BIG_SCALE = 1.3;
 	// Trade tape sizing: seed a fresh tape up to this depth from history, and
 	// keep up to this many live prints per item. Both sit at/above the deepest
 	// overlay mode (Overnight = 30) so a just-opened card is already full there.

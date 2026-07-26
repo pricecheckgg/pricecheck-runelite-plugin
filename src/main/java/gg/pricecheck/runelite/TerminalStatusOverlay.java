@@ -18,7 +18,7 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 /**
- * Terminal status bar - a thin Bloomberg command strip docked to the top edge of
+ * Terminal status bar - a thin trading-terminal command strip docked to the top edge of
  * the Grand Exchange window: brand, cash, used offer slots, world, and a live
  * clock. Opt-in via config.terminalStatusBar(). Uses only client-readable state
  * (no server call), so it works for free keys too. First panel of the terminal

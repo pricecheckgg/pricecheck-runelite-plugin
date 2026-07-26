@@ -114,7 +114,7 @@ final class GeItemInfoPainter
 	{
 	}
 
-	// ── Terminal (Bloomberg) card ──────────────────────────────────
+	// ── Terminal (trading-terminal) card ──────────────────────────────────
 	// The approved amber-on-black DES card, fed by the same Context. Classic
 	// paint() below is untouched; the overlay routes here when config.terminalCard()
 	// is on. Grid values are derived from the Context; LIMIT/RESET show "-" until

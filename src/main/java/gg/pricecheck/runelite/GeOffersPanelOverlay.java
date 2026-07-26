@@ -445,7 +445,7 @@ class GeOffersPanelOverlay extends Overlay
 		Color pressureColor;
 	}
 
-	// ── Terminal (Bloomberg) blotter ───────────────────────────────
+	// ── Terminal (trading-terminal) blotter ───────────────────────────────
 	// Same rows as the classic board, re-skinned amber-on-black to sit under the
 	// terminal status bar. Routed here from render() when config.terminalOffers().
 	static final int TERM_W = 292;
