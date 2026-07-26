@@ -86,10 +86,11 @@ class TerminalTickerOverlay extends Overlay
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+		final int ph;
 		g.translate(x, y);
 		try
 		{
-			paintTicker(g, w, flips, offset);
+			ph = paintTicker(g, w, flips, offset);
 		}
 		finally
 		{
@@ -97,12 +98,14 @@ class TerminalTickerOverlay extends Overlay
 			if (aa != null) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, aa); }
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}
-		return new Dimension(w, H);
+		plugin.noteDeskRect("ticker", x, y, w, ph);
+		return new Dimension(w, ph);
 	}
 
 	/** Pure drawing (0,0-origin). offset scrolls the tape leftward (0 = static, for
-	 *  the headless preview). Draws the strip twice for a seamless wrap. */
-	static void paintTicker(Graphics2D g, int w, List<FlipData> flips, long offset)
+	 *  the headless preview). Draws the strip twice for a seamless wrap.
+	 *  Returns the painted height. */
+	static int paintTicker(Graphics2D g, int w, List<FlipData> flips, long offset)
 	{
 		TerminalKit.hints(g);
 		g.setColor(TerminalKit.PANEL); g.fillRect(0, 0, w, H);
@@ -114,7 +117,7 @@ class TerminalTickerOverlay extends Overlay
 		final int contentW = stripWidth(fm, flips, n);
 		if (contentW <= 0)
 		{
-			return;
+			return H;   // the strip background is already down
 		}
 		final Shape clip = g.getClip();
 		g.clipRect(0, 0, w, H);
@@ -129,6 +132,7 @@ class TerminalTickerOverlay extends Overlay
 			drawStrip(g, fm, flips, n, start + contentW);
 		}
 		g.setClip(clip);
+		return H;
 	}
 
 	private static final int GAP = 26;

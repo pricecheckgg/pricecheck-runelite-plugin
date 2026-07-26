@@ -82,9 +82,10 @@ class TerminalFillsOverlay extends Overlay
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
 		g.translate(x, y);
+		final int ph;
 		try
 		{
-			paintFills(g, W, s.recent, rowN, now);
+			ph = paintFills(g, W, s.recent, rowN, now);
 		}
 		finally
 		{
@@ -93,11 +94,12 @@ class TerminalFillsOverlay extends Overlay
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}
 		plugin.noteFillsBottom(y + h);
+		plugin.noteDeskRect("fills", x, y, W, ph);
 		return new Dimension(W, h);
 	}
 
-	/** Pure drawing (0,0-origin) so the preview harness can render it headless. */
-	static void paintFills(Graphics2D g, int w, List<FlipLogEngine.Flip> recent, int rowN, long nowMs)
+	/** Pure drawing (0,0-origin) so the preview harness can render it headless; returns the painted height. */
+	static int paintFills(Graphics2D g, int w, List<FlipLogEngine.Flip> recent, int rowN, long nowMs)
 	{
 		TerminalKit.hints(g);
 		final int h = 32 + rowN * ROW + 6;
@@ -118,6 +120,7 @@ class TerminalFillsOverlay extends Overlay
 			TerminalKit.rt(g, age(nowMs - f.closedAt), w - 10, cy);
 			cy += ROW;
 		}
+		return h;
 	}
 
 	private static String age(long ms)

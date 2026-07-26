@@ -107,6 +107,9 @@ class TerminalStatusOverlay extends Overlay
 			if (aa != null) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, aa); }
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}
+		// The bar is a desk panel too: report it so the collision watchdog
+		// sees the full composition (the notice line rides inside its rect).
+		plugin.noteDeskRect("statusbar", x, y, w, h);
 		return null;
 	}
 

@@ -62,10 +62,11 @@ class TerminalSessionOverlay extends Overlay
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+		final int painted;
 		g.translate(x, y);
 		try
 		{
-			paintStrip(g, ge.width, s);
+			painted = paintStrip(g, ge.width, s);
 		}
 		finally
 		{
@@ -75,11 +76,12 @@ class TerminalSessionOverlay extends Overlay
 		}
 		// Publish the footprint so the ticker snaps directly beneath the strip.
 		plugin.noteSessionStrip(x, y + H, ge.width);
-		return new Dimension(ge.width, H);
+		plugin.noteDeskRect("session", x, y, ge.width, painted);
+		return new Dimension(ge.width, painted);
 	}
 
-	/** Pure drawing (0,0-origin) so the preview harness can render it headless. */
-	static void paintStrip(Graphics2D g, int w, FlipLogEngine.Summary s)
+	/** Pure drawing (0,0-origin) so the preview harness can render it headless. Returns the painted height. */
+	static int paintStrip(Graphics2D g, int w, FlipLogEngine.Summary s)
 	{
 		TerminalKit.hints(g);
 		TerminalKit.panel(g, 0, 0, w, H, "SESSION  ·  FLOW");
@@ -111,5 +113,6 @@ class TerminalSessionOverlay extends Overlay
 			g.setFont(TerminalKit.monoB(15)); g.setColor(colors[i]);
 			g.drawString(values[i], cx, 50);
 		}
+		return H;
 	}
 }

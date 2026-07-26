@@ -134,10 +134,11 @@ class TerminalWatchlistOverlay extends Overlay
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+		final int painted;
 		g.translate(x, y);
 		try
 		{
-			paintWatchlist(g, ge.width, h, watchPage, showPicks, fp, pc);
+			painted = paintWatchlist(g, ge.width, h, watchPage, showPicks, fp, pc);
 		}
 		finally
 		{
@@ -145,6 +146,7 @@ class TerminalWatchlistOverlay extends Overlay
 			if (aa != null) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, aa); }
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}
+		plugin.noteDeskRect("watchlist", x, y, ge.width, painted);
 		return new Dimension(ge.width, h);
 	}
 
@@ -193,8 +195,8 @@ class TerminalWatchlistOverlay extends Overlay
 		return out;
 	}
 
-	/** Pure drawing (0,0-origin) so the preview harness can render it headless. */
-	static void paintWatchlist(Graphics2D g, int w, int h, List<Watch> watch, List<Pick> picks, int favPage, int pageCount)
+	/** Pure drawing (0,0-origin) so the preview harness can render it headless. Returns the painted height. */
+	static int paintWatchlist(Graphics2D g, int w, int h, List<Watch> watch, List<Pick> picks, int favPage, int pageCount)
 	{
 		TerminalKit.hints(g);
 		int cy = TerminalKit.panel(g, 0, 0, w, h, "WATCHLIST  ·  YOUR TARGETS");
@@ -241,6 +243,7 @@ class TerminalWatchlistOverlay extends Overlay
 				cy += ROW;
 			}
 		}
+		return h;
 	}
 
 	private static String clip(String s, FontMetrics fm, int maxW)

@@ -94,10 +94,11 @@ class TerminalHeldOverlay extends Overlay
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+		final int painted;
 		g.translate(x, y);
 		try
 		{
-			paintHeld(g, ge.width, rows, anyLive ? net : Long.MIN_VALUE, hidden);
+			painted = paintHeld(g, ge.width, rows, anyLive ? net : Long.MIN_VALUE, hidden);
 		}
 		finally
 		{
@@ -105,6 +106,7 @@ class TerminalHeldOverlay extends Overlay
 			if (aa != null) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, aa); }
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}
+		plugin.noteDeskRect("held", x, y, ge.width, painted);
 		return new Dimension(ge.width, h);
 	}
 
@@ -151,8 +153,8 @@ class TerminalHeldOverlay extends Overlay
 
 	/** Pure drawing (0,0-origin) so the preview harness can render it headless. net
 	 *  = aggregate unrealised P&L (Long.MIN_VALUE to hide), hidden = positions past
-	 *  the shown rows. */
-	static void paintHeld(Graphics2D g, int w, List<Row> rows, long net, int hidden)
+	 *  the shown rows. Returns the painted height. */
+	static int paintHeld(Graphics2D g, int w, List<Row> rows, long net, int hidden)
 	{
 		TerminalKit.hints(g);
 		final int h = 32 + rows.size() * ROW + 6;
@@ -193,6 +195,7 @@ class TerminalHeldOverlay extends Overlay
 			}
 			cy += ROW;
 		}
+		return h;
 	}
 
 	private static String clip(String s, FontMetrics fm, int maxW)

@@ -72,10 +72,11 @@ class TerminalRadarOverlay extends Overlay
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+		final int paintedH;
 		g.translate(x, TOP_Y);
 		try
 		{
-			paintColumn(g, W, availH, flips, catches, tfIdx, chipRects);
+			paintedH = paintColumn(g, W, availH, flips, catches, tfIdx, chipRects);
 		}
 		finally
 		{
@@ -94,6 +95,9 @@ class TerminalRadarOverlay extends Overlay
 			hits.add(new Object[]{ new Rectangle(r.x + x, r.y + TOP_Y, r.width, r.height), tfs[i] });
 		}
 		tfChipHits = hits;
+		// Report the painted column in canvas space (unscaled) so the desk layout
+		// tracks the real footprint, not the full reserved slot height.
+		plugin.noteDeskRect("radar", x, TOP_Y, W, paintedH);
 		return new Dimension(W, availH);
 	}
 
@@ -135,8 +139,9 @@ class TerminalRadarOverlay extends Overlay
 		return 32 + (subhead ? SUBHEAD : 0) + rows * (subhead ? RADAR_ROW : LIST_ROW) + 5;
 	}
 
-	/** Pure drawing (0,0-origin) so the preview harness can render it headless. */
-	static void paintColumn(Graphics2D g, int w, int availH, List<FlipData> flips, List<CatchData> catches, int tfIdx, List<Rectangle> chipOut)
+	/** Pure drawing (0,0-origin) so the preview harness can render it headless.
+	 *  Returns the painted height (bottom edge of the last panel). */
+	static int paintColumn(Graphics2D g, int w, int availH, List<FlipData> flips, List<CatchData> catches, int tfIdx, List<Rectangle> chipOut)
 	{
 		TerminalKit.hints(g);
 		// A timeframe switch changes every value at once - not a market move, so
@@ -210,8 +215,9 @@ class TerminalRadarOverlay extends Overlay
 		}
 		if (loseRows > 0)
 		{
-			paintLosers(g, w, y, losers, loseRows, tfIdx);
+			y = paintLosers(g, w, y, losers, loseRows, tfIdx) + GAP;
 		}
+		return y - GAP;
 	}
 
 	private static int gap(int rows)

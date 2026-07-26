@@ -88,7 +88,6 @@ class TerminalOrderOverlay extends Overlay
 		}
 		final long[][] trades = plugin.ownTradesFor(t.geId, MAX_LOG);
 		final int logN = trades == null ? 0 : Math.min(trades.length, MAX_LOG);
-		final int h = TICKET_H + (logN > 0 ? 24 + logN * LOG_ROW : 0);
 		// Sit directly beneath the recent-flips ("closed swaps") panel so the right
 		// column reads Recent Flips -> Order ticket; top-align if it isn't shown.
 		final int fb = plugin.fillsBottomY();
@@ -97,10 +96,11 @@ class TerminalOrderOverlay extends Overlay
 
 		final Object aa = g.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
 		final Object taa = g.getRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING);
+		final int h;
 		g.translate(x, y);
 		try
 		{
-			paintOrder(g, W, t, trades, logN, nowSec);
+			h = paintOrder(g, W, t, trades, logN, nowSec);
 		}
 		finally
 		{
@@ -108,6 +108,7 @@ class TerminalOrderOverlay extends Overlay
 			if (aa != null) { g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, aa); }
 			if (taa != null) { g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, taa); }
 		}
+		plugin.noteDeskRect("order", x, y, W, h);
 		return new Dimension(W, h);
 	}
 
@@ -194,8 +195,9 @@ class TerminalOrderOverlay extends Overlay
 		return t;
 	}
 
-	/** Pure drawing (0,0-origin) so the preview harness can render it headless. */
-	static void paintOrder(Graphics2D g, int w, Ticket t, long[][] trades, int logN, long nowSec)
+	/** Pure drawing (0,0-origin) so the preview harness can render it headless.
+	 *  Returns the painted height. */
+	static int paintOrder(Graphics2D g, int w, Ticket t, long[][] trades, int logN, long nowSec)
 	{
 		TerminalKit.hints(g);
 		final int h = TICKET_H + (logN > 0 ? 24 + logN * LOG_ROW : 0);
@@ -237,7 +239,7 @@ class TerminalOrderOverlay extends Overlay
 
 		if (logN <= 0)
 		{
-			return;
+			return h;
 		}
 		int cy = TICKET_H + 20;
 		g.setColor(TerminalKit.GRID); g.drawLine(L, cy - 12, R, cy - 12);
@@ -273,6 +275,7 @@ class TerminalOrderOverlay extends Overlay
 			g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.DIM);
 			TerminalKit.rt(g, age(nowSec - tr[0] / 1000L), R, ry);
 		}
+		return h;
 	}
 
 	private static String age(long s)
