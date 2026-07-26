@@ -1816,12 +1816,12 @@ class PriceCheckPanel extends PluginPanel
 		advisorToggle.setFocusPainted(false);
 		styleCheckbox(advisorToggle);
 		advisorToggle.setAlignmentX(Component.LEFT_ALIGNMENT);
-		advisorToggle.setSelected(config.showAdvisor());
+		advisorToggle.setSelected(config.deskMode() != PriceCheckConfig.DeskMode.OFF);
 		advisorToggle.addItemListener(e ->
 		{
 			if (!settingsMuted)
 			{
-				configManager.setConfiguration(PriceCheckConfig.GROUP, "showAdvisor", advisorToggle.isSelected());
+				configManager.setConfiguration(PriceCheckConfig.GROUP, "deskMode", advisorToggle.isSelected() ? "AUTO" : "OFF");
 			}
 		});
 		v.add(advisorToggle);
@@ -2002,7 +2002,8 @@ class PriceCheckPanel extends PluginPanel
 		{
 			settingsMuted = true;
 			if (syncToggle.isSelected() != config.syncFlipLog()) { syncToggle.setSelected(config.syncFlipLog()); }
-			if (advisorToggle.isSelected() != config.showAdvisor()) { advisorToggle.setSelected(config.showAdvisor()); }
+			final boolean deskOnNow = config.deskMode() != PriceCheckConfig.DeskMode.OFF;
+			if (advisorToggle.isSelected() != deskOnNow) { advisorToggle.setSelected(deskOnNow); }
 			if (!minEvSpinner.getValue().equals(config.minEvPerHrK())) { minEvSpinner.setValue(config.minEvPerHrK()); }
 			settingsMuted = false;
 		});

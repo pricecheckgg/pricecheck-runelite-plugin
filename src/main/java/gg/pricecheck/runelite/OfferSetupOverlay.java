@@ -103,7 +103,7 @@ class OfferSetupOverlay extends Overlay
 		{
 			return null;
 		}
-		if (!config.geItemCard() || !plugin.marketDataOk())
+		if (!plugin.deskCard() || !plugin.marketDataOk())
 		{
 			return null;
 		}

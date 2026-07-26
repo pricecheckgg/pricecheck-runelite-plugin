@@ -47,7 +47,7 @@ class TerminalStatusOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D g)
 	{
-		if (!config.terminalStatusBar() && !plugin.terminalDesk())
+		if (!plugin.deskOn())
 		{
 			return null;
 		}

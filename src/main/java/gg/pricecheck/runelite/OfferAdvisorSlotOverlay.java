@@ -54,7 +54,7 @@ class OfferAdvisorSlotOverlay extends Overlay
 	@Override
 	public Dimension render(Graphics2D g)
 	{
-		if (!config.showAdvisor())
+		if (!plugin.deskOn())
 		{
 			return null;
 		}

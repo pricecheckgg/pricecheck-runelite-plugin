@@ -94,7 +94,6 @@ public class PriceCheckPlugin extends Plugin
 
 	private PriceCheckPanel panel;
 	private NavigationButton navButton;
-	private OfferAdvisorOverlay advisorOverlay;
 	// Shift-click on the advisor's [-]/[+] button collapses/expands it.
 	private final net.runelite.client.input.MouseAdapter advisorMouse = new net.runelite.client.input.MouseAdapter()
 	{
@@ -102,11 +101,7 @@ public class PriceCheckPlugin extends Plugin
 		public java.awt.event.MouseEvent mousePressed(java.awt.event.MouseEvent e)
 		{
 			final boolean shift = client.isKeyPressed(net.runelite.api.KeyCode.KC_SHIFT);
-			if (advisorOverlay != null && advisorOverlay.handleClick(e.getPoint(), shift))
-			{
-				e.consume();
-			}
-			else if (geCardOverlay != null && geCardOverlay.handleClick(e.getPoint(), shift))
+			if (geCardOverlay != null && geCardOverlay.handleClick(e.getPoint(), shift))
 			{
 				e.consume();
 			}
@@ -319,8 +314,6 @@ public class PriceCheckPlugin extends Plugin
 
 		geHelper = new GeChatboxHelper(client, clientThread, config, this);
 
-		advisorOverlay = new OfferAdvisorOverlay(client, this, config, configManager);
-		overlayManager.add(advisorOverlay);
 		mouseManager.registerMouseListener(advisorMouse);
 		keyManager.registerKeyListener(autofillHotkey);
 		slotOverlay = new OfferAdvisorSlotOverlay(client, this, config);
@@ -543,7 +536,9 @@ public class PriceCheckPlugin extends Plugin
 	 * this event and needs only an overlay that knows its owning plugin. */
 	void openPluginConfig()
 	{
-		final OfferAdvisorOverlay target = advisorOverlay;
+		// Any overlay that knows its owning plugin works as the vehicle; the
+		// card overlay is always registered.
+		final GeItemCardOverlay target = geCardOverlay;
 		if (target == null)
 		{
 			return;
@@ -595,13 +590,8 @@ public class PriceCheckPlugin extends Plugin
 		{
 			clientToolbar.removeNavigation(navButton);
 		}
-		if (advisorOverlay != null)
-		{
-			overlayManager.remove(advisorOverlay);
-			mouseManager.unregisterMouseListener(advisorMouse);
-			keyManager.unregisterKeyListener(autofillHotkey);
-			advisorOverlay = null;
-		}
+		mouseManager.unregisterMouseListener(advisorMouse);
+		keyManager.unregisterKeyListener(autofillHotkey);
 		if (slotOverlay != null)
 		{
 			overlayManager.remove(slotOverlay);
@@ -985,24 +975,101 @@ public class PriceCheckPlugin extends Plugin
 	 *  geOffersPanelVisible() layers the docked-overview conditions on top. */
 	boolean geOffersPanelEnabled()
 	{
-		// Either toggle shows the board: geOffersPanel = classic, terminalOffers =
-		// the terminal blotter skin. terminalOffers works on its own (no need to
-		// also enable the classic board).
-		return (config.geOffersPanel() || config.terminalOffers() || config.terminalDesk()) && marketDataOk();
+		return deskBlotter() && marketDataOk();
 	}
 
-	/** Draw the active-offers board in the Bloomberg-terminal blotter style. The
-	 *  master desk toggle implies it, so the whole desk shares one look. */
+	/** The blotter always wears the terminal skin now. */
 	boolean terminalOffers()
 	{
-		return config.terminalOffers() || config.terminalDesk();
+		return deskOn();
 	}
 
-	/** Master switch for the wraparound terminal desk panels (radar/dips/movers,
-	 *  held strip, session, recent fills, ticker). */
+	/** The wraparound desk panels (radar, held strip, session, fills, ticker,
+	 *  watchlist, order ticket) draw only at the FULL tier. */
 	boolean terminalDesk()
 	{
-		return config.terminalDesk();
+		return deskFull();
+	}
+
+	// ── Desk tiers: one control, sized to the window ──────────────────
+	// deskMode AUTO measures the free space around the open GE every frame and
+	// picks the biggest layout that fits; the fixed modes cap the pick. Panels
+	// consult these instead of individual toggles, so nothing can overlap: a
+	// tier the window cannot hold simply never gets chosen.
+	enum DeskTier { OFF, MINIMAL, COMPACT, FULL }
+
+	DeskTier deskTier()
+	{
+		final PriceCheckConfig.DeskMode m = config.deskMode();
+		if (m == PriceCheckConfig.DeskMode.OFF)
+		{
+			return DeskTier.OFF;
+		}
+		final DeskTier fit = measuredFit();
+		switch (m)
+		{
+			case MINIMAL: return fit.ordinal() < DeskTier.MINIMAL.ordinal() ? fit : DeskTier.MINIMAL;
+			case COMPACT: return fit.ordinal() < DeskTier.COMPACT.ordinal() ? fit : DeskTier.COMPACT;
+			case FULL:
+			default:
+				return fit;   // AUTO and FULL both take the biggest fitting layout
+		}
+	}
+
+	/** The biggest tier the current window supports. Client thread (reads
+	 *  widget bounds); overlays only call this from render. */
+	private DeskTier measuredFit()
+	{
+		final java.awt.Rectangle ge = geGridBounds();
+		if (ge == null)
+		{
+			// GE closed: only the sidebar + chatbox surfaces matter, and the
+			// card overlay gates on the GE being open anyway.
+			return DeskTier.FULL;
+		}
+		final int canvasW = client.getCanvasWidth();
+		final int canvasH = client.getCanvasHeight();
+		final int right = canvasW - (ge.x + ge.width);
+		final int left = ge.x;
+		// The Large detail level scales every panel up; the fit thresholds
+		// must scale with it or a borderline window overflows at Overnight.
+		final double sc = overlayScale();
+		final int CARD = (int) Math.ceil(GeItemInfoPainter.TERM_W * sc) + 16;   // terminal card column
+		final int RADAR = (int) Math.ceil(TerminalRadarOverlay.W * sc) + 16;    // left column
+		if (right >= CARD && left >= RADAR && canvasH >= 620)
+		{
+			return DeskTier.FULL;
+		}
+		if (right >= CARD)
+		{
+			return DeskTier.COMPACT;
+		}
+		if (right >= 240)
+		{
+			return DeskTier.MINIMAL;
+		}
+		return DeskTier.OFF;
+	}
+
+	boolean deskOn()
+	{
+		return config.deskMode() != PriceCheckConfig.DeskMode.OFF;
+	}
+
+	boolean deskFull()
+	{
+		return deskTier() == DeskTier.FULL;
+	}
+
+	boolean deskBlotter()
+	{
+		final DeskTier t = deskTier();
+		return t == DeskTier.FULL || t == DeskTier.COMPACT;
+	}
+
+	boolean deskCard()
+	{
+		return deskTier().ordinal() >= DeskTier.MINIMAL.ordinal();
 	}
 
 	/** True while the offer set-up panel (465:15 or 465:26) is on screen - the state
@@ -2303,10 +2370,6 @@ public class PriceCheckPlugin extends Plugin
 		{
 			if (p != null) { p.syncSettings(); }
 			poller.execute(this::refreshPanel);
-		}
-		else if ("showAdvisor".equals(key))
-		{
-			if (p != null) { p.syncSettings(); }
 		}
 		else if ("showCatches".equals(key))
 		{

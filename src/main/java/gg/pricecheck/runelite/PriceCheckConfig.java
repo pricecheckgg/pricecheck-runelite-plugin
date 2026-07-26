@@ -79,6 +79,33 @@ public interface PriceCheckConfig extends Config
 		}
 	}
 
+	/** The whole GE desk in one control. AUTO measures the space around the
+	 *  open Grand Exchange every frame and shows the biggest layout that fits,
+	 *  so any window size gets a clean desk instead of overlapping panels. The
+	 *  fixed tiers force a maximum; panels still never overlap when the window
+	 *  is too small for the pick. */
+	enum DeskMode
+	{
+		AUTO,
+		FULL,
+		COMPACT,
+		MINIMAL,
+		OFF;
+
+		@Override
+		public String toString()
+		{
+			switch (this)
+			{
+				case FULL: return "Full desk";
+				case COMPACT: return "Compact (card + blotter)";
+				case MINIMAL: return "Minimal (card only)";
+				case OFF: return "Off";
+				default: return "Auto (fit my window)";
+			}
+		}
+	}
+
 	@ConfigItem(
 		keyName = "apiKey",
 		name = "Plugin key",
@@ -95,29 +122,30 @@ public interface PriceCheckConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "syncFlipLog",
-		name = "Sync flip log (backup + web portfolio)",
-		description = "Back up your flip log to your PriceCheck account and show it at flipping.pricecheck.gg/portfolio. "
-			+ "Also keeps the log consistent when you flip on more than one computer.",
-		warning = "Enabling this submits your Grand Exchange trades (item, price, quantity, tax, profit, timestamps), open positions, "
-			+ "offer-slot snapshots, an anonymous per-account identifier (never your RSN), and your IP address to PriceCheck's servers, "
-			+ "which are not controlled or verified by the RuneLite Developers. Continue?",
+		keyName = "deskMode",
+		name = "Terminal desk",
+		description = "The Bloomberg-style desk around the open Grand Exchange: status bar, item card with the live chart and tape, "
+			+ "offers blotter, opportunity radar, held positions, session flow, fills and ticker. "
+			+ "Auto fits the layout to your window size; the fixed tiers cap how much draws; Off hides the desk entirely. "
+			+ "Market data needs Trader ($1/mo) or a trial; the flip log works without.",
 		position = 2
 	)
-	default boolean syncFlipLog()
+	default DeskMode deskMode()
 	{
-		return false;
+		return DeskMode.AUTO;
 	}
 
 	@ConfigItem(
-		keyName = "showPanel",
-		name = "Show side panel",
-		description = "Show the PriceCheck flip panel in the RuneLite sidebar.",
+		keyName = "overlayMode",
+		name = "Detail level",
+		description = "How deep the trade tape runs and how large the desk draws (size and detail, not a time window: "
+			+ "the chart's own 1h/24h/7d views are picked on the card). Compact keeps the last 10 trades, "
+			+ "Standard 20, Large 30 with bigger panels for at-a-glance watching.",
 		position = 3
 	)
-	default boolean showPanel()
+	default OverlayMode overlayMode()
 	{
-		return true;
+		return OverlayMode.ACTIVE;
 	}
 
 	@ConfigItem(
@@ -132,14 +160,53 @@ public interface PriceCheckConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "showAdvisor",
-		name = "Offer advisor overlay",
-		description = "Show a live overlay that watches your active GE offers and tells you exactly when and how much to reprice, or when a margin has died.",
+		keyName = "geAssists",
+		name = "GE fill assists",
+		description = "One-click helpers inside the GE: clickable price lines when setting an offer (our live buy/sell, your break-even "
+			+ "when selling a tracked position), your remaining 4h buy limit on the quantity box, and tracked positions plus the "
+			+ "best flips as clickable results while the item search is empty. Pre-fill only; you always press Enter yourself.",
 		position = 5
 	)
-	default boolean showAdvisor()
+	default boolean geAssists()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+		keyName = "geAutofillHotkey",
+		name = "GE autofill hotkey",
+		description = "Press this while a GE buy or sell price box is open to fill PriceCheck's recommended price for that item; press it on the quantity box of a buy offer to fill your remaining 4h buy limit. You still press Enter to place the offer. Unbound by default.",
+		position = 6
+	)
+	default Keybind geAutofillHotkey()
+	{
+		return Keybind.NOT_SET;
+	}
+
+	@ConfigItem(
+		keyName = "discordOfferAlerts",
+		name = "Discord offer alerts",
+		description = "Get a PriceCheck Discord DM when one of your open GE offers is undercut, outbid, or probably filled while you were offline. Trader Pro only. Pick how often you want to hear from the bot.",
+		position = 7
+	)
+	default AlertCadence discordOfferAlerts()
+	{
+		return AlertCadence.OFF;
+	}
+
+	@ConfigItem(
+		keyName = "syncFlipLog",
+		name = "Sync flip log (backup + web portfolio)",
+		description = "Back up your flip log to your PriceCheck account and show it at flipping.pricecheck.gg/portfolio. "
+			+ "Also keeps the log consistent when you flip on more than one computer.",
+		warning = "Enabling this submits your Grand Exchange trades (item, price, quantity, tax, profit, timestamps), open positions, "
+			+ "offer-slot snapshots, an anonymous per-account identifier (never your RSN), and your IP address to PriceCheck's servers, "
+			+ "which are not controlled or verified by the RuneLite Developers. Continue?",
+		position = 8
+	)
+	default boolean syncFlipLog()
+	{
+		return false;
 	}
 
 	@ConfigItem(
@@ -148,162 +215,81 @@ public interface PriceCheckConfig extends Config
 		description = "Report your own GE offer fills to PriceCheck toward a measured fill-time model. Only offer details (the item, your price and quantity, how much has filled, which GE slot, and the time) are sent, never your RSN or anything about your account.",
 		warning = "Enabling this submits your Grand Exchange offer details (the item, your price and quantity, how much has filled, which GE slot, and the time it happened) and your IP address "
 			+ "to PriceCheck's servers, which are not controlled or verified by the RuneLite Developers. Continue?",
-		position = 6
+		position = 9
 	)
 	default boolean contributeData()
 	{
 		return false;
 	}
 
-	// Planner: auto-detect capital. The slot planner is disabled pending testing
-	// (see PriceCheckPlugin.PLANNER_ENABLED), so this toggle is hidden from settings
-	// - the method stays so all callers compile and nothing submits capital. Restore
-	// the @ConfigItem below to re-surface it when the planner comes back.
-	/*
 	@ConfigItem(
-		keyName = "autoCapital",
-		name = "Planner: auto-detect capital",
-		description = "Send your liquid gp total (coins + platinum tokens across bank and inventory) to PriceCheck so the web slot planner fills in your capital automatically. Open your bank once after logging in to refresh it.",
-		warning = "Enabling this submits your total liquid wealth (coins + platinum tokens across bank and inventory) and your IP address "
-			+ "to PriceCheck's servers, which are not controlled or verified by the RuneLite Developers. Continue?",
-		position = 7
+		keyName = "showPanel",
+		name = "Show side panel",
+		description = "Show the PriceCheck flip panel in the RuneLite sidebar.",
+		position = 10
 	)
-	*/
+	default boolean showPanel()
+	{
+		return true;
+	}
+
+	// ── Retired toggles ───────────────────────────────────────────────
+	// The desk grew out of a pile of per-overlay switches; deskMode replaced
+	// all of them and geAssists replaced the two chatbox helpers. The methods
+	// stay (plain defaults, no settings entry) so old callers compile and old
+	// saved values are simply ignored; behavior routes through the
+	// PriceCheckPlugin desk accessors now.
+
 	default boolean autoCapital()
 	{
 		return false;
 	}
 
-	@ConfigItem(
-		keyName = "gePriceButtons",
-		name = "GE: click-to-fill prices",
-		description = "When setting an offer price, show clickable PriceCheck lines (our live buy/sell for that item, plus your break-even floor when selling a tracked position). On the quantity box of a buy offer, show your remaining 4h buy limit. One click fills the value; you press Enter.",
-		position = 8
-	)
+	default boolean showAdvisor()
+	{
+		return true;
+	}
+
 	default boolean gePriceButtons()
 	{
-		return true;
+		return geAssists();
 	}
 
-	@ConfigItem(
-		keyName = "geAutofillHotkey",
-		name = "GE: autofill hotkey",
-		description = "Press this while a GE buy or sell price box is open to fill PriceCheck's recommended price for that item; press it on the quantity box of a buy offer to fill your remaining 4h buy limit. You still press Enter to place the offer. Unbound by default.",
-		position = 9
-	)
-	default Keybind geAutofillHotkey()
-	{
-		return Keybind.NOT_SET;
-	}
-
-	@ConfigItem(
-		keyName = "geSearchSuggestions",
-		name = "GE: suggest flips in search",
-		description = "While the GE item search is empty, show your tracked positions and the current best flips as clickable results. Start typing and normal search takes over.",
-		position = 10
-	)
 	default boolean geSearchSuggestions()
 	{
-		return true;
+		return geAssists();
 	}
 
-	@ConfigItem(
-		keyName = "discordOfferAlerts",
-		name = "Discord offer alerts",
-		description = "Get a PriceCheck Discord DM when one of your open GE offers is undercut, outbid, or probably filled while you were offline. Trader Pro only. Pick how often you want to hear from the bot.",
-		position = 12
-	)
-	default AlertCadence discordOfferAlerts()
-	{
-		return AlertCadence.OFF;
-	}
-
-	@ConfigItem(
-		keyName = "geItemCard",
-		name = "GE: item evidence card",
-		description = "Beside the open offer screen: the day's traded corridor with your offer drawn on it, the trades arriving live, measured fill odds, and the after-tax outcome. Hold Shift to peek past the single-item card; on the offers grid, Shift shows each card's expand and collapse buttons.",
-		position = 11
-	)
 	default boolean geItemCard()
 	{
 		return true;
 	}
 
-	@ConfigItem(
-		keyName = "showCatches",
-		name = "Show dump catches",
-		description = "Add a Catch tab that lists live dump-reversion plays, ranked. It surfaces the board's measured base rate and a conservative, taxed, contingent target, and hides any figure it cannot back with trials (a still-falling dump reads as a skip). Trader Pro.",
-		position = 13
-	)
 	default boolean showCatches()
 	{
-		return false;
+		return true;
 	}
 
-	@ConfigItem(
-		keyName = "geOffersPanel",
-		name = "GE: active offers board",
-		description = "Dock a compact board to the right of the open Grand Exchange grid listing every active offer with its live verdict, how close it sits to a real fill, the last trade on your side, and the coarse pressure lean. Overview only. Trader Pro.",
-		position = 16
-	)
 	default boolean geOffersPanel()
 	{
 		return false;
 	}
 
-	@ConfigItem(
-		keyName = "overlayMode",
-		name = "GE: card size",
-		description = "How deep the card's trade tape runs and how big the overlays draw (this is size and detail, "
-			+ "not a time window: the chart's own 1h/24h/7d and last-trades views are picked on the card). "
-			+ "Compact keeps the last 10 trades at the normal size, Standard the last 20, and Large the last 30 "
-			+ "while drawing the advisor box and active-offers board larger for at-a-glance watching.",
-		position = 17
-	)
-	default OverlayMode overlayMode()
-	{
-		return OverlayMode.ACTIVE;
-	}
-
-	@ConfigItem(
-		keyName = "terminalStatusBar",
-		name = "GE: terminal status bar",
-		description = "Dock a Bloomberg-style status strip to the top of the open Grand Exchange window: your cash, used offer slots, current world, and a live clock. First piece of the terminal desk. Uses only on-screen game state, nothing is sent.",
-		position = 18
-	)
 	default boolean terminalStatusBar()
 	{
 		return false;
 	}
 
-	@ConfigItem(
-		keyName = "terminalCard",
-		name = "GE: terminal item card",
-		description = "Draw the item evidence card in the Bloomberg-terminal style: an amber-on-black quote grid (bid/ask/spread/margin/ROI/tax/change/volume/range/order-flow), the corridor chart, a time-and-sales tape, and your position. Needs room to the side of the GE for the wider card; falls back to the classic card when there isn't. Part of the terminal desk.",
-		position = 19
-	)
 	default boolean terminalCard()
 	{
 		return false;
 	}
 
-	@ConfigItem(
-		keyName = "terminalOffers",
-		name = "GE: terminal offers blotter",
-		description = "Show your active offers as a Bloomberg-terminal blotter docked to the right of the Grand Exchange (amber-on-black, one row per offer with side, quantity, price, closeness, verdict and running P&L). Works on its own. Trader Pro. Part of the terminal desk.",
-		position = 20
-	)
 	default boolean terminalOffers()
 	{
 		return false;
 	}
 
-	@ConfigItem(
-		keyName = "terminalDesk",
-		name = "GE: terminal desk (everything)",
-		description = "One switch for the whole Bloomberg-style desk around the Grand Exchange: the status bar, terminal item card and offers blotter, plus an opportunity radar, fresh dips and top movers to the left, your held positions above, and session flow, recent fills and a price ticker around it. Uses the live board (Trader Pro) plus your own flip log. Turning this on lights up every terminal piece; the individual toggles above still work on their own if you want just one. Panels quietly hide when there isn't room.",
-		position = 21
-	)
 	default boolean terminalDesk()
 	{
 		return false;

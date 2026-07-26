@@ -124,7 +124,7 @@ class GeItemCardOverlay extends Overlay
 		tfChipHits = tfHits;
 		// Market data is a Trader Pro surface; the server refuses it for free
 		// keys and the cards stay fully dark rather than rendering shells.
-		if ((!config.geItemCard() && !plugin.terminalDesk()) || !plugin.isGrandExchangeOpen() || !plugin.marketDataOk())
+		if (!plugin.deskCard() || !plugin.isGrandExchangeOpen() || !plugin.marketDataOk())
 		{
 			plugin.noteViewedItem(0);
 			return null;
@@ -162,7 +162,7 @@ class GeItemCardOverlay extends Overlay
 			setupQty = 0;
 		}
 
-		final boolean deskCard = config.terminalCard() || plugin.terminalDesk();
+		final boolean deskCard = plugin.deskOn();
 		final int wantW = deskCard ? GeItemInfoPainter.TERM_W : GeItemInfoPainter.W_FULL;
 		final int[] anchor = anchorFor(wantW);
 		if (slotIdx >= 0)
