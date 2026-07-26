@@ -172,11 +172,19 @@ class GeItemCardOverlay extends Overlay
 			final GeItemInfoPainter.Context c = buildContext(geId, offers, true);
 			addViewOutcome(c, offers, slotIdx);
 			c.rangeRow = plugin.viewRangeFor(geId);
-			final boolean wantTerm = deskCard && anchor[2] >= GeItemInfoPainter.TERM_W;
+			final boolean wantTerm = deskCard && anchor[2] >= GeItemInfoPainter.TERM_MIN;
 			final int termBudget = wantTerm ? termMaxHeight(anchor) : 0;
-			// Not enough vertical room for even the terminal card's fixed content (a
-			// short window): fall back to the classic card so we never overdraw the
-			// chat input. Normal windows leave plenty of room, so term stays on.
+			// A short window compresses the chart band (to 80px) before the card
+			// would overdraw the chat input; only when even that cannot fit does
+			// the classic card take over.
+			if (wantTerm && termBudget > 0)
+			{
+				final int deficit = GeItemInfoPainter.terminalFixedHeight(c) - termBudget;
+				if (deficit > 0)
+				{
+					c.chartH = Math.max(80, c.chartH - deficit);
+				}
+			}
 			final boolean term = wantTerm && termBudget >= GeItemInfoPainter.terminalFixedHeight(c);
 			c.maxHeight = term ? termBudget : 0;
 			paintAt(g, anchor[0], anchor[1], () -> term
@@ -269,11 +277,19 @@ class GeItemCardOverlay extends Overlay
 				applyOutcome(c, sellSide, entered, qty, geId, "", skip);
 			}
 			c.rangeRow = plugin.viewRangeFor(geId);
-			final boolean wantTerm = deskCard && anchor[2] >= GeItemInfoPainter.TERM_W;
+			final boolean wantTerm = deskCard && anchor[2] >= GeItemInfoPainter.TERM_MIN;
 			final int termBudget = wantTerm ? termMaxHeight(anchor) : 0;
-			// Not enough vertical room for even the terminal card's fixed content (a
-			// short window): fall back to the classic card so we never overdraw the
-			// chat input. Normal windows leave plenty of room, so term stays on.
+			// A short window compresses the chart band (to 80px) before the card
+			// would overdraw the chat input; only when even that cannot fit does
+			// the classic card take over.
+			if (wantTerm && termBudget > 0)
+			{
+				final int deficit = GeItemInfoPainter.terminalFixedHeight(c) - termBudget;
+				if (deficit > 0)
+				{
+					c.chartH = Math.max(80, c.chartH - deficit);
+				}
+			}
 			final boolean term = wantTerm && termBudget >= GeItemInfoPainter.terminalFixedHeight(c);
 			c.maxHeight = term ? termBudget : 0;
 			paintAt(g, anchor[0], anchor[1], () -> term
@@ -1055,6 +1071,22 @@ class GeItemCardOverlay extends Overlay
 		if (rightX + wantW <= client.getCanvasWidth() - 4)
 		{
 			return new int[]{rightX, y, wantW};
+		}
+		// Neither side holds the full design width. The terminal card reflows,
+		// so take the wider side at whatever width it has (down to TERM_MIN)
+		// before surrendering to the narrow classic module - a mid-size window
+		// keeps the terminal skin instead of snapping back to the old card.
+		if (wantW == GeItemInfoPainter.TERM_W)
+		{
+			final int leftAvail = b.x - 8 - 4;
+			final int rightAvail = client.getCanvasWidth() - 4 - rightX;
+			final int flexW = Math.min(wantW, Math.max(leftAvail, rightAvail));
+			if (flexW >= GeItemInfoPainter.TERM_MIN)
+			{
+				return leftAvail >= rightAvail
+					? new int[]{b.x - flexW - 8, y, flexW}
+					: new int[]{rightX, y, flexW};
+			}
 		}
 		if (b.x - narrow - 8 >= 4)
 		{

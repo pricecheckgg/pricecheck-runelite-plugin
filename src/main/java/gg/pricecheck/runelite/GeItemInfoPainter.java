@@ -73,6 +73,9 @@ final class GeItemInfoPainter
 		// Hard ceiling for the terminal card's drawn height (canvas px), 0 = unbounded.
 		// The card clamps its trade tape so it never draws over the chat input box.
 		int maxHeight = 0;
+		// Chart band height inside the terminal card. Short windows compress it
+		// (down to 80) so the card still fits instead of losing the terminal skin.
+		int chartH = 132;
 		String outcomeText;        // bottom line, prebuilt by the caller
 		Color outcomeColor;
 		String outcomeText2;       // whole-offer line under it (qty math)
@@ -120,6 +123,10 @@ final class GeItemInfoPainter
 	// is on. Grid values are derived from the Context; LIMIT/RESET show "-" until
 	// the buy-limit tracker (Phase 2) feeds them.
 	static final int TERM_W = 430;
+	// Narrowest width the terminal card reflows down to before the classic
+	// module takes over; every column inside is derived from w, so anything
+	// at or above this stays readable.
+	static final int TERM_MIN = 320;
 
 	private static long seriesHi(ItemChart.Series s)
 	{
@@ -203,8 +210,8 @@ final class GeItemInfoPainter
 	 *  card when there isn't even this much vertical room (short windows). */
 	static int terminalFixedHeight(Context c)
 	{
-		final int gridH = 5 * 26, chartH = 132;
-		return 46 + gridH + 30 + (chartH + 8) + 40 + (c.lotQty > 0 ? 20 : 0) + 16;
+		final int gridH = 5 * 26;
+		return 46 + gridH + 30 + (c.chartH + 8) + 40 + (c.lotQty > 0 ? 20 : 0) + 16;
 	}
 
 	/** A compact graph card for the overview grid (one per GE offer item): the item
@@ -276,7 +283,7 @@ final class GeItemInfoPainter
 		final boolean holding = c.lotQty > 0;
 
 		// ── height (matches the section y-progression below) ──
-		final int chartH = 132;
+		final int chartH = c.chartH;
 		// Everything except the variable-length trade tape.
 		final int fixedH = terminalFixedHeight(c);
 		int tapeRows = availTape;

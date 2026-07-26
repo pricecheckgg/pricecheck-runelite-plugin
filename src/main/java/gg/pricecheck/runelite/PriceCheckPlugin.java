@@ -1047,7 +1047,10 @@ public class PriceCheckPlugin extends Plugin
 		{
 			return DeskTier.COMPACT;
 		}
-		if (right >= 240)
+		// The card reflows down to TERM_MIN and can anchor on either side of
+		// the GE, so the card-only tier accepts whichever side has the room.
+		final int MINCARD = (int) Math.ceil(GeItemInfoPainter.TERM_MIN * sc) + 16;
+		if (right >= MINCARD || left >= MINCARD)
 		{
 			return DeskTier.MINIMAL;
 		}
@@ -1169,7 +1172,8 @@ public class PriceCheckPlugin extends Plugin
 	}
 
 	/** The one line the status bar shows: an unhonored fixed tier first, a
-	 *  broken composition second, nothing when the desk is clean. */
+	 *  broken composition second, Auto's own narration third, nothing when
+	 *  the desk is clean. */
 	String deskNotice()
 	{
 		final String fit = deskFitNotice();
@@ -1177,7 +1181,73 @@ public class PriceCheckPlugin extends Plugin
 		{
 			return fit;
 		}
-		return deskCompositionNotice();
+		final String comp = deskCompositionNotice();
+		if (comp != null)
+		{
+			return comp;
+		}
+		return autoFitNotice();
+	}
+
+	// Auto used to refit silently, which reads as "auto does nothing" - now a
+	// tier change announces itself for a few seconds with the deficit to the
+	// next tier up, and the no-room state explains itself for as long as it
+	// lasts (otherwise the desk is just absent with no clue why).
+	private DeskTier lastAutoFit;
+	private long autoFitChangedAt;
+
+	private String autoFitNotice()
+	{
+		if (config.deskMode() != PriceCheckConfig.DeskMode.AUTO)
+		{
+			return null;
+		}
+		final java.awt.Rectangle ge = geGridBounds();
+		if (ge == null)
+		{
+			return null;
+		}
+		final DeskTier fit = measuredFit();
+		final long now = System.currentTimeMillis();
+		if (fit != lastAutoFit)
+		{
+			// Stay quiet on the very first measure (login/GE open): only a
+			// CHANGE the user caused deserves a line.
+			autoFitChangedAt = lastAutoFit == null ? 0 : now;
+			lastAutoFit = fit;
+		}
+		final int canvasW = client.getCanvasWidth();
+		final int canvasH = client.getCanvasHeight();
+		final int right = canvasW - (ge.x + ge.width);
+		final int left = ge.x;
+		final double sc = overlayScale();
+		final int CARD = (int) Math.ceil(GeItemInfoPainter.TERM_W * sc) + 16;
+		final int RADAR = (int) Math.ceil(TerminalRadarOverlay.W * sc) + 16;
+		final int MINCARD = (int) Math.ceil(GeItemInfoPainter.TERM_MIN * sc) + 16;
+		if (fit == DeskTier.OFF)
+		{
+			final int deficit = MINCARD - Math.max(left, right);
+			return "auto: no room beside the GE for the desk (+" + deficit
+				+ "px) - widen the client or close the sidebar";
+		}
+		if (autoFitChangedAt == 0 || now - autoFitChangedAt > 6000)
+		{
+			return null;
+		}
+		switch (fit)
+		{
+			case FULL:
+				return "auto: full desk";
+			case COMPACT:
+			{
+				final StringBuilder need = new StringBuilder();
+				if (left < RADAR) need.append('+').append(RADAR - left).append("px left ");
+				if (canvasH < 620) need.append('+').append(620 - canvasH).append("px height ");
+				return "auto: compact desk (full needs " + need.toString().trim() + ")";
+			}
+			default:
+				return "auto: card only (blotter needs +" + (CARD - right) + "px right)";
+		}
 	}
 
 	/** One plain line when a FIXED desk mode cannot fit the current window,
@@ -1219,7 +1289,8 @@ public class PriceCheckPlugin extends Plugin
 		}
 		else
 		{
-			final int wantRight = want == DeskTier.COMPACT ? CARD : 240;
+			final int MINCARD = (int) Math.ceil(GeItemInfoPainter.TERM_MIN * sc) + 16;
+			final int wantRight = want == DeskTier.COMPACT ? CARD : MINCARD;
 			if (right < wantRight) need.append('+').append(wantRight - right).append("px right ");
 		}
 		if (need.length() == 0)
