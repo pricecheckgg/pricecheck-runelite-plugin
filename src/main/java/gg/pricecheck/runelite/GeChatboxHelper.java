@@ -61,11 +61,6 @@ class GeChatboxHelper
 	private final PriceCheckConfig config;
 	private final PriceCheckPlugin plugin;
 
-	// Hotkey cycle state: which item the last price-box press was for and
-	// whether it filled the recommendation (next press flips to insta).
-	private volatile int lastHotkeyItem = -1;
-	private volatile boolean lastHotkeyWasRec = false;
-
 	// Latest board + positions, pushed by the plugin's poller.
 	private volatile List<FlipData> flips = Collections.emptyList();
 	private volatile List<TrackedItem> tracked = Collections.emptyList();
@@ -171,13 +166,6 @@ class GeChatboxHelper
 		if (rec > 0)
 		{
 			addLine(parent, 10, 3, colW, "rec " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(rec), rec);
-		}
-		final long insta = instaPriceFor(itemId, isBuy);
-		if (insta > 0 && insta != rec)
-		{
-			final long off = Math.max(0, config.instaOffsetGp());
-			addLine(parent, 10, 33, colW,
-				"insta " + (isBuy ? "+" : "-") + Fmt.full(off) + ": " + Fmt.full(insta), insta);
 		}
 		final long traded = scanTraded(setup, 0);
 		if (traded > 0)
@@ -323,30 +311,6 @@ class GeChatboxHelper
 		}
 	}
 
-	/** The live insta price with the user's personal offset applied: buys base
-	 *  on the newest insta-sell print (+offset overcuts the other buyers),
-	 *  sells on the newest insta-buy print (-offset undercuts the sellers).
-	 *  0 when no print of the needed side is in the tape yet. */
-	private long instaPriceFor(int itemId, boolean isBuy)
-	{
-		final java.util.List<GeItemInfoPainter.Print> prints = plugin.cardPrintsFor(itemId);
-		for (int i = prints.size() - 1; i >= 0; i--)
-		{
-			final GeItemInfoPainter.Print p = prints.get(i);
-			if (p.price <= 0)
-			{
-				continue;
-			}
-			// A buy fills from sellers: base on the insta-sell (low) side.
-			if (isBuy != p.buySide)
-			{
-				final long off = Math.max(0, config.instaOffsetGp());
-				return Math.max(1, isBuy ? p.price + off : p.price - off);
-			}
-		}
-		return 0;
-	}
-
 	// Pre-fill only: write the digits into the input buffer + its on-screen echo
 	// (the '*' is the client's fake caret). The user presses Enter to submit.
 	private void fillInput(long price)
@@ -395,28 +359,10 @@ class GeChatboxHelper
 		{
 			final FlipData live = plugin.viewFor(itemId);
 			final long price = live == null ? -1 : (isBuy ? live.getBuy() : live.getSell());
-			// Second press on the same box switches to the insta price with the
-			// personal offset; presses keep alternating between the two.
-			final long insta = instaPriceFor(itemId, isBuy);
-			final boolean wantInsta = lastHotkeyItem == itemId && lastHotkeyWasRec && insta > 0;
-			lastHotkeyItem = itemId;
-			if (wantInsta)
-			{
-				lastHotkeyWasRec = false;
-				fillInput(insta);
-				return true;
-			}
 			if (price <= 0)
 			{
-				if (insta > 0)
-				{
-					lastHotkeyWasRec = false;
-					fillInput(insta);
-					return true;
-				}
-				return false;   // no data at all: fill nothing rather than a wrong price
+				return false;   // no live data yet: fill nothing rather than a wrong price
 			}
-			lastHotkeyWasRec = true;
 			fillInput(price);
 			return true;
 		}
