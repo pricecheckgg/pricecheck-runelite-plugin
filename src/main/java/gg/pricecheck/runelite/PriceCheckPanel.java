@@ -172,7 +172,7 @@ class PriceCheckPanel extends PluginPanel
 		for (final MaterialTab t : tabs)
 		{
 			t.setHorizontalAlignment(SwingConstants.CENTER);
-			t.setFont(t.getFont().deriveFont(Font.BOLD, 12f));
+			t.setFont(I18n.font(t.getFont().deriveFont(Font.BOLD, 12f)));
 			tabGroup.addTab(t);
 		}
 		tabGroup.select(flipsTab);
@@ -207,7 +207,7 @@ class PriceCheckPanel extends PluginPanel
 
 		final JLabel dTitle = new JLabel(I18n.t("Join the PriceCheck Discord"));
 		dTitle.setForeground(new Color(0x93, 0xa1, 0xff));
-		dTitle.setFont(dTitle.getFont().deriveFont(Font.BOLD, 12f));
+		dTitle.setFont(I18n.font(dTitle.getFont().deriveFont(Font.BOLD, 12f)));
 		dTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
 
 		final JLabel dSub1 = new JLabel(I18n.t("Flip chat and price checks"));
@@ -215,7 +215,7 @@ class PriceCheckPanel extends PluginPanel
 		for (final JLabel l : new JLabel[]{dSub1, dSub2})
 		{
 			l.setForeground(Palette.SUBTLE);
-			l.setFont(FontManager.getRunescapeSmallFont());
+			l.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 			l.setAlignmentX(Component.LEFT_ALIGNMENT);
 		}
 
@@ -584,7 +584,7 @@ class PriceCheckPanel extends PluginPanel
 		p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
 		final JLabel kl = new JLabel(k);
 		kl.setForeground(Palette.SUBTLE);
-		kl.setFont(FontManager.getRunescapeSmallFont());
+		kl.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		final JLabel vl = mono(v, col);
 		vl.setHorizontalAlignment(SwingConstants.RIGHT);
 		p.add(kl, BorderLayout.WEST);
@@ -824,10 +824,10 @@ class PriceCheckPanel extends PluginPanel
 		col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
 		col.setBackground(CARD);
 		final JLabel cap = new JLabel(caption);
-		cap.setFont(FontManager.getRunescapeSmallFont());
+		cap.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		cap.setForeground(Palette.SUBTLE);
 		cap.setAlignmentX(Component.LEFT_ALIGNMENT);
-		value.setFont(FontManager.getRunescapeBoldFont());
+		value.setFont(I18n.font(FontManager.getRunescapeBoldFont()));
 		value.setAlignmentX(Component.LEFT_ALIGNMENT);
 		col.add(cap);
 		col.add(Box.createVerticalStrut(2));
@@ -856,11 +856,11 @@ class PriceCheckPanel extends PluginPanel
 
 		// Hero: the session owns the header. Kept compact so the completed-flip
 		// list below stays visible without scrolling on a short panel.
-		heroTitle.setFont(FontManager.getRunescapeSmallFont());
+		heroTitle.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		heroTitle.setForeground(Palette.SUBTLE);
-		heroValue.setFont(FontManager.getRunescapeBoldFont().deriveFont(20f));
+		heroValue.setFont(I18n.font(FontManager.getRunescapeBoldFont().deriveFont(20f)));
 		heroValue.setForeground(Palette.SUBTLE);
-		heroSub.setFont(FontManager.getRunescapeSmallFont());
+		heroSub.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		heroSub.setForeground(Palette.SUBTLE);
 		for (final JLabel l : new JLabel[]{heroTitle, heroValue, heroSub})
 		{
@@ -904,7 +904,7 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel sync = new JPanel(new BorderLayout(6, 0));
 		sync.setBackground(CARD);
 		sync.setAlignmentX(Component.LEFT_ALIGNMENT);
-		logSync.setFont(FontManager.getRunescapeSmallFont());
+		logSync.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		logSync.setForeground(Palette.SUBTLE);
 		sync.add(logSyncDot, BorderLayout.WEST);
 		sync.add(logSync, BorderLayout.CENTER);
@@ -1272,7 +1272,7 @@ class PriceCheckPanel extends PluginPanel
 		capRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
 		final JLabel capLbl = new JLabel(I18n.t("Capital"));
 		capLbl.setForeground(Palette.SUBTLE);
-		planCapital.setFont(FontManager.getRunescapeSmallFont());
+		planCapital.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		planCapital.setToolTipText(I18n.t("Your roll, like 25m or 1.2b. Filled from your bank when detected."));
 		planCapital.setPreferredSize(new Dimension(90, 24));
 		planCapital.setMaximumSize(new Dimension(90, 24));
@@ -1368,7 +1368,7 @@ class PriceCheckPanel extends PluginPanel
 		controls.add(gap(6));
 
 		planStatus.setForeground(Palette.SUBTLE);
-		planStatus.setFont(planStatus.getFont().deriveFont(11f));
+		planStatus.setFont(I18n.font(planStatus.getFont().deriveFont(11f)));
 		planStatus.setAlignmentX(Component.LEFT_ALIGNMENT);
 		controls.add(planStatus);
 
@@ -1662,12 +1662,12 @@ class PriceCheckPanel extends PluginPanel
 		card.setAlignmentX(Component.LEFT_ALIGNMENT);
 		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 62));
 		final JPanel head = row();
-		acctName.setFont(acctName.getFont().deriveFont(Font.BOLD, 13f));
+		acctName.setFont(I18n.font(acctName.getFont().deriveFont(Font.BOLD, 13f)));
 		acctName.setForeground(Color.WHITE);
 		head.add(acctName, BorderLayout.CENTER);
 		head.add(acctPlan, BorderLayout.EAST);
 		acctSub.setForeground(Palette.SUBTLE);
-		acctSub.setFont(FontManager.getRunescapeSmallFont());
+		acctSub.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		acctSub.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
 		card.add(head);
 		card.add(acctSub);
@@ -1678,7 +1678,7 @@ class PriceCheckPanel extends PluginPanel
 		v.add(sectionHeader("Plugin key"));
 		final JPanel keyRow = row();
 		keyRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
-		keyPrefixLabel.setFont(FontManager.getRunescapeSmallFont());
+		keyPrefixLabel.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		keyPrefixLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		keyDot.setColor(Palette.SUBTLE);
 		keyRow.add(keyPrefixLabel, BorderLayout.CENTER);
@@ -1754,7 +1754,7 @@ class PriceCheckPanel extends PluginPanel
 
 		final JLabel link = new JLabel(I18n.t("Free key · Discord login, no RSN"));
 		link.setForeground(Palette.SUBTLE);
-		link.setFont(FontManager.getRunescapeSmallFont());
+		link.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		link.setAlignmentX(Component.LEFT_ALIGNMENT);
 		link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		link.addMouseListener(new MouseAdapter()
@@ -1866,7 +1866,7 @@ class PriceCheckPanel extends PluginPanel
 		// helpers, data sharing) lives in RuneLite's own config panel, which
 		// users rarely think to open. This jumps straight to it.
 		final JLabel allOpts = new JLabel("<html><span style='color:#9a917c'>All options · </span><span style='color:#e6c667'>RuneLite plugin settings</span></html>");
-		allOpts.setFont(FontManager.getRunescapeSmallFont());
+		allOpts.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		allOpts.setAlignmentX(Component.LEFT_ALIGNMENT);
 		allOpts.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		allOpts.setToolTipText(I18n.t("Every PriceCheck toggle, including overlay and GE options"));
@@ -1881,7 +1881,7 @@ class PriceCheckPanel extends PluginPanel
 
 		final JLabel footer = new JLabel("PriceCheck v" + PriceCheckPlugin.VERSION);
 		footer.setForeground(Palette.SUBTLE);
-		footer.setFont(footer.getFont().deriveFont(10f));
+		footer.setFont(I18n.font(footer.getFont().deriveFont(10f)));
 		footer.setAlignmentX(Component.LEFT_ALIGNMENT);
 		footer.setBorder(BorderFactory.createEmptyBorder(14, 0, 0, 0));
 		v.add(footer);
@@ -2114,7 +2114,7 @@ class PriceCheckPanel extends PluginPanel
 		if (sd == null || sd.ts == null || sd.ts.length < 2)
 		{
 			final JLabel wait = new JLabel(I18n.t("Loading day chart…"));
-			wait.setFont(FontManager.getRunescapeSmallFont());
+			wait.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 			wait.setForeground(Palette.SUBTLE);
 			card.add(wait, BorderLayout.CENTER);
 			card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
@@ -2215,12 +2215,12 @@ class PriceCheckPanel extends PluginPanel
 			// The amber mark carries WHY so the row explains itself on hover.
 			final JLabel dot = new JLabel("! ");
 			dot.setForeground(Palette.AMBER);
-			dot.setFont(dot.getFont().deriveFont(Font.BOLD));
+			dot.setFont(I18n.font(dot.getFont().deriveFont(Font.BOLD)));
 			dot.setToolTipText(I18n.t("Higher risk: ") + f.riskLabel() + ". Margin is volume-confirmed but this missed one board quality bar.");
 			line1.add(dot, BorderLayout.WEST);
 			final JLabel why = new JLabel(f.riskLabel());
 			why.setForeground(Palette.AMBER);
-			why.setFont(FontManager.getRunescapeSmallFont());
+			why.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 			line3.add(why, BorderLayout.WEST);
 		}
 		else if (f.isConfirmed())
@@ -2299,7 +2299,7 @@ class PriceCheckPanel extends PluginPanel
 		icon.setPreferredSize(new Dimension(24, 20));
 		if (itemManager != null) { itemManager.getImage(t.getGeId()).addTo(icon); }
 		final JLabel name = new JLabel(t.getName());
-		name.setFont(name.getFont().deriveFont(Font.BOLD));
+		name.setFont(I18n.font(name.getFont().deriveFont(Font.BOLD)));
 		name.setForeground(Color.WHITE);
 		final Mark rm = new Mark(Mark.CROSS, Palette.SUBTLE, 18, 20);
 		rm.setToolTipText(I18n.t("Stop tracking"));
@@ -2342,7 +2342,7 @@ class PriceCheckPanel extends PluginPanel
 		}
 		final JLabel pnl = new JLabel(pnlText);
 		pnl.setForeground(pnlCol);
-		pnl.setFont(pnl.getFont().deriveFont(Font.BOLD, 13f));
+		pnl.setFont(I18n.font(pnl.getFont().deriveFont(Font.BOLD, 13f)));
 		pnl.setAlignmentX(Component.LEFT_ALIGNMENT);
 		pnl.setBorder(BorderFactory.createEmptyBorder(3, 0, 2, 0));
 		pnl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
@@ -2362,7 +2362,7 @@ class PriceCheckPanel extends PluginPanel
 			? (nodata ? "not held · not trading" : "not held · vs your watch price")
 			: (nodata ? "not trading right now" : (thin ? "margin closing" : "good to hold")));
 		hint.setForeground(Palette.LIGHT);
-		hint.setFont(FontManager.getRunescapeSmallFont());
+		hint.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		verdict.add(hint);
 		st.add(verdict, BorderLayout.WEST);
 		card.add(st);
@@ -2371,7 +2371,7 @@ class PriceCheckPanel extends PluginPanel
 			? "Floor " + Fmt.full(t.getFloor()) + " · don't sell below"
 			: "Would break even at " + Fmt.full(t.getFloor()));
 		floor.setForeground(Palette.SUBTLE);
-		floor.setFont(FontManager.getRunescapeSmallFont());
+		floor.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		floor.setAlignmentX(Component.LEFT_ALIGNMENT);
 		floor.setBorder(BorderFactory.createEmptyBorder(3, 0, 0, 0));
 		floor.setMaximumSize(new Dimension(Integer.MAX_VALUE, 16));
@@ -2396,7 +2396,7 @@ class PriceCheckPanel extends PluginPanel
 		}
 		final JLabel t = new JLabel(title);
 		t.setForeground(Palette.GOLD);
-		t.setFont(t.getFont().deriveFont(Font.BOLD, 13f));
+		t.setFont(I18n.font(t.getFont().deriveFont(Font.BOLD, 13f)));
 		t.setAlignmentX(Component.LEFT_ALIGNMENT);
 		final JLabel b = new JLabel("<html><body style='width:180px'>" + body + "</body></html>");
 		b.setForeground(Palette.SUBTLE);
@@ -2422,7 +2422,7 @@ class PriceCheckPanel extends PluginPanel
 	private JComponent sectionHeader(String text)
 	{
 		final JLabel h = new JLabel(text.toUpperCase(Locale.ROOT));
-		h.setFont(FontManager.getRunescapeSmallFont());
+		h.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		h.setForeground(Palette.GOLD);
 		h.setBorder(BorderFactory.createEmptyBorder(2, 1, 6, 8));
 		// A hairline rule fills the rest of the header line; raised a little
@@ -2452,7 +2452,7 @@ class PriceCheckPanel extends PluginPanel
 		p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
 		final JLabel kl = new JLabel(k);
 		kl.setForeground(Palette.SUBTLE);
-		kl.setFont(FontManager.getRunescapeSmallFont());
+		kl.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		final JLabel vl = mono(v, Color.WHITE);
 		vl.setHorizontalAlignment(SwingConstants.RIGHT);
 		p.add(kl, BorderLayout.WEST);
@@ -2466,7 +2466,7 @@ class PriceCheckPanel extends PluginPanel
 		p.setOpaque(true);
 		p.setBackground(new Color(col.getRed(), col.getGreen(), col.getBlue(), 40));
 		p.setForeground(col);
-		p.setFont(p.getFont().deriveFont(10f));
+		p.setFont(I18n.font(p.getFont().deriveFont(10f)));
 		p.setBorder(BorderFactory.createEmptyBorder(1, 3, 1, 3));
 		return p;
 	}
@@ -2475,7 +2475,7 @@ class PriceCheckPanel extends PluginPanel
 	{
 		final JLabel l = new JLabel(text);
 		l.setForeground(col);
-		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		return l;
 	}
 
@@ -2484,7 +2484,7 @@ class PriceCheckPanel extends PluginPanel
 		// HTML with a fixed body width wraps; a plain label clips mid-sentence
 		// at the panel's 226px.
 		final JLabel l = new JLabel("<html><body style='width:176px'>" + escHtml(text) + "</body></html>");
-		l.setFont(FontManager.getRunescapeSmallFont());
+		l.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		l.setForeground(col);
 		l.setBorder(BorderFactory.createEmptyBorder(6, 2, 6, 2));
 		l.setAlignmentX(Component.LEFT_ALIGNMENT);

@@ -311,7 +311,9 @@ public class PriceCheckPlugin extends Plugin
 		{
 			clientToolbar.addNavigation(navButton);
 		}
-		I18n.applyFonts(panel);
+		// Watcher, not a one-shot sweep: tabs and rows built later must get the
+		// Japanese face too or they render as empty boxes.
+		I18n.installFontWatcher(panel);
 	}
 
 	@Override

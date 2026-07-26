@@ -37,7 +37,7 @@ final class I18n
 	private static volatile boolean jp;
 	private static volatile String cjk;
 	private static volatile boolean probed;
-	private static final Map<Integer, Font> SUBST = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final Map<String, Font> SUBST = new java.util.concurrent.ConcurrentHashMap<>();
 
 	private I18n() { }
 
@@ -82,6 +82,23 @@ final class I18n
 	}
 
 	/**
+	 * Translate a pattern, then fill it. Composed labels ("31 FLIPS · BY EV/HR")
+	 * must translate as ONE pattern, never as glued fragments: Japanese puts the
+	 * pieces in a different order and needs no plural forms.
+	 */
+	static String f(String pattern, Object... args)
+	{
+		try
+		{
+			return String.format(t(pattern), args);
+		}
+		catch (Exception e)
+		{
+			return String.format(pattern, args);   // a bad translation never breaks a label
+		}
+	}
+
+	/**
 	 * The face to draw `text` in: the caller's own font whenever it can render
 	 * the string, else the Japanese face at the same size and style. Latin
 	 * strings therefore keep the mono/pixel face the layout was built around.
@@ -96,9 +113,53 @@ final class I18n
 		{
 			return base;   // pure Latin keeps the mono face the columns were measured in
 		}
-		// Cached: fit() runs for every drawn label, every frame.
-		final int key = base.getStyle() * 1000 + base.getSize();
-		return SUBST.computeIfAbsent(key, k -> new Font(cjk, base.getStyle(), base.getSize()));
+		return font(base);
+	}
+
+	/**
+	 * The Japanese stand-in for a font, matched on RENDERED LINE HEIGHT rather
+	 * than nominal size. RuneLite's "size 16" pixel faces are 12px tall, so
+	 * substituting at the same point size doubles every label and bursts the
+	 * layout - this picks the size that occupies the same line instead.
+	 */
+	static Font font(Font base)
+	{
+		if (!jp || cjk == null || base == null || cjk.equals(base.getFamily()))
+		{
+			return base;
+		}
+		return SUBST.computeIfAbsent(base.getFamily() + "|" + base.getStyle() + "|" + base.getSize(),
+			k -> matchHeight(base));
+	}
+
+	private static Font matchHeight(Font base)
+	{
+		final java.awt.Graphics2D g = metrics();
+		// +2px: kanji carry far more detail than Latin at the same height, so
+		// an exact match reads as squinting-small. Two pixels stays inside the
+		// line spacing the panel lays out with.
+		final int want = g.getFontMetrics(base).getHeight() + 2;
+		for (int size = 6; size <= 40; size++)
+		{
+			final Font f = new Font(cjk, base.getStyle(), size);
+			if (g.getFontMetrics(f).getHeight() >= want)
+			{
+				return f;
+			}
+		}
+		return new Font(cjk, base.getStyle(), base.getSize());
+	}
+
+	private static java.awt.Graphics2D probeG;
+
+	private static java.awt.Graphics2D metrics()
+	{
+		if (probeG == null)
+		{
+			probeG = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+				.createGraphics();
+		}
+		return probeG;
 	}
 
 	/**
@@ -117,7 +178,7 @@ final class I18n
 		{
 			// Unconditional: RuneLite's pixel faces have no kana at all, and the
 			// logical ones cannot be trusted to draw a mixed row.
-			root.setFont(new Font(cjk, f.getStyle(), f.getSize()));
+			root.setFont(font(f));
 		}
 		if (root instanceof Container)
 		{
@@ -125,6 +186,47 @@ final class I18n
 			{
 				applyFonts(kid);
 			}
+		}
+	}
+
+	/**
+	 * Keep a whole panel in the right face for as long as it lives: every
+	 * component added to the tree from now on gets the substitution too. Without
+	 * this, a tab built the first time it is opened renders its Japanese as
+	 * empty boxes, because the one-shot sweep already ran.
+	 */
+	static void installFontWatcher(Container root)
+	{
+		if (!jp || cjk == null || root == null)
+		{
+			return;
+		}
+		applyFonts(root);
+		attach(root);
+	}
+
+	private static final java.awt.event.ContainerListener WATCHER = new java.awt.event.ContainerAdapter()
+	{
+		@Override
+		public void componentAdded(java.awt.event.ContainerEvent e)
+		{
+			applyFonts(e.getChild());
+			attach(e.getChild());
+		}
+	};
+
+	private static void attach(Component c)
+	{
+		if (!(c instanceof Container))
+		{
+			return;
+		}
+		final Container k = (Container) c;
+		k.removeContainerListener(WATCHER);   // never stack duplicates
+		k.addContainerListener(WATCHER);
+		for (final Component kid : k.getComponents())
+		{
+			attach(kid);
 		}
 	}
 
