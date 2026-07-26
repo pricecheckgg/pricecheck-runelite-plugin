@@ -175,7 +175,7 @@ class TerminalOrderOverlay extends Overlay
 			if (hold != null && hold[0] > 0)
 			{
 				t.ref = hold[1] / hold[0];   // avg cost basis
-				t.refLabel = "your cost";
+				t.refLabel = I18n.t("your cost");
 			}
 			else
 			{
@@ -187,7 +187,7 @@ class TerminalOrderOverlay extends Overlay
 		else
 		{
 			t.ref = live != null && live.getSell() > 0 ? live.getSell() : entered;
-			t.refLabel = "resells at";
+			t.refLabel = I18n.t("resells at");
 			t.netEa = GeTax.net(entered, t.ref);
 		}
 		t.total = t.netEa * t.qty;
@@ -215,7 +215,7 @@ class TerminalOrderOverlay extends Overlay
 		if (!t.priced)
 		{
 			g.setFont(TerminalKit.mono(11)); g.setColor(TerminalKit.DIM);
-			g.drawString("type a price to preview profit", L, 74);
+			TerminalKit.str(g, "type a price to preview profit", L, 74);
 		}
 		else
 		{

@@ -529,6 +529,18 @@ final class I18n
 		JA.put("buy limit: %s left of %s", "購入上限: 残り%s / %s");
 		JA.put("4h buy limit reached", "4時間の購入上限に到達");
 		JA.put("4h buy limit reached - resets in %s", "4時間の購入上限に到達 - %s後に回復");
+		JA.put("No trade history yet", "取引履歴はまだありません");
+		JA.put("balanced", "均衡");
+		JA.put("%s SELL", "%s 売り優勢");
+		JA.put("%s BUY", "%s 買い優勢");
+		JA.put("%s price", "%s 価格");
+		JA.put("%s trades", "%s 約定");
+		JA.put("hold shift", "Shift長押し");
+		JA.put("Latest", "最新");
+		JA.put("type a price to preview profit", "価格を入力すると利益を表示");
+		JA.put("resells at", "再販価格");
+		JA.put("your cost", "取得単価");
+		JA.put("vs buy", "買値との比");
 		JA.put("TRIAL", "体験");
 		JA.put("FREE", "無料");
 		JA.put("PREMIUM", "プレミアム");

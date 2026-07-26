@@ -326,7 +326,7 @@ final class GeItemInfoPainter
 		TerminalKit.cell(g, c0, colW, y, "HI", hi > 0 ? TerminalKit.commas(hi) : "-", TerminalKit.AMBER);
 		TerminalKit.cell(g, c1, colW, y, "LO", lo > 0 ? TerminalKit.commas(lo) : "-", TerminalKit.AMBER);
 		TerminalKit.cell(g, c2, colW, y, "OFI",
-			Math.abs(ofi) < 1 ? "balanced" : signPct(ofi).replace("+", "+").replace("%", "%") + (ofi >= 0 ? " SELL" : " BUY"),
+			Math.abs(ofi) < 1 ? I18n.t("balanced") : I18n.f(ofi >= 0 ? "%s SELL" : "%s BUY", signPct(ofi)),
 			Math.abs(ofi) < 1 ? TerminalKit.LABEL : ofi >= 0 ? TerminalKit.RED : TerminalKit.GREEN);
 		y += 26;
 		final long limTotal = c.limitTotal;
@@ -389,7 +389,7 @@ final class GeItemInfoPainter
 		y = chartY + chartH;
 		if (c.chartLabel != null && !c.chartLabel.isEmpty())
 		{
-			final String tag = c.chartLabel + (c.tradesChartN > 0 ? " trades" : " price");
+			final String tag = I18n.f(c.tradesChartN > 0 ? "%s trades" : "%s price", I18n.t(c.chartLabel));
 			g.setFont(TerminalKit.monoB(10));
 			final int tw = g.getFontMetrics().stringWidth(tag) + 8;
 			g.setColor(TerminalKit.TITLEBG); g.fillRect(L + 2, chartY + 2, tw, 14);
@@ -598,7 +598,7 @@ final class GeItemInfoPainter
 		}
 		if (c.chartLabel != null && !c.chartLabel.isEmpty())
 		{
-			final String tag = c.chartLabel + (c.tradesChartN > 0 ? " trades" : " price");
+			final String tag = I18n.f(c.tradesChartN > 0 ? "%s trades" : "%s price", I18n.t(c.chartLabel));
 			final int tw = fm.stringWidth(tag) + 8;
 			g.setColor(SHADOW);
 			g.fillRoundRect(PAD + 2, y + 2, tw, lineH - 1, 5, 5);
@@ -1091,7 +1091,7 @@ final class GeItemInfoPainter
 		}
 		final int lineH = fm.getHeight();
 		final int chartTop = PAD + fm.getAscent() + 8;   // header baseline + rule gap
-		final int tw = fm.stringWidth(label + (trades ? " trades" : " price")) + 8;
+		final int tw = fm.stringWidth(I18n.f(trades ? "%s trades" : "%s price", I18n.t(label))) + 8;
 		return new java.awt.Rectangle(PAD + 2, chartTop + 2, tw, lineH - 1);
 	}
 
@@ -1108,7 +1108,7 @@ final class GeItemInfoPainter
 			return null;
 		}
 		final int lineH = fm.getHeight();
-		final int tw = fm.stringWidth(label + (trades ? " trades" : " price")) + 8;
+		final int tw = fm.stringWidth(I18n.f(trades ? "%s trades" : "%s price", I18n.t(label))) + 8;
 		return new java.awt.Rectangle(12 + 2, TERM_CHART_Y + 2, tw, lineH - 1);
 	}
 
@@ -1636,11 +1636,18 @@ final class GeItemInfoPainter
 		return hm + " " + rel;
 	}
 
-	private static void shadowed(Graphics2D g, String s, int x, int yy, Color c)
+	private static void shadowed(Graphics2D g, String text, int x, int yy, Color c)
 	{
+		// The pixel face has no kana, so a translated label borrows a face that
+		// does. Latin strings keep the pixel font they were tuned for.
+		final String s = I18n.t(text);
+		final java.awt.Font base = g.getFont();
+		final java.awt.Font use = I18n.fit(base, s);
+		if (use != base) { g.setFont(use); }
 		g.setColor(SHADOW);
 		g.drawString(s, x + 1, yy + 1);
 		g.setColor(c);
 		g.drawString(s, x, yy);
+		if (use != base) { g.setFont(base); }
 	}
 }

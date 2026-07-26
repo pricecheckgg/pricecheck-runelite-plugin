@@ -86,7 +86,7 @@ class ItemChart extends JComponent
 		if (d == null)
 		{
 			g2.setColor(Palette.SUBTLE);
-			g2.drawString("No trade history yet", PAD_L + 4, h / 2);
+			TerminalKit.str(g2, "No trade history yet", PAD_L + 4, h / 2);
 			return;
 		}
 

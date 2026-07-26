@@ -831,11 +831,15 @@ class GeItemCardOverlay extends Overlay
 		}
 		final int x = cardX + tag.x + tag.width + 4;
 		final int base = cardY + tag.y + fm.getAscent() - 1;
-		final String hint = "hold shift";
+		final String hint = I18n.t("hold shift");
+		final java.awt.Font hb = g.getFont();
+		final java.awt.Font hu = I18n.fit(hb, hint);
+		if (hu != hb) { g.setFont(hu); }
 		g.setColor(new Color(0, 0, 0, 170));
 		g.drawString(hint, x + 1, base + 1);
 		g.setColor(Palette.SUBTLE_CANVAS);
 		g.drawString(hint, x, base);
+		if (hu != hb) { g.setFont(hb); }
 	}
 
 	private static final PriceCheckPlugin.ChartTf[] TF_TIME =
@@ -865,7 +869,7 @@ class GeItemCardOverlay extends Overlay
 			int rw = 0;
 			for (final PriceCheckPlugin.ChartTf tf : row)
 			{
-				rw += fm.stringWidth(tf.label) + 8 + 2;
+				rw += g.getFontMetrics(I18n.fit(g.getFont(), I18n.t(tf.label))).stringWidth(I18n.t(tf.label)) + 8 + 2;
 			}
 			maxRow = Math.max(maxRow, rw);
 		}
@@ -881,17 +885,22 @@ class GeItemCardOverlay extends Overlay
 		final int base = y + fm.getAscent() - 1;
 		for (final PriceCheckPlugin.ChartTf tf : row)
 		{
-			final String s = tf.label;
-			final int w = fm.stringWidth(s) + 8;
+			final String s = I18n.t(tf.label);
+			final java.awt.FontMetrics cfm = g.getFontMetrics(I18n.fit(g.getFont(), s));
+			final int w = cfm.stringWidth(s) + 8;
 			final boolean active = tf == plugin.chartTf();
 			g.setColor(active ? new Color(0xe6, 0xc6, 0x67, 70) : new Color(0, 0, 0, 150));
 			g.fillRoundRect(x, y, w, h, 4, 4);
 			g.setColor(active ? Palette.GOLD : Palette.SUBTLE);
 			g.drawRoundRect(x, y, w, h, 4, 4);
 			g.setColor(new Color(0, 0, 0, 180));
+			final java.awt.Font cb = g.getFont();
+			final java.awt.Font cu = I18n.fit(cb, s);
+			if (cu != cb) { g.setFont(cu); }
 			g.drawString(s, x + 5, base + 1);
 			g.setColor(active ? Palette.GOLD : Palette.LIGHT);
 			g.drawString(s, x + 4, base);
+			if (cu != cb) { g.setFont(cb); }
 			final PriceCheckPlugin.ChartTf sel = tf;
 			tfChipHits.add(new Object[]{new Rectangle(x, y, w, h), (Runnable) () -> plugin.setChartTf(sel)});
 			x += w + 2;
