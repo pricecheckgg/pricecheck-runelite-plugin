@@ -99,6 +99,25 @@ final class I18n
 	}
 
 	/**
+	 * A verdict like "OK +26.2k" or "RAISE +12.9k" is a word plus a number. The
+	 * word translates; the number is left exactly as the engine produced it.
+	 */
+	static String verdict(String s)
+	{
+		if (!jp || s == null || s.isEmpty())
+		{
+			return s;
+		}
+		final int sp = s.indexOf(' ');
+		if (sp < 0)
+		{
+			return t(s);
+		}
+		final String head = t(s.substring(0, sp));
+		return head + s.substring(sp);
+	}
+
+	/**
 	 * The face to draw `text` in: the caller's own font whenever it can render
 	 * the string, else the Japanese face at the same size and style. Latin
 	 * strings therefore keep the mono/pixel face the layout was built around.
@@ -549,6 +568,25 @@ final class I18n
 		JA.put("FORMING", "形成中");
 		JA.put("QUIET", "閑散");
 		JA.put("NORMAL", "通常");
+		JA.put("OK", "適正");
+		JA.put("HOLD", "待ち");
+		JA.put("COLLECT", "回収");
+		JA.put("RAISE", "引上げ");
+		JA.put("DROP", "引下げ");
+		JA.put("CUT", "損切り");
+		JA.put("DEAD", "妙味なし");
+		JA.put("SELL", "売り");
+		JA.put("BUY", "買い");
+		JA.put("seated", "約定待ち");
+		JA.put("%s closing", "%s 接近中");
+		JA.put("%s drifting", "%s 乖離中");
+		JA.put("%s away", "%s 差");
+		JA.put("%d/%d SEATED", "%d/%d 約定待ち");
+		JA.put("REALIZED TODAY", "本日確定");
+		JA.put("GP / HR", "GP/時");
+		JA.put("WIN", "勝率");
+		JA.put("TAX PAID", "支払い税");
+		JA.put("buy %s", "買値 %s");
 		JA.put("TRIAL", "体験");
 		JA.put("FREE", "無料");
 		JA.put("PREMIUM", "プレミアム");

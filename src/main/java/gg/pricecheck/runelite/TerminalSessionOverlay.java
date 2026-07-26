@@ -109,7 +109,7 @@ class TerminalSessionOverlay extends Overlay
 		{
 			final int cx = 8 + i * colW;
 			g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
-			g.drawString(labels[i], cx, 36);
+			TerminalKit.str(g, labels[i], cx, 36);
 			g.setFont(TerminalKit.monoB(15)); g.setColor(colors[i]);
 			g.drawString(values[i], cx, 50);
 		}

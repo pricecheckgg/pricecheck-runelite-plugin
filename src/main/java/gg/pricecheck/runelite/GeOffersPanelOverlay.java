@@ -208,7 +208,7 @@ class GeOffersPanelOverlay extends Overlay
 
 		if (a != null && a.getKind() != OfferAdvice.Kind.NO_DATA && a.getShortText() != null && !a.getShortText().isEmpty())
 		{
-			r.verdict = a.getShortText();
+			r.verdict = I18n.verdict(a.getShortText());
 			r.verdictColor = a.getColor();
 		}
 		else
@@ -500,7 +500,7 @@ class GeOffersPanelOverlay extends Overlay
 		g.setColor(TerminalKit.GRID); g.drawLine(1, h - footerH, w - 1, h - footerH);
 		g.setFont(TerminalKit.monoB(10));
 		g.setColor(rows.size() > 0 && seated == rows.size() ? TerminalKit.GREEN : TerminalKit.AMBER);
-		g.drawString(seated + "/" + rows.size() + " SEATED", 8, h - 5);
+		TerminalKit.str(g, I18n.f("%d/%d SEATED", seated, rows.size()), 8, h - 5);
 		g.setColor(total >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
 		TerminalKit.rt(g, I18n.t("NET ") + (total >= 0 ? "+" : "") + Fmt.compact(total), w - 8, h - 5);
 		return new Result(new Dimension(w, h), btn);
@@ -525,7 +525,7 @@ class GeOffersPanelOverlay extends Overlay
 		if (r.verdict != null)
 		{
 			g.setColor(r.verdictColor != null ? r.verdictColor : TerminalKit.AMBER);
-			verdW = fm.stringWidth(r.verdict);
+			verdW = TerminalKit.width(g, r.verdict);
 			TerminalKit.rt(g, r.verdict, w - 8, base1);
 		}
 		g.setColor(TerminalKit.AMBERHI);
@@ -537,10 +537,10 @@ class GeOffersPanelOverlay extends Overlay
 		g.drawString(q + " @ " + Fmt.compact(r.price), 8, base2);
 		final String mid;
 		final Color midC;
-		if (r.seated) { mid = "seated"; midC = TerminalKit.GREEN; }
+		if (r.seated) { mid = I18n.t("seated"); midC = TerminalKit.GREEN; }
 		else if (r.closenessGp > 0)
 		{
-			mid = Fmt.compact(r.closenessGp) + (r.trend > 0 ? " closing" : r.trend < 0 ? " drifting" : " away");
+			mid = I18n.f(r.trend > 0 ? "%s closing" : r.trend < 0 ? "%s drifting" : "%s away", Fmt.compact(r.closenessGp));
 			midC = r.trend > 0 ? TerminalKit.GREEN : r.trend < 0 ? TerminalKit.RED : TerminalKit.LABEL;
 		}
 		else { mid = ""; midC = TerminalKit.LABEL; }
@@ -795,10 +795,14 @@ class GeOffersPanelOverlay extends Overlay
 
 	private static void shadowed(Graphics2D g, String s, int x, int y, Color c)
 	{
+		final java.awt.Font sb = g.getFont();
+		final java.awt.Font su = I18n.fit(sb, s);
+		if (su != sb) { g.setFont(su); }
 		g.setColor(SHADOW);
 		g.drawString(s, x + 1, y + 1);
 		g.setColor(c);
 		g.drawString(s, x, y);
+		if (su != sb) { g.setFont(sb); }
 	}
 
 	private static String ellipsize(String s, FontMetrics fm, int max)

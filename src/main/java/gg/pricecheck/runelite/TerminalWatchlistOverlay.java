@@ -219,7 +219,7 @@ class TerminalWatchlistOverlay extends Overlay
 			g.setFont(TerminalKit.mono(11)); g.setColor(TerminalKit.AMBER);
 			g.drawString(clip(wc.name, fm, nameClip - 16), 24, cy);
 			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL);
-			TerminalKit.rt(g, "buy " + TerminalKit.gp(wc.target), buyXr, cy);
+			TerminalKit.rt(g, I18n.f("buy %s", TerminalKit.gp(wc.target)), buyXr, cy);
 			g.setFont(TerminalKit.monoB(9)); g.setColor(sc);
 			TerminalKit.rt(g, wc.state == 2 ? I18n.t("BUY") : wc.state == 1 ? I18n.t("NEAR") : I18n.t("WAIT"), tagXr, cy);
 			cy += ROW;
@@ -237,7 +237,7 @@ class TerminalWatchlistOverlay extends Overlay
 				g.setFont(TerminalKit.mono(11)); g.setColor(TerminalKit.AMBER);
 				g.drawString(clip(p.name, fm, nameClip), 8, cy);
 				g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL);
-				TerminalKit.rt(g, "buy " + TerminalKit.gp(p.buy), buyXr, cy);
+				TerminalKit.rt(g, I18n.f("buy %s", TerminalKit.gp(p.buy)), buyXr, cy);
 				g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.AMBERHI);
 				TerminalKit.rt(g, TerminalKit.gp(p.evPerHr), tagXr, cy);
 				cy += ROW;

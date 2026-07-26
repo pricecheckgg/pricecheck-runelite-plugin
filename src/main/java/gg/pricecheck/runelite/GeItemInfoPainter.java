@@ -196,13 +196,13 @@ final class GeItemInfoPainter
 		}
 		if (s.startsWith("S "))
 		{
-			return "SELL " + s.substring(2);
+			return I18n.t("SELL") + " " + I18n.verdict(s.substring(2));
 		}
 		if (s.startsWith("B "))
 		{
-			return "BUY " + s.substring(2);
+			return I18n.t("BUY") + " " + I18n.verdict(s.substring(2));
 		}
-		return s;
+		return I18n.verdict(s);
 	}
 
 	/** The terminal card's height minus the variable trade tape - a hard floor the

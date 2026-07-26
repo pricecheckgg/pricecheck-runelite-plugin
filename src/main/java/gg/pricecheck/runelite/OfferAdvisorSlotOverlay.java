@@ -95,7 +95,7 @@ class OfferAdvisorSlotOverlay extends Overlay
 			{
 				continue;
 			}
-			final String label = a.getShortText();
+			final String label = I18n.verdict(a.getShortText());
 			if (label == null || label.isEmpty())
 			{
 				continue;
@@ -197,10 +197,14 @@ class OfferAdvisorSlotOverlay extends Overlay
 			cx += triW;
 		}
 		final int ty = barY + 2 + ((BAR_H - 2 - (fm.getAscent() + fm.getDescent())) / 2) + fm.getAscent();
+		final java.awt.Font vb = g.getFont();
+		final java.awt.Font vu = I18n.fit(vb, text);
+		if (vu != vb) { g.setFont(vu); }
 		g.setColor(new Color(0, 0, 0, 205));
 		g.drawString(text, cx + 1, ty + 1);
 		g.setColor(col);
 		g.drawString(text, cx, ty);
+		if (vu != vb) { g.setFont(vb); }
 
 		// Right segment: proximity to a real fill. Never contradicts the centre
 		// verdict - the seated "at mkt" shows only on non-action slots, and AMBER
