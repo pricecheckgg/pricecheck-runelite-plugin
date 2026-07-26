@@ -1075,6 +1075,56 @@ public class PriceCheckPlugin extends Plugin
 		return deskTier().ordinal() >= DeskTier.MINIMAL.ordinal();
 	}
 
+	/** One plain line when a FIXED desk mode cannot fit the current window,
+	 *  with the real deficit and the fix. AUTO never complains: silently
+	 *  fitting is what it is for. Null when everything the user asked for is
+	 *  on screen. */
+	String deskFitNotice()
+	{
+		final PriceCheckConfig.DeskMode m = config.deskMode();
+		if (m == PriceCheckConfig.DeskMode.AUTO || m == PriceCheckConfig.DeskMode.OFF)
+		{
+			return null;
+		}
+		final DeskTier fit = measuredFit();
+		final DeskTier want = m == PriceCheckConfig.DeskMode.FULL ? DeskTier.FULL
+			: m == PriceCheckConfig.DeskMode.COMPACT ? DeskTier.COMPACT : DeskTier.MINIMAL;
+		if (fit.ordinal() >= want.ordinal())
+		{
+			return null;
+		}
+		final java.awt.Rectangle ge = geGridBounds();
+		if (ge == null)
+		{
+			return null;
+		}
+		final int canvasW = client.getCanvasWidth();
+		final int canvasH = client.getCanvasHeight();
+		final int right = canvasW - (ge.x + ge.width);
+		final int left = ge.x;
+		final double sc = overlayScale();
+		final int CARD = (int) Math.ceil(GeItemInfoPainter.TERM_W * sc) + 16;
+		final int RADAR = (int) Math.ceil(TerminalRadarOverlay.W * sc) + 16;
+		final StringBuilder need = new StringBuilder();
+		if (want == DeskTier.FULL)
+		{
+			if (right < CARD) need.append('+').append(CARD - right).append("px right ");
+			if (left < RADAR) need.append('+').append(RADAR - left).append("px left ");
+			if (canvasH < 620) need.append('+').append(620 - canvasH).append("px height ");
+		}
+		else
+		{
+			final int wantRight = want == DeskTier.COMPACT ? CARD : 240;
+			if (right < wantRight) need.append('+').append(wantRight - right).append("px right ");
+		}
+		if (need.length() == 0)
+		{
+			return null;
+		}
+		return want.name().toLowerCase() + " desk needs " + need.toString().trim()
+			+ " - widen the client or close the sidebar (showing " + fit.name().toLowerCase() + ")";
+	}
+
 	/** True while the offer set-up panel (465:15 or 465:26) is on screen - the state
 	 *  the terminal ORDER ticket wants; the blotter yields the right dock to it. */
 	boolean setupScreenOpen()

@@ -82,6 +82,23 @@ class TerminalStatusOverlay extends Overlay
 			paintBar(g, (int) Math.round(w / scale), BAR_H, cash(), usedSlots(),
 				client.getWorld(), LocalTime.now().format(CLOCK),
 				sum != null ? sum.todayProfit : Long.MIN_VALUE);
+			// A fixed desk mode the window cannot hold explains itself instead
+			// of silently downgrading: one amber line under the bar with the
+			// real deficit and the fix.
+			final String notice = plugin.deskFitNotice();
+			if (notice != null)
+			{
+				TerminalKit.hints(g);
+				g.setFont(TerminalKit.mono(10));
+				final int tw = g.getFontMetrics().stringWidth(notice) + 14;
+				final int ny = BAR_H + 3;
+				g.setColor(TerminalKit.PANEL);
+				g.fillRect(0, ny, Math.min(tw, (int) Math.round(w / scale)), 16);
+				g.setColor(TerminalKit.BORDER);
+				g.drawRect(0, ny, Math.min(tw, (int) Math.round(w / scale)), 16);
+				g.setColor(TerminalKit.AMBERHI);
+				g.drawString(notice, 7, ny + 12);
+			}
 		}
 		finally
 		{
