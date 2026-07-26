@@ -120,12 +120,26 @@ public interface PriceCheckConfig extends Config
 	@ConfigItem(
 		keyName = "geAutofillHotkey",
 		name = "GE autofill hotkey",
-		description = "Press this while a GE buy or sell price box is open to fill PriceCheck's recommended price for that item; press it on the quantity box of a buy offer to fill your remaining 4h buy limit. You still press Enter to place the offer. Unbound by default.",
+		description = "Press this while a GE buy or sell price box is open to fill PriceCheck's recommended price for that item; "
+			+ "press it AGAIN to switch to the live insta price with your offset applied (buys: last insta-sell + offset, sells: last insta-buy - offset). "
+			+ "On the quantity box of a buy offer it fills your remaining 4h buy limit. You still press Enter to place the offer. Unbound by default.",
 		position = 6
 	)
 	default Keybind geAutofillHotkey()
 	{
 		return Keybind.NOT_SET;
+	}
+
+	@ConfigItem(
+		keyName = "instaOffsetGp",
+		name = "Insta price offset (gp)",
+		description = "Your personal cut applied to the live insta price by the second hotkey press and the \"insta\" price line: "
+			+ "buys fill the last insta-sell PLUS this, sells fill the last insta-buy MINUS this. 1 = classic undercut/overcut.",
+		position = 7
+	)
+	default int instaOffsetGp()
+	{
+		return 1;
 	}
 
 	@ConfigItem(
