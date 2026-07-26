@@ -433,7 +433,10 @@ public class PriceCheckPlugin extends Plugin
 
 	private void flushCapital()
 	{
-		if (!config.autoCapital() || !bankSeen || !capitalDirty)
+		// Capital posting retired with the planner: detection stays local-only
+		// (panel prefill) until a consent-gated toggle returns. Never post
+		// wealth without an explicit opt-in.
+		if (true)
 		{
 			return;
 		}
@@ -485,7 +488,7 @@ public class PriceCheckPlugin extends Plugin
 	@Subscribe
 	public void onItemContainerChanged(net.runelite.api.events.ItemContainerChanged event)
 	{
-		if (!config.autoCapital() || event.getItemContainer() == null)
+		if (event.getItemContainer() == null)
 		{
 			return;
 		}

@@ -101,7 +101,7 @@ class GeChatboxHelper
 		{
 			standDown(false);
 		}
-		if (!config.gePriceButtons())
+		if (!config.geAssists())
 		{
 			return;
 		}
@@ -412,7 +412,7 @@ class GeChatboxHelper
 
 	void onScriptPostFired(ScriptPostFired e)
 	{
-		if (e.getScriptId() != SCRIPT_GE_SEARCHBOX_BUILT || !config.geSearchSuggestions())
+		if (e.getScriptId() != SCRIPT_GE_SEARCHBOX_BUILT || !config.geAssists())
 		{
 			return;
 		}
@@ -620,7 +620,7 @@ class GeChatboxHelper
 
 	void onGrandExchangeSearched(GrandExchangeSearched e)
 	{
-		if (!config.geSearchSuggestions() || e.isConsumed())
+		if (!config.geAssists() || e.isConsumed())
 		{
 			return;   // another plugin (bank tags etc.) got there first
 		}

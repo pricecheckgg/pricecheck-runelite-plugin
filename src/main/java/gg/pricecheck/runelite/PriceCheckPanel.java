@@ -159,7 +159,7 @@ class PriceCheckPanel extends PluginPanel
 		{
 			tabs.add(planTab);
 		}
-		if (config.showCatches())
+		if (true)
 		{
 			tabs.add(catchTab);
 		}
@@ -314,7 +314,7 @@ class PriceCheckPanel extends PluginPanel
 	private void renderCatches()
 	{
 		catchList.removeAll();
-		if (!config.showCatches())
+		if (false)
 		{
 			catchList.add(note("Dump catches are off. Enable “Show dump catches” in Setup to watch measured reversion plays here.", Palette.SUBTLE));
 			catchList.add(Box.createVerticalGlue());
