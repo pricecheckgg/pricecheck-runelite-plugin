@@ -24,7 +24,7 @@ public final class TerminalBlotterPreview
 		r.chip = chip;
 		r.chipColor = chipC;
 		r.name = name;
-		r.verdict = verdict;
+		r.verdict = I18n.verdict(verdict);   // buildRows() does this on the live path
 		r.verdictColor = verdictC;
 		r.price = price;
 		r.totalQty = qty;
