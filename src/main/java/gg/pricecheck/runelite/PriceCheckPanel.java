@@ -996,10 +996,10 @@ class PriceCheckPanel extends PluginPanel
 			heroValue.setText(s.sessionProfit == 0 ? "0 gp" : statGp(s.sessionProfit));
 			heroValue.setForeground(s.sessionProfit > 0 ? Palette.GREEN : (s.sessionProfit < 0 ? Palette.RED : Palette.SUBTLE));
 			heroSub.setText(s.sessionProfit == 0 && s.sessionGpHr <= 0
-				? "no flips yet this session"
+				? I18n.t("no flips yet this session")
 				: (s.sessionGpHr != Long.MIN_VALUE
-					? statGp(s.sessionGpHr) + "/hr while flipping"
-					: "gp/hr shows after a few active minutes"));
+					? I18n.f("%s/hr while flipping", statGp(s.sessionGpHr))
+					: I18n.t("gp/hr shows after a few active minutes")));
 			setStat(cellToday, s.todayProfit);
 			setStat(cellWeek, s.weekProfit);
 			setStat(cellAll, s.allProfit);
@@ -1027,9 +1027,11 @@ class PriceCheckPanel extends PluginPanel
 			// Two-tone: state stays quiet, the clickable action reads as a link.
 			logSync.setText(hasKey
 				? (s.pendingSync > 0
-					? "Backing up " + s.pendingSync + " fills…"
-					: "<html><span style='color:#9a917c'>Backed up · </span><span style='color:#e6c667'>open web portfolio</span></html>")
-				: "<html><span style='color:#9a917c'>Local only · </span><span style='color:#e6c667'>back up in Setup</span></html>");
+					? I18n.f("Backing up %d fills…", s.pendingSync)
+					: "<html><span style='color:#9a917c'>" + I18n.t("Backed up · ")
+						+ "</span><span style='color:#e6c667'>" + I18n.t("open web portfolio") + "</span></html>")
+				: "<html><span style='color:#9a917c'>" + I18n.t("Local only · ")
+					+ "</span><span style='color:#e6c667'>" + I18n.t("back up in Setup") + "</span></html>");
 
 			logList.removeAll();
 			if (!s.openLots.isEmpty())
@@ -1043,8 +1045,8 @@ class PriceCheckPanel extends PluginPanel
 				logList.add(gap(4));
 			}
 			logList.add(sectionHeader(s.recent.size() < s.allFlips
-				? "Completed flips · last " + s.recent.size()
-				: "Completed flips"));
+				? I18n.f("Completed flips · last %d", s.recent.size())
+				: I18n.t("Completed flips")));
 			if (s.recent.isEmpty())
 			{
 				logList.add(note("Buy and sell on the GE and flips appear here. No key needed.", Palette.SUBTLE));

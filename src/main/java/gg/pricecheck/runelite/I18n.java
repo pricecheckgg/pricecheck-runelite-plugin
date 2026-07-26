@@ -316,8 +316,10 @@ final class I18n
 	static
 	{
 		// ── side panel: tabs and chrome ──
-		JA.put("Flips", "フリップ");
-		JA.put("Catch", "キャッチ");
+		// Tab labels are 2 characters on purpose: four kana truncate to "フリ…"
+		// in a ~56px tab, and a clipped label is worse than a terser one.
+		JA.put("Flips", "売買");
+		JA.put("Catch", "急落");
 		JA.put("Log", "記録");
 		JA.put("Plan", "プラン");
 		JA.put("Setup", "設定");
@@ -508,6 +510,16 @@ final class I18n
 		JA.put("Low EV", "EVが低い");
 		JA.put("Small Margin", "利幅が小さい");
 		JA.put("Higher risk: %s. Margin is volume-confirmed but this missed one board quality bar.", "高リスク: %s。利幅は出来高で確認済みですが、板の品質基準を1つ満たしていません。");
+		JA.put("no flips yet this session", "このセッションはまだ取引なし");
+		JA.put("%s/hr while flipping", "取引中 %s/時");
+		JA.put("gp/hr shows after a few active minutes", "gp/時は数分の取引後に表示されます");
+		JA.put("Backing up %d fills…", "%d件をバックアップ中…");
+		JA.put("Backed up · ", "バックアップ済 · ");
+		JA.put("open web portfolio", "ウェブのポートフォリオを開く");
+		JA.put("Local only · ", "ローカルのみ · ");
+		JA.put("back up in Setup", "設定でバックアップ");
+		JA.put("Completed flips · last %d", "完了フリップ · 直近%d件");
+		JA.put("Completed flips", "完了フリップ");
 		JA.put("TRIAL", "体験");
 		JA.put("FREE", "無料");
 		JA.put("PREMIUM", "プレミアム");
