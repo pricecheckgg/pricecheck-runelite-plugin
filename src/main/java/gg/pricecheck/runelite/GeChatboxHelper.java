@@ -165,12 +165,12 @@ class GeChatboxHelper
 		final int colW = 235;
 		if (rec > 0)
 		{
-			addLine(parent, 10, 3, colW, "rec " + (isBuy ? "buy" : "sell") + ": " + Fmt.full(rec), rec);
+			addLine(parent, 10, 3, colW, I18n.f(isBuy ? "rec buy: %s" : "rec sell: %s", Fmt.full(rec)), rec);
 		}
 		final long traded = scanTraded(setup, 0);
 		if (traded > 0)
 		{
-			addLine(parent, colR, 3, colW, "traded: " + Fmt.full(traded), traded);
+			addLine(parent, colR, 3, colW, I18n.f("traded: %s", Fmt.full(traded)), traded);
 		}
 		if (vr != null)
 		{
@@ -178,11 +178,11 @@ class GeChatboxHelper
 			final String vl = tf.label + (tf.isTrades() ? " trades" : "");
 			if (vr[2] > 0)
 			{
-				addLine(parent, 10, 18, colW, vl + " low: " + Fmt.full(vr[2]), vr[2]);
+				addLine(parent, 10, 18, colW, I18n.f("%s low: %s", vl, Fmt.full(vr[2])), vr[2]);
 			}
 			if (vr[0] > 0)
 			{
-				addLine(parent, colR, 18, colW, vl + " high: " + Fmt.full(vr[0]), vr[0]);
+				addLine(parent, colR, 18, colW, I18n.f("%s high: %s", vl, Fmt.full(vr[0])), vr[0]);
 			}
 		}
 	}
@@ -227,6 +227,23 @@ class GeChatboxHelper
 		return 0;
 	}
 
+	/**
+	 * Put our text on a GE widget. Japanese cannot go INTO the widget - the
+	 * client's fonts have no kana, so it would render as nothing - so the widget
+	 * is left blank (it keeps its bounds, action and hover) and GeLabelOverlay
+	 * paints the line over it instead.
+	 */
+	private void setLabel(Widget w, String text)
+	{
+		if (I18n.japanese())
+		{
+			w.setText("");
+			GeLabelOverlay.note(w, text);
+			return;
+		}
+		w.setText(text);
+	}
+
 	private void addLine(Widget parent, int x, int y, int width, String label, long value)
 	{
 		addLine(parent, x, y, width, label, value, "Set price");
@@ -235,7 +252,7 @@ class GeChatboxHelper
 	private void addLine(Widget parent, int x, int y, int width, String label, long value, String action)
 	{
 		final Widget w = parent.createChild(-1, WidgetType.TEXT);
-		w.setText(label);
+		setLabel(w, label);
 		w.setTextColor(INK);
 		w.setFontId(FontID.VERDANA_11_BOLD);
 		w.setOriginalX(x);
@@ -255,7 +272,7 @@ class GeChatboxHelper
 	private void addNote(Widget parent, int x, int y, int width, String label)
 	{
 		final Widget w = parent.createChild(-1, WidgetType.TEXT);
-		w.setText(label);
+		setLabel(w, label);
 		w.setTextColor(INK);
 		w.setFontId(FontID.VERDANA_11_BOLD);
 		w.setOriginalX(x);
@@ -301,13 +318,14 @@ class GeChatboxHelper
 		if (remaining > 0)
 		{
 			addLine(parent, 10, 3, 300,
-				"buy limit: " + Fmt.full(remaining) + " left of " + Fmt.full(total), remaining, "Set quantity");
+				I18n.f("buy limit: %s left of %s", Fmt.full(remaining), Fmt.full(total)), remaining, "Set quantity");
 		}
 		else
 		{
 			final long left = lim[2] > 0 ? lim[2] - System.currentTimeMillis() : 0;
 			addNote(parent, 10, 3, 300,
-				"4h buy limit reached" + (left > 0 ? " - resets in " + Fmt.duration(left) : ""));
+				left > 0 ? I18n.f("4h buy limit reached - resets in %s", Fmt.duration(left))
+					: I18n.t("4h buy limit reached"));
 		}
 	}
 
@@ -583,7 +601,7 @@ class GeChatboxHelper
 		}
 		final Widget w = parent.createChild(-1, WidgetType.TEXT);
 		banner = w;
-		w.setText("Your tracked items + best flips, ranked. Click here to type a search instead.");
+		setLabel(w, I18n.t("Your tracked items + best flips, ranked. Click here to type a search instead."));
 		w.setTextColor(INK);
 		w.setFontId(FontID.VERDANA_11_BOLD);
 		w.setOriginalX(10);

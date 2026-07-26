@@ -520,6 +520,15 @@ final class I18n
 		JA.put("back up in Setup", "設定でバックアップ");
 		JA.put("Completed flips · last %d", "完了フリップ · 直近%d件");
 		JA.put("Completed flips", "完了フリップ");
+		JA.put("Your tracked items + best flips, ranked. Click here to type a search instead.", "追跡中のアイテムと注目フリップ（ランク順）。ここをクリックすると通常の検索に戻ります。");
+		JA.put("rec buy: %s", "推奨買値: %s");
+		JA.put("rec sell: %s", "推奨売値: %s");
+		JA.put("traded: %s", "直近約定: %s");
+		JA.put("%s low: %s", "%s 安値: %s");
+		JA.put("%s high: %s", "%s 高値: %s");
+		JA.put("buy limit: %s left of %s", "購入上限: 残り%s / %s");
+		JA.put("4h buy limit reached", "4時間の購入上限に到達");
+		JA.put("4h buy limit reached - resets in %s", "4時間の購入上限に到達 - %s後に回復");
 		JA.put("TRIAL", "体験");
 		JA.put("FREE", "無料");
 		JA.put("PREMIUM", "プレミアム");

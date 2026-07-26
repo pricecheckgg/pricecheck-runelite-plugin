@@ -93,6 +93,7 @@ public class PriceCheckPlugin extends Plugin
 	private ScheduledExecutorService poller;
 
 	private PriceCheckPanel panel;
+	private GeLabelOverlay geLabelOverlay;
 	private NavigationButton navButton;
 	// Shift-click on the advisor's [-]/[+] button collapses/expands it.
 	private final net.runelite.client.input.MouseAdapter advisorMouse = new net.runelite.client.input.MouseAdapter()
@@ -325,6 +326,9 @@ public class PriceCheckPlugin extends Plugin
 		buildPanel();
 
 		geHelper = new GeChatboxHelper(client, clientThread, config, this);
+		// Paints our GE lines when the language is one the client cannot draw.
+		geLabelOverlay = new GeLabelOverlay();
+		overlayManager.add(geLabelOverlay);
 
 		mouseManager.registerMouseListener(advisorMouse);
 		keyManager.registerKeyListener(autofillHotkey);
@@ -603,7 +607,12 @@ public class PriceCheckPlugin extends Plugin
 		}
 		if (navButton != null)
 		{
-			clientToolbar.removeNavigation(navButton);
+			if (geLabelOverlay != null)
+		{
+			overlayManager.remove(geLabelOverlay);
+			GeLabelOverlay.clear();
+		}
+		clientToolbar.removeNavigation(navButton);
 		}
 		mouseManager.unregisterMouseListener(advisorMouse);
 		keyManager.unregisterKeyListener(autofillHotkey);
@@ -2603,6 +2612,7 @@ public class PriceCheckPlugin extends Plugin
 					clientToolbar.removeNavigation(navButton);
 				}
 				I18n.setLanguage(config.language());
+				GeLabelOverlay.clear();
 				buildPanel();
 			});
 			refreshPanel();
