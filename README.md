@@ -17,6 +17,12 @@ measured against your own price. Around it sit your watchlist, the positions you
 are holding, and a live order ticket reading the exact profit on the offer you are
 typing. Your closed flips and session P&L run alongside. Nothing here is mocked.
 
+## Language
+
+English and Japanese. Pick one in the plugin settings; it applies straight away.
+Item names, prices and the game's own menus stay as the client provides them,
+and the plugin stays in English if no font that can draw Japanese is installed.
+
 ## Free: the flip log
 
 Works with no account and no key. Everything runs locally in your client.

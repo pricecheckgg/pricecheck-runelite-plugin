@@ -180,7 +180,7 @@ class TerminalOrderOverlay extends Overlay
 			else
 			{
 				t.ref = live != null ? live.getBuy() : 0;
-				t.refLabel = "vs buy";
+				t.refLabel = I18n.t("vs buy");
 			}
 			t.netEa = t.ref > 0 ? GeTax.net(t.ref, entered) : 0;
 		}

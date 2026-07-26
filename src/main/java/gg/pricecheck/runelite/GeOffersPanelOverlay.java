@@ -466,7 +466,7 @@ class GeOffersPanelOverlay extends Overlay
 			final int h = 22;
 			g.setColor(TerminalKit.PANEL); g.fillRect(0, 0, cw, h);
 			g.setColor(TerminalKit.BORDER); g.drawRect(0, 0, cw, h);
-			g.setColor(TerminalKit.AMBERHI); g.drawString(t, 12, 15);
+			g.setColor(TerminalKit.AMBERHI); TerminalKit.str(g, t, 12, 15);
 			return new Result(new Dimension(cw, h), shiftHeld ? drawToggle(g, cw, true) : null);
 		}
 		final int w = TERM_W;
@@ -481,7 +481,8 @@ class GeOffersPanelOverlay extends Overlay
 		g.setFont(TerminalKit.monoB(10)); g.setColor(TerminalKit.AMBERHI);
 		TerminalKit.str(g, I18n.t("POSITIONS"), 8, 12);
 		g.setColor(TerminalKit.LABEL);
-		g.drawString("· " + rows.size() + I18n.t(" OFFERS"), 8 + TerminalKit.width(g, I18n.t("POSITIONS")) + 6, 12);
+		TerminalKit.str(g, "· " + rows.size() + I18n.t(" OFFERS"),
+			8 + TerminalKit.width(g, I18n.t("POSITIONS")) + 6, 12);
 		final Rectangle btn = shiftHeld ? drawToggle(g, w, false) : null;
 		g.setColor(TerminalKit.GRID); g.drawLine(1, 18, w - 1, 18);
 		// rows
@@ -545,7 +546,7 @@ class GeOffersPanelOverlay extends Overlay
 		}
 		else { mid = ""; midC = TerminalKit.LABEL; }
 		g.setColor(midC);
-		g.drawString(mid, 8 + 96, base2);
+		TerminalKit.str(g, mid, 8 + 96, base2);
 		g.setFont(TerminalKit.monoB(11));
 		g.setColor(r.posProfit >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
 		TerminalKit.rt(g, (r.posProfit >= 0 ? "+" : "") + Fmt.compact(r.posProfit), w - 8, base2);

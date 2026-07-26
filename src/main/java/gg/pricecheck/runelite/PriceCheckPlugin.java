@@ -40,7 +40,7 @@ public class PriceCheckPlugin extends Plugin
 	// Displayed version. Source of truth for what the panel shows: the Hub
 	// rebuilds with its own build.gradle, so a gradle-only version never
 	// reaches users. Keep build.gradle's version in sync for the dev jar name.
-	public static final String VERSION = "0.6.0";
+	public static final String VERSION = "0.7.0";
 
 	private static final int SLOTS = 8;
 	// Slot planner (Plan tab + auto-capital). Disabled pending further testing; the
@@ -2608,15 +2608,33 @@ public class PriceCheckPlugin extends Plugin
 		{
 			javax.swing.SwingUtilities.invokeLater(() ->
 			{
-				if (navButton != null)
-				{
-					clientToolbar.removeNavigation(navButton);
-				}
+				final PriceCheckPanel old = panel;
+				final NavigationButton oldNav = navButton;
 				I18n.setLanguage(config.language());
 				GeLabelOverlay.clear();
-				buildPanel();
+				try
+				{
+					if (oldNav != null)
+					{
+						clientToolbar.removeNavigation(oldNav);
+					}
+					buildPanel();
+				}
+				catch (Exception ex)
+				{
+					// Never strand the user without a sidebar: put the old panel
+					// back if the rebuild fails.
+					log.warn("PriceCheck: language rebuild failed, keeping the previous panel", ex);
+					panel = old;
+					navButton = oldNav;
+					if (oldNav != null && config.showPanel())
+					{
+						clientToolbar.addNavigation(oldNav);
+					}
+				}
 			});
-			refreshPanel();
+			// Off the config-change thread: refreshPanel talks to the network.
+			poller.execute(this::refreshPanel);
 			return;
 		}
 		if ("apiKey".equals(key))

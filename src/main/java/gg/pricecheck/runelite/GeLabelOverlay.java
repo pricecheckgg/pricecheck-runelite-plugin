@@ -67,9 +67,20 @@ class GeLabelOverlay extends Overlay
 		{
 			synchronized (LABELS)
 			{
-				for (final Map.Entry<Widget, String> e : LABELS.entrySet())
+				final java.util.Iterator<Map.Entry<Widget, String>> it = LABELS.entrySet().iterator();
+				while (it.hasNext())
 				{
-					paint(g, e.getKey(), e.getValue());
+					final Map.Entry<Widget, String> e = it.next();
+					final Widget w = e.getKey();
+					// A widget the GE has torn down keeps no bounds; drop it
+					// rather than wait for the collector, so nothing can paint
+					// over whatever the client puts there next.
+					if (w == null || w.getBounds() == null)
+					{
+						it.remove();
+						continue;
+					}
+					paint(g, w, e.getValue());
 				}
 			}
 		}

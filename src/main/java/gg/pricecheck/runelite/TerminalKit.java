@@ -108,7 +108,7 @@ final class TerminalKit
 	{
 		final String s = I18n.t(label);
 		g.setFont(monoB(10));
-		final int w = g.getFontMetrics().stringWidth(s) + 10;
+		final int w = width(g, s) + 10;
 		g.setColor(new Color(0x20, 0x1a, 0x10)); g.fillRect(x, y - 10, w, 14);
 		g.setColor(fg); str(g, s, x + 5, y);
 	}

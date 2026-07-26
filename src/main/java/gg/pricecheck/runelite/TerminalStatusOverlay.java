@@ -133,7 +133,7 @@ class TerminalStatusOverlay extends Overlay
 		g.setFont(TerminalKit.mono(9));
 		g.setColor(TerminalKit.DIM);
 		TerminalKit.str(g, I18n.t("ENGINE"), 12 + brandW + 8, 20);
-		final int engineW = g.getFontMetrics().stringWidth("ENGINE");
+		final int engineW = TerminalKit.width(g, I18n.t("ENGINE"));
 
 		// RIGHT block first: clock (right-pinned) + LIVE label + dot. Compute its
 		// left edge so the flowing fields on the left can stop before it.
@@ -142,7 +142,7 @@ class TerminalStatusOverlay extends Overlay
 		g.setColor(TerminalKit.AMBER);
 		g.drawString(clock, w - 12 - clockW, 20);
 		g.setFont(TerminalKit.mono(10));
-		final int liveW = g.getFontMetrics().stringWidth("LIVE");
+		final int liveW = TerminalKit.width(g, I18n.t("LIVE"));
 		final int liveX = w - 12 - clockW - 10 - liveW;
 		g.setColor(TerminalKit.LABEL);
 		TerminalKit.str(g, I18n.t("LIVE"), liveX, 19);

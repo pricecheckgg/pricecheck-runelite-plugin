@@ -56,8 +56,8 @@ final class I18n
 		}
 		if (!probed)
 		{
-			probed = true;
 			cjk = findJapaneseFamily();
+			probed = true;   // set AFTER the scan it guards
 			if (cjk == null)
 			{
 				log.warn("PriceCheck: no font on this machine can draw Japanese, staying in English");
@@ -169,9 +169,11 @@ final class I18n
 		return new Font(cjk, base.getStyle(), base.getSize());
 	}
 
-	private static java.awt.Graphics2D probeG;
+	private static volatile java.awt.Graphics2D probeG;
 
-	private static java.awt.Graphics2D metrics()
+	/** Synchronised: reachable from the client thread (overlays) and the EDT
+	 *  (panel build) both. Only ever called on a cache miss. */
+	private static synchronized java.awt.Graphics2D metrics()
 	{
 		if (probeG == null)
 		{
@@ -329,7 +331,7 @@ final class I18n
 	/** The table itself, for the guard test that checks pattern parity. */
 	static Map<String, String> dictionary()
 	{
-		return JA;
+		return java.util.Collections.unmodifiableMap(JA);
 	}
 
 	static
@@ -371,7 +373,7 @@ final class I18n
 		JA.put("Enter your capital, or open your bank once in game.", "資金を入力するか、ゲーム内で銀行を一度開いてください。");
 		JA.put("Enter at least 100k. 25m and 1.2b formats work.", "最低100k。25mや1.2bの形式も使えます。");
 		JA.put("From your bank + inventory: ", "銀行＋インベントリ: ");
-		JA.put("Tax paid: ", "支払い税: ");
+		JA.put("Tax paid: ", "税支払額: ");
 		JA.put("Higher risk: ", "高リスク: ");
 		JA.put("Every PriceCheck toggle, including overlay and GE options",
 			"オーバーレイとGEオプションを含む、すべてのPriceCheck設定");
@@ -452,7 +454,7 @@ final class I18n
 		JA.put("WATCH", "様子見");
 		JA.put("OFFERS", "件");
 		JA.put(" OFFERS", " 件");
-		JA.put("Catches · %d", "キャッチ · %d件");
+		JA.put("Catches · %d", "急落 · %d件");
 		JA.put("Open positions · %d", "建玉 · %d件");
 		JA.put("Tracking · %d", "追跡中 · %d件");
 		JA.put("Plugin key", "プラグインキー");
@@ -483,8 +485,7 @@ final class I18n
 		JA.put("%d hours left", "残り%d時間");
 		JA.put("Trial · day %d of %d · %dm left today", "体験 · %d/%d日目 · 本日残り%d分");
 		JA.put("%s · watching %d items", "%s · %d件を監視");
-		JA.put("CATCH", "拾う");
-		JA.put("SKIP", "見送");
+		JA.put("SKIP", "見送り");
 		JA.put("FORMING", "形成中");
 		JA.put("RECOVER", "回復中");
 		JA.put("FALLING KNIFE - skip", "落下中 - 見送り");
@@ -492,17 +493,17 @@ final class I18n
 		JA.put("displaced", "乖離");
 		JA.put("displaced %s", "乖離 %s");
 		JA.put("est.", "推定");
-		JA.put("%s est", "%s 見込");
+		JA.put("%s est", "%s 推定");
 		JA.put("bounces %d/10 (n=%d)", "反発 %d/10 (n=%d)");
 		JA.put("Displaced", "乖離");
-		JA.put("Entry", "参入値");
+		JA.put("Entry", "建値");
 		JA.put("Recover to", "戻り目標");
 		JA.put("Read", "判断");
 		JA.put("Est. profit", "予想利益");
 		JA.put("Reversion", "反発");
 		JA.put("Exp. hold", "予想保有");
 		JA.put("Suggested size", "推奨数量");
-		JA.put("The dump-catch board comes online when the measured detector is live.", "ダンプキャッチ板は計測検知が稼働すると表示されます。");
+		JA.put("The dump-catch board comes online when the measured detector is live.", "急落検知パネルは計測検知が稼働すると表示されます。");
 		JA.put("held %s", "保有 %s");
 		JA.put("in %s", "所要 %s");
 		JA.put("Remove position…", "建玉を削除…");
@@ -523,7 +524,6 @@ final class I18n
 		JA.put("Reconnecting…", "再接続中…");
 		JA.put("No items match.", "一致するアイテムはありません。");
 		JA.put("No flips right now.", "今はフリップがありません。");
-		JA.put("SESSION", "セッション");
 		JA.put("Stale Prints", "約定が古い");
 		JA.put("Slow Fills", "約定が遅い");
 		JA.put("Low EV", "EVが低い");
@@ -554,7 +554,7 @@ final class I18n
 		JA.put("%s BUY", "%s 買い優勢");
 		JA.put("%s price", "%s 価格");
 		JA.put("%s trades", "%s 約定");
-		JA.put("hold shift", "Shift長押し");
+		JA.put("hold shift", "Shiftキーで表示");
 		JA.put("Latest", "最新");
 		JA.put("type a price to preview profit", "価格を入力すると利益を表示");
 		JA.put("resells at", "再販価格");
@@ -565,7 +565,6 @@ final class I18n
 		JA.put("ENDED", "終了");
 		JA.put("RECOVERING", "回復中");
 		JA.put("FADED", "消滅");
-		JA.put("FORMING", "形成中");
 		JA.put("QUIET", "閑散");
 		JA.put("NORMAL", "通常");
 		JA.put("OK", "適正");
@@ -575,8 +574,6 @@ final class I18n
 		JA.put("DROP", "引下げ");
 		JA.put("CUT", "損切り");
 		JA.put("DEAD", "妙味なし");
-		JA.put("SELL", "売り");
-		JA.put("BUY", "買い");
 		JA.put("seated", "約定待ち");
 		JA.put("%s closing", "%s 接近中");
 		JA.put("%s drifting", "%s 乖離中");
@@ -585,7 +582,7 @@ final class I18n
 		JA.put("REALIZED TODAY", "本日確定");
 		JA.put("GP / HR", "GP/時");
 		JA.put("WIN", "勝率");
-		JA.put("TAX PAID", "支払い税");
+		JA.put("TAX PAID", "税支払額");
 		JA.put("buy %s", "買値 %s");
 		JA.put("TRIAL", "体験");
 		JA.put("FREE", "無料");
