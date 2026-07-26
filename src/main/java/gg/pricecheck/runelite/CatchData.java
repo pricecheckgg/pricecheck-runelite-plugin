@@ -69,19 +69,19 @@ public class CatchData
 	{
 		if (!measured || trialsN() < 20)
 		{
-			return "displaced";
+			return I18n.t("displaced");
 		}
 		if (thinEvidence)
 		{
 			return "n=" + trialsN();
 		}
 		final int hits = (int) Math.round(Math.max(0.0, Math.min(1.0, pReversion)) * 10);
-		return "bounces " + hits + "/10 (n=" + trialsN() + ")";
+		return I18n.f("bounces %d/10 (n=%d)", hits, trialsN());
 	}
 
 	/** Measured median recovery time, or an honest "est." placeholder. */
 	String holdText()
 	{
-		return (measured && expHoldMin > 0) ? "~" + expHoldMin + "m" : "est.";
+		return (measured && expHoldMin > 0) ? "~" + expHoldMin + "m" : I18n.t("est.");
 	}
 }

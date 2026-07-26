@@ -95,7 +95,7 @@ class PriceCheckPanel extends PluginPanel
 	private final javax.swing.JTextField planCapital = new javax.swing.JTextField();
 	private final JSpinner planSlots = new JSpinner(new SpinnerNumberModel(8, 1, 8, 1));
 	private final JSpinner planAccts = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
-	private final JComboBox<String> planHours = new JComboBox<>(new String[]{"1 hour", "4 hours", "Overnight"});
+	private final JComboBox<String> planHours = new JComboBox<>(new String[]{I18n.t("1 hour"), I18n.t("4 hours"), I18n.t("Overnight")});
 	private static final int[] PLAN_HOURS_VALUES = {1, 4, 8};
 	private final JButton planBuild = new JButton(I18n.t("Build plan"));
 	private final JLabel planStatus = new JLabel(" ");
@@ -112,8 +112,8 @@ class PriceCheckPanel extends PluginPanel
 	private final Dot keyDot = new Dot();
 	private final JPasswordField keyField = new JPasswordField();
 	private final JButton saveKeyBtn = new JButton(I18n.t("Save key"));
-	private final JCheckBox syncToggle = new JCheckBox("Sync flip log");
-	private final JCheckBox advisorToggle = new JCheckBox("Offer advisor overlay");
+	private final JCheckBox syncToggle = new JCheckBox(I18n.t("Sync flip log"));
+	private final JCheckBox advisorToggle = new JCheckBox(I18n.t("Offer advisor overlay"));
 	private final JSpinner minEvSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 10000, 50));
 	private boolean settingsMuted = false;
 	private MaterialTab settingsTab;
@@ -342,7 +342,7 @@ class PriceCheckPanel extends PluginPanel
 		}
 		else
 		{
-			catchList.add(sectionHeader("Catches · " + rows.size()));
+			catchList.add(sectionHeader(I18n.f("Catches · %d", rows.size())));
 			for (final CatchData c : rows)
 			{
 				catchList.add(catchRow(c));
@@ -402,7 +402,7 @@ class PriceCheckPanel extends PluginPanel
 		line1.add(chip, BorderLayout.EAST);
 
 		// Line 2: the factual displacement, and (loud only) the entry->target.
-		final JLabel displaced = mono("displaced " + pctSigned(c.getPctMove()), Palette.LIGHT);
+		final JLabel displaced = mono(I18n.f("displaced %s", pctSigned(c.getPctMove())), Palette.LIGHT);
 		final JPanel line2 = row();
 		line2.add(displaced, BorderLayout.WEST);
 		if (loud && c.getBid() > 0 && c.getTarget() > c.getBid())
@@ -422,7 +422,7 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel line3 = row();
 		if (knife)
 		{
-			final JLabel skip = mono("FALLING KNIFE - skip", Palette.RED);
+			final JLabel skip = mono(I18n.t("FALLING KNIFE - skip"), Palette.RED);
 			line3.add(skip, BorderLayout.WEST);
 		}
 		else if (loud)
@@ -434,7 +434,7 @@ class PriceCheckPanel extends PluginPanel
 			if (each != 0 && c.getBid() > 0 && c.getTarget() > 0)
 			{
 				final long est = each * Math.max(1, c.getCatchQty());
-				final JLabel profit = mono(signedGp(est) + " est", est >= 0 ? Palette.GREEN : Palette.RED);
+				final JLabel profit = mono(I18n.f("%s est", signedGp(est)), est >= 0 ? Palette.GREEN : Palette.RED);
 				profit.setHorizontalAlignment(SwingConstants.RIGHT);
 				profit.setToolTipText(I18n.t("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed."));
 				line3.add(profit, BorderLayout.EAST);
@@ -492,7 +492,7 @@ class PriceCheckPanel extends PluginPanel
 		final PriceCheckApiClient.SeriesData sd = seriesSupplier != null ? seriesSupplier.apply(c.getGeId()) : null;
 		if (sd == null || sd.ts == null || sd.ts.length < 2)
 		{
-			final JLabel wait = mono("Loading chart…", Palette.SUBTLE);
+			final JLabel wait = mono(I18n.t("Loading chart…"), Palette.SUBTLE);
 			wait.setAlignmentX(Component.LEFT_ALIGNMENT);
 			card.add(wait);
 			// The supplier schedules the fetch; repaint shortly to pick it up.
@@ -553,13 +553,13 @@ class PriceCheckPanel extends PluginPanel
 			if (each != 0)
 			{
 				final long est = each * Math.max(1, c.getCatchQty());
-				final JPanel p = catchKv("Est. profit", signedGp(est) + " est", est >= 0 ? Palette.GREEN : Palette.RED);
+				final JPanel p = catchKv("Est. profit", I18n.f("%s est", signedGp(est)), est >= 0 ? Palette.GREEN : Palette.RED);
 				p.setToolTipText(I18n.t("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed."));
 				card.add(p);
 			}
 			if (c.getRoi() != 0)
 			{
-				card.add(catchKv("ROI", pctSigned(c.getRoi()) + " est", c.getRoi() >= 0 ? Palette.GREEN : Palette.RED));
+				card.add(catchKv("ROI", I18n.f("%s est", pctSigned(c.getRoi())), c.getRoi() >= 0 ? Palette.GREEN : Palette.RED));
 			}
 			if (c.getCatchQty() > 0)
 			{
@@ -580,6 +580,8 @@ class PriceCheckPanel extends PluginPanel
 	/** A labelled read line for the catch expand: subtle key, coloured value. */
 	private JPanel catchKv(String k, String v, Color col)
 	{
+		k = I18n.t(k);
+		v = I18n.t(v);
 		final JPanel p = row();
 		p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
 		final JLabel kl = new JLabel(k);
@@ -603,7 +605,7 @@ class PriceCheckPanel extends PluginPanel
 	// between hairline dividers, one meta line, and a painted status dot
 	// (the RuneScape font has no dot glyph, so it is drawn, not typed).
 	private static final Color HAIRLINE = new Color(48, 48, 48);
-	private final JLabel heroTitle = new JLabel("SESSION");
+	private final JLabel heroTitle = new JLabel(I18n.t("SESSION"));
 	private final JLabel heroValue = new JLabel(" ");
 	private final JLabel heroSub = new JLabel(" ");
 	private final JLabel cellToday = new JLabel(" ");
@@ -820,6 +822,7 @@ class PriceCheckPanel extends PluginPanel
 
 	private JPanel statCol(String caption, JLabel value)
 	{
+		caption = I18n.t(caption);
 		final JPanel col = new JPanel();
 		col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
 		col.setBackground(CARD);
@@ -1031,7 +1034,7 @@ class PriceCheckPanel extends PluginPanel
 			logList.removeAll();
 			if (!s.openLots.isEmpty())
 			{
-				logList.add(sectionHeader("Open positions · " + s.openLots.size()));
+				logList.add(sectionHeader(I18n.f("Open positions · %d", s.openLots.size())));
 				for (final FlipLogEngine.Lot l : s.openLots)
 				{
 					logList.add(lotRow(l));
@@ -1074,7 +1077,7 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel line1 = row();
 		line1.add(name, BorderLayout.CENTER);
 		final JLabel amt = mono(Fmt.full(l.qty) + " @ " + Fmt.compact(l.qty > 0 ? l.cost / l.qty : l.cost), Palette.SUBTLE);
-		final JLabel age = mono("held " + dur(System.currentTimeMillis() - l.openedAt), Palette.SUBTLE);
+		final JLabel age = mono(I18n.f("held %s", dur(System.currentTimeMillis() - l.openedAt)), Palette.SUBTLE);
 		age.setHorizontalAlignment(SwingConstants.RIGHT);
 		final JPanel line2 = row();
 		line2.add(amt, BorderLayout.CENTER);
@@ -1087,7 +1090,7 @@ class PriceCheckPanel extends PluginPanel
 		rowP.add(center, BorderLayout.CENTER);
 		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
 		final String lotLabel = (l.name != null ? l.name : ("#" + l.itemId)) + " × " + l.qty;
-		attachDeleteMenu(rowP, "Remove position…",
+		attachDeleteMenu(rowP, I18n.t("Remove position…"),
 			"Remove " + lotLabel + " from tracking?\nA later sell of it will show as untracked instead of a flip.",
 			() -> listener.onDeleteLot(l.itemId, l.qty, l.cost, l.openedAt));
 		return rowP;
@@ -1232,7 +1235,7 @@ class PriceCheckPanel extends PluginPanel
 		line1.add(name, BorderLayout.CENTER);
 		line1.add(profit, BorderLayout.EAST);
 		final JLabel det = mono(flipDetail(f), Palette.SUBTLE);
-		final JLabel when = mono("in " + dur(Math.max(0, f.closedAt - f.openedAt)), Palette.SUBTLE);
+		final JLabel when = mono(I18n.f("in %s", dur(Math.max(0, f.closedAt - f.openedAt))), Palette.SUBTLE);
 		when.setHorizontalAlignment(SwingConstants.RIGHT);
 		final JPanel line2 = row();
 		line2.add(det, BorderLayout.CENTER);
@@ -1245,7 +1248,7 @@ class PriceCheckPanel extends PluginPanel
 		rowP.add(center, BorderLayout.CENTER);
 		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
 		final int fills = group.size();
-		attachDeleteMenu(rowP, "Delete flip…",
+		attachDeleteMenu(rowP, I18n.t("Delete flip…"),
 			"Delete this " + (f.name != null ? f.name : ("#" + f.itemId)) + " flip (" + gpSign(f.profit) + ")?\n"
 				+ (fills > 1 ? "It is " + fills + " partial fills shown as one row; all of them go.\n" : "")
 				+ "It comes out of your log and totals everywhere. Open positions are not restored.",
@@ -1551,7 +1554,7 @@ class PriceCheckPanel extends PluginPanel
 		if ("detected".equals(d.getCapitalSource()))
 		{
 			final JPanel l4 = row();
-			final JLabel src = mono("capital from your bank: " + Fmt.compact(d.getCapital()), Palette.SUBTLE);
+			final JLabel src = mono(I18n.f("capital from your bank: %s", Fmt.compact(d.getCapital())), Palette.SUBTLE);
 			l4.add(src, BorderLayout.WEST);
 			card.add(l4);
 		}
@@ -1595,7 +1598,7 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel line2 = row();
 		line2.add(qty, BorderLayout.CENTER);
 
-		final JLabel outlay = mono(Fmt.compact(r.getOutlay()) + " in", Palette.SUBTLE);
+		final JLabel outlay = mono(I18n.f("%s in", Fmt.compact(r.getOutlay())), Palette.SUBTLE);
 		final JLabel ev = mono(r.getEstSession() != 0
 			? "+" + Fmt.compact(r.getEstSession()) : Fmt.compact(r.getEstPerHr()) + "/hr", Palette.GOLD);
 		ev.setToolTipText(r.getEstSession() != 0 ? "Expected over your session (" + Fmt.compact(r.getEstPerHr()) + "/hr)" : null);
@@ -1865,7 +1868,8 @@ class PriceCheckPanel extends PluginPanel
 		// The panel shows the everyday options; the full set (overlays, GE
 		// helpers, data sharing) lives in RuneLite's own config panel, which
 		// users rarely think to open. This jumps straight to it.
-		final JLabel allOpts = new JLabel("<html><span style='color:#9a917c'>All options · </span><span style='color:#e6c667'>RuneLite plugin settings</span></html>");
+		final JLabel allOpts = new JLabel("<html><span style='color:#9a917c'>" + I18n.t("All options · ")
+			+ "</span><span style='color:#e6c667'>" + I18n.t("RuneLite plugin settings") + "</span></html>");
 		allOpts.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		allOpts.setAlignmentX(Component.LEFT_ALIGNMENT);
 		allOpts.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
@@ -1960,16 +1964,16 @@ class PriceCheckPanel extends PluginPanel
 			String lic;
 			if (acct.isTrial())
 			{
-				lic = "Trial · day " + Math.max(1, acct.getTrialDay()) + " of " + Math.max(1, acct.getTrialDays())
-					+ " · " + acct.getTrialRemainingMin() + "m left today";
+				lic = I18n.f("Trial · day %d of %d · %dm left today", Math.max(1, acct.getTrialDay()),
+					Math.max(1, acct.getTrialDays()), acct.getTrialRemainingMin());
 			}
 			else if (!acct.isPremium())
 			{
-				lic = "Free plan";
+				lic = I18n.t("Free plan");
 			}
 			else if (acct.getExpiresAt() == null || acct.getExpiresAt() <= 0)
 			{
-				lic = "Lifetime license";
+				lic = I18n.t("Lifetime license");
 			}
 			else
 			{
@@ -1978,22 +1982,21 @@ class PriceCheckPanel extends PluginPanel
 				final boolean renews = "stripe".equals(acct.getSource());
 				if (msLeft <= 0)
 				{
-					lic = "License expired";
+					lic = I18n.t("License expired");
 				}
 				else if (msLeft < 48 * 3_600_000L)
 				{
 					// Short windows (trials) read in hours, not "1 day".
 					final long hours = Math.max(1, msLeft / 3_600_000L);
-					lic = (renews ? "Renews in " : "") + hours + (hours == 1 ? " hour" : " hours")
-						+ (renews ? "" : " left");
+					lic = renews ? I18n.f("Renews in %d hours", hours) : I18n.f("%d hours left", hours);
 				}
 				else
 				{
-					lic = (renews ? "Renews in " : "") + days + (renews ? (days == 1 ? " day" : " days") : (days == 1 ? " day left" : " days left"));
+					lic = renews ? I18n.f("Renews in %d days", days) : I18n.f("%d days left", days);
 				}
 			}
 			final int n = acct.getTrackedCount();
-			acctSub.setText(lic + " · watching " + n + (n == 1 ? " item" : " items"));
+			acctSub.setText(I18n.f("%s · watching %d items", lic, n));
 			acctSub.setToolTipText(I18n.t("Watching = your tracked-margins watchlist (the + button on flip rows); live GE offers show on the Flips tab and the in-game overlays."));
 			if (acct.getKeyPrefix() != null) { keyPrefixLabel.setText(acct.getKeyPrefix()); }
 		});
@@ -2043,7 +2046,7 @@ class PriceCheckPanel extends PluginPanel
 		// Tracking section
 		if (!searching && !lastTracked.isEmpty())
 		{
-			list.add(sectionHeader("Tracking · " + lastTracked.size()));
+			list.add(sectionHeader(I18n.f("Tracking · %d", lastTracked.size())));
 			for (TrackedItem t : lastTracked) { list.add(trackingCard(t)); list.add(gap(6)); }
 			list.add(gap(6));
 		}
@@ -2066,8 +2069,9 @@ class PriceCheckPanel extends PluginPanel
 		}
 
 		final String header = searching
-			? (pending ? "Searching \"" + q + "\"…" : shown.size() + " match \"" + q + "\"")
-			: (minEvPerHrK > 0 ? shown.size() + " flips · " + minEvPerHrK + "k+/hr" : shown.size() + " flips · by EV/hr");
+			? (pending ? I18n.f("Searching \"%s\"…", q) : I18n.f("%d match \"%s\"", shown.size(), q))
+			: (minEvPerHrK > 0 ? I18n.f("%d flips · %dk+/hr", shown.size(), minEvPerHrK)
+				: I18n.f("%d flips · by EV/hr", shown.size()));
 		list.add(sectionHeader(header));
 
 		if (authState == PriceCheckApiClient.AuthState.ERROR)
@@ -2216,9 +2220,9 @@ class PriceCheckPanel extends PluginPanel
 			final JLabel dot = new JLabel("! ");
 			dot.setForeground(Palette.AMBER);
 			dot.setFont(I18n.font(dot.getFont().deriveFont(Font.BOLD)));
-			dot.setToolTipText(I18n.t("Higher risk: ") + f.riskLabel() + ". Margin is volume-confirmed but this missed one board quality bar.");
+			dot.setToolTipText(I18n.f("Higher risk: %s. Margin is volume-confirmed but this missed one board quality bar.", I18n.t(f.riskLabel())));
 			line1.add(dot, BorderLayout.WEST);
-			final JLabel why = new JLabel(f.riskLabel());
+			final JLabel why = new JLabel(I18n.t(f.riskLabel()));
 			why.setForeground(Palette.AMBER);
 			why.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 			line3.add(why, BorderLayout.WEST);
@@ -2319,7 +2323,7 @@ class PriceCheckPanel extends PluginPanel
 		card.add(head);
 
 		final boolean held = t.isHeld();
-		card.add(kv(held ? ("Held " + Fmt.full(t.getHeldQty()) + " · avg") : "Watching at", Fmt.full(t.getEntryBuy())));
+		card.add(kv(held ? I18n.f("Held %s · avg", Fmt.full(t.getHeldQty())) : I18n.t("Watching at"), Fmt.full(t.getEntryBuy())));
 		card.add(kv("Sell now", t.getSellNow() != null ? Fmt.full(t.getSellNow()) : "-"));
 		card.add(Box.createVerticalStrut(5));
 		card.add(hairline());
@@ -2421,7 +2425,7 @@ class PriceCheckPanel extends PluginPanel
 
 	private JComponent sectionHeader(String text)
 	{
-		final JLabel h = new JLabel(text.toUpperCase(Locale.ROOT));
+		final JLabel h = new JLabel(I18n.t(text).toUpperCase(Locale.ROOT));
 		h.setFont(I18n.font(FontManager.getRunescapeSmallFont()));
 		h.setForeground(Palette.GOLD);
 		h.setBorder(BorderFactory.createEmptyBorder(2, 1, 6, 8));
@@ -2448,6 +2452,7 @@ class PriceCheckPanel extends PluginPanel
 
 	private JPanel kv(String k, String v)
 	{
+		k = I18n.t(k);
 		final JPanel p = row();
 		p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 18));
 		final JLabel kl = new JLabel(k);
@@ -2462,6 +2467,7 @@ class PriceCheckPanel extends PluginPanel
 
 	private static JLabel pill(String text, Color col)
 	{
+		text = I18n.t(text);
 		final JLabel p = new JLabel(" " + text + " ");
 		p.setOpaque(true);
 		p.setBackground(new Color(col.getRed(), col.getGreen(), col.getBlue(), 40));
@@ -2481,6 +2487,7 @@ class PriceCheckPanel extends PluginPanel
 
 	private JLabel note(String text, Color col)
 	{
+		text = I18n.t(text);
 		// HTML with a fixed body width wraps; a plain label clips mid-sentence
 		// at the panel's 226px.
 		final JLabel l = new JLabel("<html><body style='width:176px'>" + escHtml(text) + "</body></html>");

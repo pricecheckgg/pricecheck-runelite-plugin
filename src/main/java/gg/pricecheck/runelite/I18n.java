@@ -307,6 +307,12 @@ final class I18n
 	// two or three character Japanese label fits where the English one did.
 	private static final Map<String, String> JA = new HashMap<>();
 
+	/** The table itself, for the guard test that checks pattern parity. */
+	static Map<String, String> dictionary()
+	{
+		return JA;
+	}
+
 	static
 	{
 		// ── side panel: tabs and chrome ──
@@ -425,6 +431,89 @@ final class I18n
 		JA.put("WATCH", "様子見");
 		JA.put("OFFERS", "件");
 		JA.put(" OFFERS", " 件");
+		JA.put("Catches · %d", "キャッチ · %d件");
+		JA.put("Open positions · %d", "建玉 · %d件");
+		JA.put("Tracking · %d", "追跡中 · %d件");
+		JA.put("Plugin key", "プラグインキー");
+		JA.put("Options", "オプション");
+		JA.put("%d flips · by EV/hr", "%d件 · EV/時順");
+		JA.put("%d flips · %dk+/hr", "%d件 · %dk+/時");
+		JA.put("Searching \"%s\"…", "「%s」を検索中…");
+		JA.put("%d match \"%s\"", "「%2$s」に%1$d件");
+		JA.put("TODAY", "本日");
+		JA.put("WEEK", "今週");
+		JA.put("ALL TIME", "累計");
+		JA.put("FLIPS", "件数");
+		JA.put("WON", "勝率");
+		JA.put("AVG ROI", "平均利益率");
+		JA.put("Sync flip log", "フリップ記録を同期");
+		JA.put("Offer advisor overlay", "注文アドバイザー表示");
+		JA.put("All options · ", "すべての設定 · ");
+		JA.put("RuneLite plugin settings", "RuneLiteのプラグイン設定");
+		JA.put("Key active", "キー有効");
+		JA.put("Key rejected", "キーが拒否されました");
+		JA.put("Free plan", "無料プラン");
+		JA.put("Lifetime license", "無期限ライセンス");
+		JA.put("License expired", "ライセンス期限切れ");
+		JA.put("PriceCheck member", "PriceCheckメンバー");
+		JA.put("Renews in %d days", "%d日後に更新");
+		JA.put("%d days left", "残り%d日");
+		JA.put("Renews in %d hours", "%d時間後に更新");
+		JA.put("%d hours left", "残り%d時間");
+		JA.put("Trial · day %d of %d · %dm left today", "体験 · %d/%d日目 · 本日残り%d分");
+		JA.put("%s · watching %d items", "%s · %d件を監視");
+		JA.put("CATCH", "拾う");
+		JA.put("SKIP", "見送");
+		JA.put("FORMING", "形成中");
+		JA.put("RECOVER", "回復中");
+		JA.put("FALLING KNIFE - skip", "落下中 - 見送り");
+		JA.put("Loading chart…", "チャート読込中…");
+		JA.put("displaced", "乖離");
+		JA.put("displaced %s", "乖離 %s");
+		JA.put("est.", "推定");
+		JA.put("%s est", "%s 見込");
+		JA.put("bounces %d/10 (n=%d)", "反発 %d/10 (n=%d)");
+		JA.put("Displaced", "乖離");
+		JA.put("Entry", "参入値");
+		JA.put("Recover to", "戻り目標");
+		JA.put("Read", "判断");
+		JA.put("Est. profit", "予想利益");
+		JA.put("Reversion", "反発");
+		JA.put("Exp. hold", "予想保有");
+		JA.put("Suggested size", "推奨数量");
+		JA.put("The dump-catch board comes online when the measured detector is live.", "ダンプキャッチ板は計測検知が稼働すると表示されます。");
+		JA.put("held %s", "保有 %s");
+		JA.put("in %s", "所要 %s");
+		JA.put("Remove position…", "建玉を削除…");
+		JA.put("Delete flip…", "フリップを削除…");
+		JA.put("Buy and sell on the GE and flips appear here. No key needed.", "GEで売買するとここにフリップが表示されます。キーは不要です。");
+		JA.put("1 hour", "1時間");
+		JA.put("4 hours", "4時間");
+		JA.put("Overnight", "夜通し");
+		JA.put("%s in", "%s 投入");
+		JA.put("capital from your bank: %s", "銀行の資金: %s");
+		JA.put("Held %s · avg", "保有 %s · 平均");
+		JA.put("Watching at", "監視価格");
+		JA.put("Sell now", "現在の売値");
+		JA.put("watching", "監視中");
+		JA.put("no data", "データなし");
+		JA.put("thin", "薄い");
+		JA.put("healthy", "良好");
+		JA.put("Reconnecting…", "再接続中…");
+		JA.put("No items match.", "一致するアイテムはありません。");
+		JA.put("No flips right now.", "今はフリップがありません。");
+		JA.put("SESSION", "セッション");
+		JA.put("Stale Prints", "約定が古い");
+		JA.put("Slow Fills", "約定が遅い");
+		JA.put("Low EV", "EVが低い");
+		JA.put("Small Margin", "利幅が小さい");
+		JA.put("Higher risk: %s. Margin is volume-confirmed but this missed one board quality bar.", "高リスク: %s。利幅は出来高で確認済みですが、板の品質基準を1つ満たしていません。");
+		JA.put("TRIAL", "体験");
+		JA.put("FREE", "無料");
+		JA.put("PREMIUM", "プレミアム");
+		JA.put("DIP", "押し目");
+		JA.put("BIG", "大口");
+		JA.put("BIG · BAND", "大口 · 帯");
 		JA.put("holding", "保有中");
 		JA.put("no live price", "価格データなし");
 	}
