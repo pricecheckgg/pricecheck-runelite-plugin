@@ -17,7 +17,7 @@ final class OfferAdvisor
 	private static final Color AMBER = new Color(0xe6, 0xc6, 0x67);
 	private static final Color RED = new Color(0xf2, 0x6b, 0x6d);
 	private static final Color GREY = new Color(0x9a, 0x91, 0x7c);
-	private static final Color BLUE = new Color(0x7f, 0xb0, 0xff);   // patient hold: no action, will fill
+	private static final Color BLUE = new Color(0xb5, 0xa1, 0x5e);   // patient hold: no action, will fill (dim gold - the desk has no blue)
 
 	private OfferAdvisor()
 	{

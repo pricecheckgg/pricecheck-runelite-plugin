@@ -1056,10 +1056,12 @@ final class GeItemInfoPainter
 		final int chartH = chartless ? 0 : 68;
 		final int h = 7 + lineH + (chartless ? 5 : 4 + chartH + 8);
 
-		g.setColor(Palette.INK);
-		g.fillRoundRect(0, 0, W - 1, h - 1, 8, 8);
-		g.setColor(FRAME);
-		g.drawRoundRect(0, 0, W - 1, h - 1, 8, 8);
+		// Terminal skin: the collapsed verdict bar is a desk surface like any
+		// other, so it wears the desk's panel/border, not the classic pill.
+		g.setColor(TerminalKit.PANEL);
+		g.fillRect(0, 0, W - 1, h - 1);
+		g.setColor(TerminalKit.BORDER);
+		g.drawRect(0, 0, W - 1, h - 1);
 
 		final int y = 7 + fm.getAscent() - 2;
 		final int nameEnd = paintVerdicts(g, c, fm, W, y);

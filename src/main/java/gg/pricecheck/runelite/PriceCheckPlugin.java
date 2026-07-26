@@ -1148,6 +1148,13 @@ public class PriceCheckPlugin extends Plugin
 				{
 					continue;
 				}
+				// Layout containers span (almost) the whole canvas and would
+				// "cover" the desk forever - only solid sub-interfaces count.
+				final long canvasArea = (long) client.getCanvasWidth() * client.getCanvasHeight();
+				if ((long) rb.width * rb.height > canvasArea * 0.8)
+				{
+					continue;
+				}
 				for (final java.awt.Rectangle d : rects)
 				{
 					final java.awt.Rectangle o = rb.intersection(d);
