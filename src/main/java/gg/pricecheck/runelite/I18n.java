@@ -541,6 +541,14 @@ final class I18n
 		JA.put("resells at", "再販価格");
 		JA.put("your cost", "取得単価");
 		JA.put("vs buy", "買値との比");
+		JA.put("ACTIVE", "進行中");
+		JA.put("SETTLING", "収束中");
+		JA.put("ENDED", "終了");
+		JA.put("RECOVERING", "回復中");
+		JA.put("FADED", "消滅");
+		JA.put("FORMING", "形成中");
+		JA.put("QUIET", "閑散");
+		JA.put("NORMAL", "通常");
 		JA.put("TRIAL", "体験");
 		JA.put("FREE", "無料");
 		JA.put("PREMIUM", "プレミアム");
