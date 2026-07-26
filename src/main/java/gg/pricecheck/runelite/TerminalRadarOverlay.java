@@ -228,12 +228,12 @@ class TerminalRadarOverlay extends Overlay
 	private static int paintRadar(Graphics2D g, int w, int y, List<FlipData> flips, int rows)
 	{
 		final int h = sectionH(rows, true);
-		int cy = TerminalKit.panel(g, 0, y, w, h, "OPPORTUNITY RADAR  ·  TOP EV/HR");
+		int cy = TerminalKit.panel(g, 0, y, w, h, I18n.t("OPPORTUNITY RADAR  ·  TOP EV/HR"));
 		// column sub-header
 		g.setFont(TerminalKit.mono(8)); g.setColor(TerminalKit.DIM);
-		g.drawString("ITEM", 8, cy);
-		TerminalKit.rt(g, "MARGIN", w - 92, cy);
-		TerminalKit.rt(g, "EV/HR", w - 26, cy);
+		TerminalKit.str(g, I18n.t("ITEM"), 8, cy);
+		TerminalKit.rt(g, I18n.t("MARGIN"), w - 92, cy);
+		TerminalKit.rt(g, I18n.t("EV/HR"), w - 26, cy);
 		cy += SUBHEAD;
 		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
 		for (int i = 0; i < rows; i++)
@@ -254,7 +254,7 @@ class TerminalRadarOverlay extends Overlay
 	private static int paintDips(Graphics2D g, int w, int y, List<CatchData> dips, int rows)
 	{
 		final int h = sectionH(Math.max(1, rows), false);
-		final int cy = TerminalKit.panel(g, 0, y, w, h, "FRESH DIPS  ·  DUMP CATCHER");
+		final int cy = TerminalKit.panel(g, 0, y, w, h, I18n.t("FRESH DIPS  ·  DUMP CATCHER"));
 		if (rows <= 0)
 		{
 			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.DIM);
@@ -294,7 +294,7 @@ class TerminalRadarOverlay extends Overlay
 	private static int paintGainers(Graphics2D g, int w, int y, List<FlipData> gainers, int rows, int tfIdx, List<Rectangle> chipOut)
 	{
 		final int h = sectionH(rows, false);
-		final int cy = TerminalKit.panel(g, 0, y, w, h, "TOP MOVERS  ·  GAINERS");
+		final int cy = TerminalKit.panel(g, 0, y, w, h, I18n.t("TOP MOVERS  ·  GAINERS"));
 		paintTfChips(g, w, y, tfIdx, chipOut);
 		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
 		for (int i = 0; i < rows; i++)
@@ -316,7 +316,7 @@ class TerminalRadarOverlay extends Overlay
 	private static int paintLosers(Graphics2D g, int w, int y, List<FlipData> losers, int rows, int tfIdx)
 	{
 		final int h = sectionH(rows, false);
-		final int cy = TerminalKit.panel(g, 0, y, w, h, "TOP MOVERS  ·  LOSERS");
+		final int cy = TerminalKit.panel(g, 0, y, w, h, I18n.t("TOP MOVERS  ·  LOSERS"));
 		final FontMetrics fm = g.getFontMetrics(TerminalKit.mono(11));
 		for (int i = 0; i < rows; i++)
 		{

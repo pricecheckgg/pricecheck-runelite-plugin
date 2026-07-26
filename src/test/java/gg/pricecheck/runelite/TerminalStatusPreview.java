@@ -19,6 +19,10 @@ public final class TerminalStatusPreview
 	public static void main(String[] args) throws Exception
 	{
 		System.setProperty("java.awt.headless", "true");
+		// -Dpc.lang=ja renders the panel in Japanese, so the real layout can be
+		// checked for clipping without launching a client. A property, not an
+		// arg: some previews already parse their own positional args.
+		if ("ja".equals(System.getProperty("pc.lang"))) { I18n.setLanguage(PriceCheckConfig.Language.JAPANESE); }
 		final String out = args.length > 0 ? args[0] : "/tmp/termbar.png";
 		final int h = 30, pad = 16, s = 2;
 		// wide = GE overview window; narrow = single-offer status window (the tight case)

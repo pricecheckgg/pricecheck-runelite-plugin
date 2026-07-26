@@ -64,6 +64,22 @@ public interface PriceCheckConfig extends Config
 		}
 	}
 
+	/** Plugin language. English is the source text; anything without a
+	 *  translation stays English rather than going blank. */
+	enum Language
+	{
+		ENGLISH,
+		JAPANESE;
+
+		@Override
+		public String toString()
+		{
+			// ASCII only: RuneLite's settings UI draws this label in a font with
+			// no Japanese glyphs, so a native label renders as an empty box.
+			return this == JAPANESE ? "Japanese" : "English";
+		}
+	}
+
 	@ConfigItem(
 		keyName = "apiKey",
 		name = "Plugin key",
@@ -91,6 +107,19 @@ public interface PriceCheckConfig extends Config
 	default DeskMode deskMode()
 	{
 		return DeskMode.AUTO;
+	}
+
+	@ConfigItem(
+		keyName = "language",
+		name = "Language",
+		description = "Language for the PriceCheck panel and the Grand Exchange desk. Applies straight away. "
+			+ "Item names, prices and the text filled into the game stay as the game gives them, because the client's own font "
+			+ "cannot draw Japanese. If no Japanese font is installed the plugin stays in English.",
+		position = 3
+	)
+	default Language language()
+	{
+		return Language.ENGLISH;
 	}
 
 	@ConfigItem(

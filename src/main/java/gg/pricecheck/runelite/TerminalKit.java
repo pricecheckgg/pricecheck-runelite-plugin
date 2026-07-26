@@ -46,9 +46,40 @@ final class TerminalKit
 	}
 
 	/** Draw s so its right edge ends at xr (tabular right-align). */
-	static void rt(Graphics2D g, String s, int xr, int y)
+	static void rt(Graphics2D g, String text, int xr, int y)
 	{
+		// Translate at the primitive, so a label held in a variable (verdicts,
+		// catch states) is covered as well as a literal. Item names, prices and
+		// anything else with no entry pass straight through.
+		final String s = I18n.t(text);
+		final Font base = g.getFont();
+		final Font use = I18n.fit(base, s);   // identity for Latin, so numbers keep the mono face
+		if (use != base) { g.setFont(use); }
 		g.drawString(s, xr - g.getFontMetrics().stringWidth(s), y);
+		if (use != base) { g.setFont(base); }
+	}
+
+	/** Width of s in the face it will actually draw in (not the caller's, which
+	 *  may be about to be swapped for a Japanese-capable one). */
+	static int width(Graphics2D g, String text)
+	{
+		final String s = I18n.t(text);
+		final Font use = I18n.fit(g.getFont(), s);
+		return g.getFontMetrics(use).stringWidth(s);
+	}
+
+	/** drawString for text that may be translated: borrows a Japanese-capable
+	 *  face only when the current one cannot draw the string, then puts the
+	 *  caller's font back. */
+	static void str(Graphics2D g, String text, int x, int y)
+	{
+		final String s = I18n.t(text);
+		final Font base = g.getFont();
+		final Font use = I18n.fit(base, s);
+		if (use == base) { g.drawString(s, x, y); return; }
+		g.setFont(use);
+		g.drawString(s, x, y);
+		g.setFont(base);
 	}
 
 	/** Panel frame + amber title strip; returns the content-start y. */
@@ -57,7 +88,8 @@ final class TerminalKit
 		g.setColor(PANEL); g.fillRect(x, y, w, h);
 		g.setColor(BORDER); g.setStroke(new BasicStroke(1f)); g.drawRect(x, y, w, h);
 		g.setColor(TITLEBG); g.fillRect(x + 1, y + 1, w - 2, 17);
-		g.setFont(monoB(10)); g.setColor(AMBERHI); g.drawString(title, x + 8, y + 13);
+		final String ti = I18n.t(title);
+		g.setFont(monoB(10)); g.setColor(AMBERHI); str(g, ti, x + 8, y + 13);
 		g.setColor(GRID); g.drawLine(x + 1, y + 18, x + w - 1, y + 18);
 		return y + 32;
 	}
@@ -65,16 +97,20 @@ final class TerminalKit
 	/** Dim uppercase label with a right-aligned value below it. */
 	static void cell(Graphics2D g, int x, int w, int y, String label, String value, Color vc)
 	{
-		g.setFont(mono(9)); g.setColor(LABEL); g.drawString(label, x, y);
+		// The label translates; the VALUE never does (prices and counts keep the
+		// mono face the columns were measured in).
+		final String lb = I18n.t(label);
+		g.setFont(mono(9)); g.setColor(LABEL); str(g, lb, x, y);
 		g.setFont(monoB(13)); g.setColor(vc); rt(g, value, x + w, y + 15);
 	}
 
-	static void chip(Graphics2D g, int x, int y, String s, Color fg)
+	static void chip(Graphics2D g, int x, int y, String label, Color fg)
 	{
+		final String s = I18n.t(label);
 		g.setFont(monoB(10));
 		final int w = g.getFontMetrics().stringWidth(s) + 10;
 		g.setColor(new Color(0x20, 0x1a, 0x10)); g.fillRect(x, y - 10, w, 14);
-		g.setColor(fg); g.drawString(s, x + 5, y);
+		g.setColor(fg); str(g, s, x + 5, y);
 	}
 
 	static void spark(Graphics2D g, int x, int y, int w, int h, int seed, Color c)

@@ -158,7 +158,7 @@ class TerminalHeldOverlay extends Overlay
 	{
 		TerminalKit.hints(g);
 		final int h = 32 + rows.size() * ROW + 6;
-		int cy = TerminalKit.panel(g, 0, 0, w, h, "HELD  ·  YOUR POSITIONS");
+		int cy = TerminalKit.panel(g, 0, 0, w, h, I18n.t("HELD  ·  YOUR POSITIONS"));
 		// Net unrealised P&L across all positions, right-aligned on the title strip.
 		if (net != Long.MIN_VALUE)
 		{
@@ -168,7 +168,7 @@ class TerminalHeldOverlay extends Overlay
 			TerminalKit.rt(g, v, w - 8, 13);
 			final int vw = g.getFontMetrics().stringWidth(v);
 			g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
-			TerminalKit.rt(g, hidden > 0 ? "+" + hidden + " more  NET" : "NET", w - 8 - vw - 6, 13);
+			TerminalKit.rt(g, hidden > 0 ? "+" + hidden + " more  NET" : I18n.t("NET"), w - 8 - vw - 6, 13);
 		}
 		// Metrics for the ACTUAL name font (11pt) - clipping with a smaller font's
 		// metrics under-truncates and the name runs into the qty column.
@@ -183,7 +183,7 @@ class TerminalHeldOverlay extends Overlay
 			if (r.live)
 			{
 				g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
-				TerminalKit.rt(g, "uP&L", w - 96, cy);
+				TerminalKit.rt(g, I18n.t("uP&L"), w - 96, cy);
 				g.setFont(TerminalKit.monoB(12));
 				g.setColor(r.uPnl >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
 				TerminalKit.rt(g, (r.uPnl >= 0 ? "+" : "-") + TerminalKit.gp(Math.abs(r.uPnl)), w - 10, cy);
@@ -191,7 +191,7 @@ class TerminalHeldOverlay extends Overlay
 			else
 			{
 				g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.DIM);
-				TerminalKit.rt(g, "no live price", w - 10, cy);
+				TerminalKit.rt(g, I18n.t("no live price"), w - 10, cy);
 			}
 			cy += ROW;
 		}

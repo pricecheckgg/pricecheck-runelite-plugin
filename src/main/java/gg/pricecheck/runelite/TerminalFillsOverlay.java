@@ -103,7 +103,7 @@ class TerminalFillsOverlay extends Overlay
 	{
 		TerminalKit.hints(g);
 		final int h = 32 + rowN * ROW + 6;
-		int cy = TerminalKit.panel(g, 0, 0, w, h, "RECENT FLIPS  ·  CLOSED");
+		int cy = TerminalKit.panel(g, 0, 0, w, h, I18n.t("RECENT FLIPS  ·  CLOSED"));
 		final FontMetrics fm = g.getFontMetrics();
 		for (int i = 0; i < rowN; i++)
 		{

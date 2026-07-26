@@ -199,7 +199,7 @@ class TerminalWatchlistOverlay extends Overlay
 	static int paintWatchlist(Graphics2D g, int w, int h, List<Watch> watch, List<Pick> picks, int favPage, int pageCount)
 	{
 		TerminalKit.hints(g);
-		int cy = TerminalKit.panel(g, 0, 0, w, h, "WATCHLIST  ·  YOUR TARGETS");
+		int cy = TerminalKit.panel(g, 0, 0, w, h, I18n.t("WATCHLIST  ·  YOUR TARGETS"));
 		// Page indicator on the title strip when the favourites span multiple pages.
 		if (pageCount > 1)
 		{
@@ -221,7 +221,7 @@ class TerminalWatchlistOverlay extends Overlay
 			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL);
 			TerminalKit.rt(g, "buy " + TerminalKit.gp(wc.target), buyXr, cy);
 			g.setFont(TerminalKit.monoB(9)); g.setColor(sc);
-			TerminalKit.rt(g, wc.state == 2 ? "BUY" : wc.state == 1 ? "NEAR" : "WAIT", tagXr, cy);
+			TerminalKit.rt(g, wc.state == 2 ? I18n.t("BUY") : wc.state == 1 ? I18n.t("NEAR") : I18n.t("WAIT"), tagXr, cy);
 			cy += ROW;
 		}
 
@@ -229,8 +229,8 @@ class TerminalWatchlistOverlay extends Overlay
 		{
 			g.setColor(TerminalKit.GRID); g.drawLine(8, cy - 4, w - 8, cy - 4);
 			g.setFont(TerminalKit.mono(8)); g.setColor(TerminalKit.DIM);
-			g.drawString(watch.isEmpty() ? "TOP PICKS  ·  EV/HR" : "TOP PICKS  ·  BY EV/HR", 8, cy + 8);
-			TerminalKit.rt(g, "EV/HR", tagXr, cy + 8);
+			g.drawString(watch.isEmpty() ? I18n.t("TOP PICKS  ·  EV/HR") : I18n.t("TOP PICKS  ·  BY EV/HR"), 8, cy + 8);
+			TerminalKit.rt(g, I18n.t("EV/HR"), tagXr, cy + 8);
 			cy += DIVIDER_H;
 			for (final Pick p : picks)
 			{

@@ -479,9 +479,9 @@ class GeOffersPanelOverlay extends Overlay
 		// header
 		g.setColor(TerminalKit.TITLEBG); g.fillRect(1, 1, w - 2, 16);
 		g.setFont(TerminalKit.monoB(10)); g.setColor(TerminalKit.AMBERHI);
-		g.drawString("POSITIONS", 8, 12);
+		TerminalKit.str(g, I18n.t("POSITIONS"), 8, 12);
 		g.setColor(TerminalKit.LABEL);
-		g.drawString("· " + rows.size() + " OFFERS", 8 + g.getFontMetrics().stringWidth("POSITIONS") + 6, 12);
+		g.drawString("· " + rows.size() + I18n.t(" OFFERS"), 8 + TerminalKit.width(g, I18n.t("POSITIONS")) + 6, 12);
 		final Rectangle btn = shiftHeld ? drawToggle(g, w, false) : null;
 		g.setColor(TerminalKit.GRID); g.drawLine(1, 18, w - 1, 18);
 		// rows
@@ -502,7 +502,7 @@ class GeOffersPanelOverlay extends Overlay
 		g.setColor(rows.size() > 0 && seated == rows.size() ? TerminalKit.GREEN : TerminalKit.AMBER);
 		g.drawString(seated + "/" + rows.size() + " SEATED", 8, h - 5);
 		g.setColor(total >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
-		TerminalKit.rt(g, "NET " + (total >= 0 ? "+" : "") + Fmt.compact(total), w - 8, h - 5);
+		TerminalKit.rt(g, I18n.t("NET ") + (total >= 0 ? "+" : "") + Fmt.compact(total), w - 8, h - 5);
 		return new Result(new Dimension(w, h), btn);
 	}
 

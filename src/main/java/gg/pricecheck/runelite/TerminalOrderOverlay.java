@@ -205,7 +205,7 @@ class TerminalOrderOverlay extends Overlay
 		// side + item on the title strip's right
 		g.setFont(TerminalKit.monoB(10));
 		g.setColor(t.sell ? TerminalKit.RED : TerminalKit.GREEN);
-		TerminalKit.rt(g, t.sell ? "SELL" : "BUY", w - 8, 13);
+		TerminalKit.rt(g, t.sell ? I18n.t("SELL") : I18n.t("BUY"), w - 8, 13);
 
 		final int L = 10, R = w - 10, colW = (R - L - 8) / 2;
 		g.setFont(TerminalKit.monoB(12)); g.setColor(TerminalKit.AMBERHI);
@@ -231,7 +231,7 @@ class TerminalOrderOverlay extends Overlay
 			// hero: total profit for the whole order
 			g.setColor(TerminalKit.GRID); g.drawLine(L, 116, R, 116);
 			g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
-			g.drawString(t.qty > 1 ? "PROFIT  ·  x" + t.qty : "PROFIT", L, 134);
+			g.drawString(t.qty > 1 ? I18n.t("PROFIT  ·  x") + t.qty : I18n.t("PROFIT"), L, 134);
 			g.setFont(TerminalKit.monoB(17));
 			g.setColor(t.total >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
 			TerminalKit.rt(g, (t.total >= 0 ? "+" : "-") + TerminalKit.gp(Math.abs(t.total)), R, 137);
@@ -244,8 +244,8 @@ class TerminalOrderOverlay extends Overlay
 		int cy = TICKET_H + 20;
 		g.setColor(TerminalKit.GRID); g.drawLine(L, cy - 12, R, cy - 12);
 		g.setFont(TerminalKit.mono(8)); g.setColor(TerminalKit.DIM);
-		g.drawString("YOUR TRADES  ·  " + t.item.toUpperCase(), L, cy - 2);
-		TerminalKit.rt(g, "AGE", R, cy - 2);
+		g.drawString(I18n.t("YOUR TRADES  ·  ") + t.item.toUpperCase(), L, cy - 2);
+		TerminalKit.rt(g, I18n.t("AGE"), R, cy - 2);
 		for (int i = 0; i < logN; i++)
 		{
 			final long[] tr = trades[i];
@@ -263,7 +263,7 @@ class TerminalOrderOverlay extends Overlay
 				if (tr[4] == 1)
 				{
 					g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.DIM);
-					TerminalKit.rt(g, "holding", R - 44, ry);
+					TerminalKit.rt(g, I18n.t("holding"), R - 44, ry);
 				}
 			}
 			else if (tr[5] != 0)

@@ -97,7 +97,7 @@ class PriceCheckPanel extends PluginPanel
 	private final JSpinner planAccts = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
 	private final JComboBox<String> planHours = new JComboBox<>(new String[]{"1 hour", "4 hours", "Overnight"});
 	private static final int[] PLAN_HOURS_VALUES = {1, 4, 8};
-	private final JButton planBuild = new JButton("Build plan");
+	private final JButton planBuild = new JButton(I18n.t("Build plan"));
 	private final JLabel planStatus = new JLabel(" ");
 	private final JPanel planList = new JPanel();
 	private boolean planCapitalEdited = false;   // stop auto-detect from clobbering typed capital
@@ -105,13 +105,13 @@ class PriceCheckPanel extends PluginPanel
 	private long detectedCapital = -1;           // exact bank+inventory total; the field shows a display copy
 
 	// Settings tab widgets (built once, mutated in place)
-	private final JLabel acctName = new JLabel("Loading account…");
+	private final JLabel acctName = new JLabel(I18n.t("Loading account…"));
 	private final JLabel acctPlan = pill("PREMIUM", Palette.GOLD);
 	private final JLabel acctSub = new JLabel(" ");
 	private final JLabel keyPrefixLabel = new JLabel("-");
 	private final Dot keyDot = new Dot();
 	private final JPasswordField keyField = new JPasswordField();
-	private final JButton saveKeyBtn = new JButton("Save key");
+	private final JButton saveKeyBtn = new JButton(I18n.t("Save key"));
 	private final JCheckBox syncToggle = new JCheckBox("Sync flip log");
 	private final JCheckBox advisorToggle = new JCheckBox("Offer advisor overlay");
 	private final JSpinner minEvSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 10000, 50));
@@ -141,14 +141,14 @@ class PriceCheckPanel extends PluginPanel
 		final JPanel display = new JPanel(new BorderLayout());
 		final MaterialTabGroup tabGroup = new MaterialTabGroup(display);
 		tabGroup.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
-		final MaterialTab flipsTab = new MaterialTab("Flips", tabGroup, buildFlipsView());
-		final MaterialTab logTab = new MaterialTab("Log", tabGroup, buildLogView());
-		final MaterialTab planTab = new MaterialTab("Plan", tabGroup, buildPlanView());
+		final MaterialTab flipsTab = new MaterialTab(I18n.t("Flips"), tabGroup, buildFlipsView());
+		final MaterialTab logTab = new MaterialTab(I18n.t("Log"), tabGroup, buildLogView());
+		final MaterialTab planTab = new MaterialTab(I18n.t("Plan"), tabGroup, buildPlanView());
 		// Always build the catch view (so setCatches has a live panel), but only
 		// give it a TAB when the user opts in - five text tabs will not fit a
 		// 225px panel as one row without clipping ("Fli...", "Set...").
-		final MaterialTab catchTab = new MaterialTab("Catch", tabGroup, buildCatchView());
-		settingsTab = new MaterialTab("Setup", tabGroup, buildSettingsView());
+		final MaterialTab catchTab = new MaterialTab(I18n.t("Catch"), tabGroup, buildCatchView());
+		settingsTab = new MaterialTab(I18n.t("Setup"), tabGroup, buildSettingsView());
 		settingsTab.setOnSelectEvent(() -> { listener.onFetchAccount(); return true; });
 		final java.util.List<MaterialTab> tabs = new ArrayList<>();
 		tabs.add(flipsTab);
@@ -205,13 +205,13 @@ class PriceCheckPanel extends PluginPanel
 		disc.setAlignmentX(Component.LEFT_ALIGNMENT);
 		disc.setMaximumSize(new Dimension(Integer.MAX_VALUE, 64));
 
-		final JLabel dTitle = new JLabel("Join the PriceCheck Discord");
+		final JLabel dTitle = new JLabel(I18n.t("Join the PriceCheck Discord"));
 		dTitle.setForeground(new Color(0x93, 0xa1, 0xff));
 		dTitle.setFont(dTitle.getFont().deriveFont(Font.BOLD, 12f));
 		dTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		final JLabel dSub1 = new JLabel("Flip chat and price checks");
-		final JLabel dSub2 = new JLabel("Giveaways and community help");
+		final JLabel dSub1 = new JLabel(I18n.t("Flip chat and price checks"));
+		final JLabel dSub2 = new JLabel(I18n.t("Giveaways and community help"));
 		for (final JLabel l : new JLabel[]{dSub1, dSub2})
 		{
 			l.setForeground(Palette.SUBTLE);
@@ -318,6 +318,7 @@ class PriceCheckPanel extends PluginPanel
 		{
 			catchList.add(note("Dump catches are off. Enable “Show dump catches” in Setup to watch measured reversion plays here.", Palette.SUBTLE));
 			catchList.add(Box.createVerticalGlue());
+			I18n.applyFonts(catchList);
 			catchList.revalidate();
 			catchList.repaint();
 			return;
@@ -354,6 +355,7 @@ class PriceCheckPanel extends PluginPanel
 			}
 		}
 		catchList.add(Box.createVerticalGlue());
+		I18n.applyFonts(catchList);
 		catchList.revalidate();
 		catchList.repaint();
 	}
@@ -434,7 +436,7 @@ class PriceCheckPanel extends PluginPanel
 				final long est = each * Math.max(1, c.getCatchQty());
 				final JLabel profit = mono(signedGp(est) + " est", est >= 0 ? Palette.GREEN : Palette.RED);
 				profit.setHorizontalAlignment(SwingConstants.RIGHT);
-				profit.setToolTipText("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed.");
+				profit.setToolTipText(I18n.t("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed."));
 				line3.add(profit, BorderLayout.EAST);
 			}
 		}
@@ -536,7 +538,7 @@ class PriceCheckPanel extends PluginPanel
 		{
 			// Conservative, taxed, half-recovery level: contingent, never a promise.
 			final JPanel t = catchKv("Recover to", Fmt.full(c.getTarget()), Palette.GREEN);
-			t.setToolTipText("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed.");
+			t.setToolTipText(I18n.t("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed."));
 			card.add(t);
 		}
 
@@ -552,7 +554,7 @@ class PriceCheckPanel extends PluginPanel
 			{
 				final long est = each * Math.max(1, c.getCatchQty());
 				final JPanel p = catchKv("Est. profit", signedGp(est) + " est", est >= 0 ? Palette.GREEN : Palette.RED);
-				p.setToolTipText("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed.");
+				p.setToolTipText(I18n.t("Conservative half-recovery target, taxed. Only if it reverts - never guaranteed."));
 				card.add(p);
 			}
 			if (c.getRoi() != 0)
@@ -998,7 +1000,7 @@ class PriceCheckPanel extends PluginPanel
 			setStat(cellToday, s.todayProfit);
 			setStat(cellWeek, s.weekProfit);
 			setStat(cellAll, s.allProfit);
-			cellAll.setToolTipText("Tax paid: " + Fmt.compact(s.allTax) + " gp");
+			cellAll.setToolTipText(I18n.t("Tax paid: ") + Fmt.compact(s.allTax) + " gp");
 			cellFlips.setText(Fmt.full(s.allFlips));
 			cellFlips.setForeground(Palette.LIGHT);
 			cellFlips.setToolTipText((s.checks > 0 ? s.checks + " margin checks kept out of these totals" : "Margin checks are kept out of these totals")
@@ -1016,7 +1018,7 @@ class PriceCheckPanel extends PluginPanel
 				cellRoi.setText(pctSigned(s.avgRoiPct));
 				cellRoi.setForeground(s.avgRoiPct > 0 ? Palette.GREEN : (s.avgRoiPct < 0 ? Palette.RED : Palette.SUBTLE));
 			}
-			cellRoi.setToolTipText("Profit vs gp spent across your logged flips, checks excluded");
+			cellRoi.setToolTipText(I18n.t("Profit vs gp spent across your logged flips, checks excluded"));
 			syncOpensWeb = hasKey && s.pendingSync == 0;
 			logSyncDot.setColor(hasKey ? (s.pendingSync > 0 ? Palette.AMBER : Palette.GREEN) : Palette.SUBTLE);
 			// Two-tone: state stays quiet, the clickable action reads as a link.
@@ -1050,6 +1052,7 @@ class PriceCheckPanel extends PluginPanel
 				logList.add(gap(5));
 			}
 			logList.add(Box.createVerticalGlue());
+			I18n.applyFonts(logList);
 			logList.revalidate();
 			logList.repaint();
 		});
@@ -1267,10 +1270,10 @@ class PriceCheckPanel extends PluginPanel
 		// tracker fills it in live once your bank has been opened.
 		final JPanel capRow = row();
 		capRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
-		final JLabel capLbl = new JLabel("Capital");
+		final JLabel capLbl = new JLabel(I18n.t("Capital"));
 		capLbl.setForeground(Palette.SUBTLE);
 		planCapital.setFont(FontManager.getRunescapeSmallFont());
-		planCapital.setToolTipText("Your roll, like 25m or 1.2b. Filled from your bank when detected.");
+		planCapital.setToolTipText(I18n.t("Your roll, like 25m or 1.2b. Filled from your bank when detected."));
 		planCapital.setPreferredSize(new Dimension(90, 24));
 		planCapital.setMaximumSize(new Dimension(90, 24));
 		planCapital.getDocument().addDocumentListener(new DocumentListener()
@@ -1292,7 +1295,7 @@ class PriceCheckPanel extends PluginPanel
 		// multiply how much of each item the plan can move.
 		final JPanel slotRow = row();
 		slotRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-		final JLabel slotLbl = new JLabel("Slots / account");
+		final JLabel slotLbl = new JLabel(I18n.t("Slots / account"));
 		slotLbl.setForeground(Palette.SUBTLE);
 		planSlots.setPreferredSize(new Dimension(56, 24));
 		planSlots.setMaximumSize(new Dimension(56, 24));
@@ -1306,9 +1309,9 @@ class PriceCheckPanel extends PluginPanel
 
 		final JPanel acctRow = row();
 		acctRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-		final JLabel acctLbl = new JLabel("Accounts");
+		final JLabel acctLbl = new JLabel(I18n.t("Accounts"));
 		acctLbl.setForeground(Palette.SUBTLE);
-		planAccts.setToolTipText("Buy limits are per account, so more accounts move more of each item. Volume caps stay shared.");
+		planAccts.setToolTipText(I18n.t("Buy limits are per account, so more accounts move more of each item. Volume caps stay shared."));
 		planAccts.setPreferredSize(new Dimension(56, 24));
 		planAccts.setMaximumSize(new Dimension(56, 24));
 		final JPanel acctWrap = new JPanel(new BorderLayout());
@@ -1321,9 +1324,9 @@ class PriceCheckPanel extends PluginPanel
 
 		final JPanel hoursRow = row();
 		hoursRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-		final JLabel hoursLbl = new JLabel("Session");
+		final JLabel hoursLbl = new JLabel(I18n.t("Session"));
 		hoursLbl.setForeground(Palette.SUBTLE);
-		planHours.setToolTipText("How long you are flipping for. Short sessions favour fast movers; overnight admits patient big tickets and fits more buy-limit windows.");
+		planHours.setToolTipText(I18n.t("How long you are flipping for. Short sessions favour fast movers; overnight admits patient big tickets and fits more buy-limit windows."));
 		planHours.setPreferredSize(new Dimension(96, 24));
 		planHours.setMaximumSize(new Dimension(96, 24));
 		planHours.setSelectedIndex(1);
@@ -1405,7 +1408,7 @@ class PriceCheckPanel extends PluginPanel
 			capital = Fmt.parseGp(txt);
 			if (capital < 100_000)
 			{
-				planStatus.setText("Enter at least 100k. 25m and 1.2b formats work.");
+				planStatus.setText(I18n.t("Enter at least 100k. 25m and 1.2b formats work."));
 				planStatus.setForeground(Palette.AMBER);
 				return;
 			}
@@ -1417,7 +1420,7 @@ class PriceCheckPanel extends PluginPanel
 		configManager.setConfiguration(PriceCheckConfig.GROUP, "planAccounts", String.valueOf(accounts));
 		configManager.setConfiguration(PriceCheckConfig.GROUP, "planHours", String.valueOf(hours));
 		planBuild.setEnabled(false);
-		planBuild.setText("Building…");
+		planBuild.setText(I18n.t("Building…"));
 		planStatus.setText(" ");
 		planStatus.setForeground(Palette.SUBTLE);
 		listener.onBuildPlan(capital, slots, accounts, hours);
@@ -1439,7 +1442,7 @@ class PriceCheckPanel extends PluginPanel
 			}
 			planCapitalMuted = true;
 			planCapital.setText(Fmt.full(total));   // exact; parseGp strips the commas
-			planCapital.setToolTipText("From your bank + inventory: " + Fmt.full(total) + " gp. Type to override.");
+			planCapital.setToolTipText(I18n.t("From your bank + inventory: ") + Fmt.full(total) + " gp. Type to override.");
 			planCapitalMuted = false;
 		});
 	}
@@ -1449,42 +1452,42 @@ class PriceCheckPanel extends PluginPanel
 		SwingUtilities.invokeLater(() ->
 		{
 			planBuild.setEnabled(true);
-			planBuild.setText("Build plan");
+			planBuild.setText(I18n.t("Build plan"));
 			planList.removeAll();
 
 			if (result == null || result.state == PriceCheckApiClient.AuthState.ERROR)
 			{
-				planStatus.setText("Couldn't reach PriceCheck. Try again.");
+				planStatus.setText(I18n.t("Couldn't reach PriceCheck. Try again."));
 				planStatus.setForeground(Palette.AMBER);
 			}
 			else if (result.state == PriceCheckApiClient.AuthState.NO_KEY)
 			{
-				planStatus.setText("Add your plugin key in Settings first.");
+				planStatus.setText(I18n.t("Add your plugin key in Settings first."));
 				planStatus.setForeground(Palette.AMBER);
 			}
 			else if (result.state == PriceCheckApiClient.AuthState.INVALID_KEY)
 			{
-				planStatus.setText("Key rejected. Check it in Settings.");
+				planStatus.setText(I18n.t("Key rejected. Check it in Settings."));
 				planStatus.setForeground(Palette.RED);
 			}
 			else if (result.state == PriceCheckApiClient.AuthState.NO_SUBSCRIPTION)
 			{
-				planStatus.setText("Subscription inactive.");
+				planStatus.setText(I18n.t("Subscription inactive."));
 				planStatus.setForeground(Palette.RED);
 			}
 			else if (result.state == PriceCheckApiClient.AuthState.PLAN_REQUIRED)
 			{
-				planStatus.setText("The plugin comes with Trader Pro.");
+				planStatus.setText(I18n.t("The plugin comes with Trader Pro."));
 				planStatus.setForeground(Palette.AMBER);
 			}
 			else if (result.needCapital)
 			{
-				planStatus.setText("Enter your capital, or open your bank once in game.");
+				planStatus.setText(I18n.t("Enter your capital, or open your bank once in game."));
 				planStatus.setForeground(Palette.AMBER);
 			}
 			else if (result.plan == null || result.plan.getPlan() == null || result.plan.getPlan().isEmpty())
 			{
-				planStatus.setText("Nothing to allocate right now. Try again shortly.");
+				planStatus.setText(I18n.t("Nothing to allocate right now. Try again shortly."));
 				planStatus.setForeground(Palette.SUBTLE);
 			}
 			else
@@ -1499,6 +1502,7 @@ class PriceCheckPanel extends PluginPanel
 					planList.add(gap(5));
 				}
 			}
+			I18n.applyFonts(planList);
 			planList.revalidate();
 			planList.repaint();
 		});
@@ -1525,7 +1529,7 @@ class PriceCheckPanel extends PluginPanel
 			final JPanel lr = row();
 			final JLabel range = mono(Fmt.compact(d.getTotals().getLow()) + " to " + Fmt.compact(d.getTotals().getHigh())
 				+ (d.getTotals().getWorstCase() > 0 ? " · worst case -" + Fmt.compact(d.getTotals().getWorstCase()) : ""), Palette.SUBTLE);
-			range.setToolTipText("Range from the measured odds: a slow tape lands near the low, a clean sweep near the high. Worst case assumes every big ticket bails and every flow item eats its daily wobble.");
+			range.setToolTipText(I18n.t("Range from the measured odds: a slow tape lands near the low, a clean sweep near the high. Worst case assumes every big ticket bails and every flow item eats its daily wobble."));
 			lr.add(range, BorderLayout.WEST);
 			card.add(lr);
 		}
@@ -1686,7 +1690,7 @@ class PriceCheckPanel extends PluginPanel
 		keyField.setForeground(Color.WHITE);
 		keyField.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
 		keyField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-		keyField.setToolTipText("Paste a new key (pck_…)");
+		keyField.setToolTipText(I18n.t("Paste a new key (pck_…)"));
 		saveKeyBtn.setEnabled(false);
 		saveKeyBtn.setFocusPainted(false);
 		saveKeyBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
@@ -1739,7 +1743,7 @@ class PriceCheckPanel extends PluginPanel
 			keyField.setText("");
 			saveKeyBtn.setEnabled(false);
 			keyDot.setColor(Palette.AMBER);
-			keyDot.setToolTipText("Checking…");
+			keyDot.setToolTipText(I18n.t("Checking…"));
 			listener.onFetchAccount();
 		});
 		keyField.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -1748,7 +1752,7 @@ class PriceCheckPanel extends PluginPanel
 		v.add(saveKeyBtn);
 		v.add(gap(4));
 
-		final JLabel link = new JLabel("Free key · Discord login, no RSN");
+		final JLabel link = new JLabel(I18n.t("Free key · Discord login, no RSN"));
 		link.setForeground(Palette.SUBTLE);
 		link.setFont(FontManager.getRunescapeSmallFont());
 		link.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -1773,7 +1777,7 @@ class PriceCheckPanel extends PluginPanel
 		syncToggle.setFocusPainted(false);
 		styleCheckbox(syncToggle);
 		syncToggle.setAlignmentX(Component.LEFT_ALIGNMENT);
-		syncToggle.setToolTipText("Back up your flip log to your PriceCheck account and see it at flipping.pricecheck.gg/portfolio");
+		syncToggle.setToolTipText(I18n.t("Back up your flip log to your PriceCheck account and see it at flipping.pricecheck.gg/portfolio"));
 		syncToggle.setSelected(config.syncFlipLog());
 		syncToggle.addItemListener(e ->
 		{
@@ -1829,7 +1833,7 @@ class PriceCheckPanel extends PluginPanel
 
 		final JPanel evRow = row();
 		evRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 26));
-		final JLabel evLbl = new JLabel("Min EV/hr (k)");
+		final JLabel evLbl = new JLabel(I18n.t("Min EV/hr (k)"));
 		evLbl.setForeground(Palette.SUBTLE);
 		minEvSpinner.setValue(config.minEvPerHrK());
 		minEvSpinner.setPreferredSize(new Dimension(64, 24));
@@ -1865,7 +1869,7 @@ class PriceCheckPanel extends PluginPanel
 		allOpts.setFont(FontManager.getRunescapeSmallFont());
 		allOpts.setAlignmentX(Component.LEFT_ALIGNMENT);
 		allOpts.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		allOpts.setToolTipText("Every PriceCheck toggle, including overlay and GE options");
+		allOpts.setToolTipText(I18n.t("Every PriceCheck toggle, including overlay and GE options"));
 		allOpts.addMouseListener(new MouseAdapter()
 		{
 			public void mousePressed(MouseEvent e) { listener.onOpenPluginConfig(); }
@@ -1990,7 +1994,7 @@ class PriceCheckPanel extends PluginPanel
 			}
 			final int n = acct.getTrackedCount();
 			acctSub.setText(lic + " · watching " + n + (n == 1 ? " item" : " items"));
-			acctSub.setToolTipText("Watching = your tracked-margins watchlist (the + button on flip rows); live GE offers show on the Flips tab and the in-game overlays.");
+			acctSub.setToolTipText(I18n.t("Watching = your tracked-margins watchlist (the + button on flip rows); live GE offers show on the Flips tab and the in-game overlays."));
 			if (acct.getKeyPrefix() != null) { keyPrefixLabel.setText(acct.getKeyPrefix()); }
 		});
 	}
@@ -2030,6 +2034,7 @@ class PriceCheckPanel extends PluginPanel
 		{
 			list.add(emptyState());
 			list.add(Box.createVerticalGlue());
+			I18n.applyFonts(list);
 			list.revalidate();
 			list.repaint();
 			return;
@@ -2093,6 +2098,7 @@ class PriceCheckPanel extends PluginPanel
 		}
 
 		list.add(Box.createVerticalGlue());
+		I18n.applyFonts(list);
 		list.revalidate();
 		list.repaint();
 	}
@@ -2107,7 +2113,7 @@ class PriceCheckPanel extends PluginPanel
 		final PriceCheckApiClient.SeriesData sd = seriesSupplier != null ? seriesSupplier.apply(f.getGeId()) : null;
 		if (sd == null || sd.ts == null || sd.ts.length < 2)
 		{
-			final JLabel wait = new JLabel("Loading day chart…");
+			final JLabel wait = new JLabel(I18n.t("Loading day chart…"));
 			wait.setFont(FontManager.getRunescapeSmallFont());
 			wait.setForeground(Palette.SUBTLE);
 			card.add(wait, BorderLayout.CENTER);
@@ -2210,7 +2216,7 @@ class PriceCheckPanel extends PluginPanel
 			final JLabel dot = new JLabel("! ");
 			dot.setForeground(Palette.AMBER);
 			dot.setFont(dot.getFont().deriveFont(Font.BOLD));
-			dot.setToolTipText("Higher risk: " + f.riskLabel() + ". Margin is volume-confirmed but this missed one board quality bar.");
+			dot.setToolTipText(I18n.t("Higher risk: ") + f.riskLabel() + ". Margin is volume-confirmed but this missed one board quality bar.");
 			line1.add(dot, BorderLayout.WEST);
 			final JLabel why = new JLabel(f.riskLabel());
 			why.setForeground(Palette.AMBER);
@@ -2220,7 +2226,7 @@ class PriceCheckPanel extends PluginPanel
 		else if (f.isConfirmed())
 		{
 			final Mark ok = new Mark(Mark.CHECK, Palette.GREEN, 13, 16);
-			ok.setToolTipText("Margin confirmed across the 5m + 1h books");
+			ok.setToolTipText(I18n.t("Margin confirmed across the 5m + 1h books"));
 			line1.add(ok, BorderLayout.WEST);
 		}
 
@@ -2296,7 +2302,7 @@ class PriceCheckPanel extends PluginPanel
 		name.setFont(name.getFont().deriveFont(Font.BOLD));
 		name.setForeground(Color.WHITE);
 		final Mark rm = new Mark(Mark.CROSS, Palette.SUBTLE, 18, 20);
-		rm.setToolTipText("Stop tracking");
+		rm.setToolTipText(I18n.t("Stop tracking"));
 		rm.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 		rm.addMouseListener(new MouseAdapter()
 		{
@@ -2396,7 +2402,7 @@ class PriceCheckPanel extends PluginPanel
 		b.setForeground(Palette.SUBTLE);
 		b.setBorder(BorderFactory.createEmptyBorder(6, 0, 10, 0));
 		b.setAlignmentX(Component.LEFT_ALIGNMENT);
-		final JButton open = new JButton("Open Settings");
+		final JButton open = new JButton(I18n.t("Open Settings"));
 		open.setFocusPainted(false);
 		open.setAlignmentX(Component.LEFT_ALIGNMENT);
 		open.addActionListener(e -> { if (settingsTab != null) { settingsTab.select(); } });

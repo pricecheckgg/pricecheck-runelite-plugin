@@ -207,11 +207,11 @@ public class PriceCheckPlugin extends Plugin
 		return configManager.getConfig(PriceCheckConfig.class);
 	}
 
-	@Override
-	protected void startUp()
+	/** Builds the side panel and its toolbar button. Re-runnable: a language
+	 *  change throws the old panel away and builds a new one in the new
+	 *  language, so the switch does not wait for a client restart. */
+	private void buildPanel()
 	{
-		chartTf = ChartTf.fromName(configManager.getConfiguration(PriceCheckConfig.GROUP, CHART_TF_KEY));
-		moversTf = MoversTf.fromName(configManager.getConfiguration(PriceCheckConfig.GROUP, MOVERS_TF_KEY));
 		panel = new PriceCheckPanel(new PriceCheckPanel.Listener()
 		{
 			@Override
@@ -311,6 +311,16 @@ public class PriceCheckPlugin extends Plugin
 		{
 			clientToolbar.addNavigation(navButton);
 		}
+		I18n.applyFonts(panel);
+	}
+
+	@Override
+	protected void startUp()
+	{
+		chartTf = ChartTf.fromName(configManager.getConfiguration(PriceCheckConfig.GROUP, CHART_TF_KEY));
+		moversTf = MoversTf.fromName(configManager.getConfiguration(PriceCheckConfig.GROUP, MOVERS_TF_KEY));
+		I18n.setLanguage(config.language());
+		buildPanel();
 
 		geHelper = new GeChatboxHelper(client, clientThread, config, this);
 
@@ -2582,6 +2592,20 @@ public class PriceCheckPlugin extends Plugin
 		}
 		final String key = e.getKey();
 		final PriceCheckPanel p = panel;
+		if ("language".equals(key))
+		{
+			javax.swing.SwingUtilities.invokeLater(() ->
+			{
+				if (navButton != null)
+				{
+					clientToolbar.removeNavigation(navButton);
+				}
+				I18n.setLanguage(config.language());
+				buildPanel();
+			});
+			refreshPanel();
+			return;
+		}
 		if ("apiKey".equals(key))
 		{
 			poller.execute(() ->

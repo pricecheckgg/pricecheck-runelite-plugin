@@ -132,7 +132,7 @@ class TerminalStatusOverlay extends Overlay
 		final int brandW = g.getFontMetrics().stringWidth("PRICECHECK");
 		g.setFont(TerminalKit.mono(9));
 		g.setColor(TerminalKit.DIM);
-		g.drawString("ENGINE", 12 + brandW + 8, 20);
+		TerminalKit.str(g, I18n.t("ENGINE"), 12 + brandW + 8, 20);
 		final int engineW = g.getFontMetrics().stringWidth("ENGINE");
 
 		// RIGHT block first: clock (right-pinned) + LIVE label + dot. Compute its
@@ -145,19 +145,19 @@ class TerminalStatusOverlay extends Overlay
 		final int liveW = g.getFontMetrics().stringWidth("LIVE");
 		final int liveX = w - 12 - clockW - 10 - liveW;
 		g.setColor(TerminalKit.LABEL);
-		g.drawString("LIVE", liveX, 19);
+		TerminalKit.str(g, I18n.t("LIVE"), liveX, 19);
 		g.setColor(TerminalKit.GREEN);
 		g.fillOval(liveX - 11, 9, 6, 6);
 		final int rEdge = liveX - 11 - 14;   // fields must end before here
 
 		// LEFT fields, left-flowing, clamped so they never cross rEdge.
 		int fx = 12 + brandW + 8 + engineW + 22;
-		fx = field(g, fx, rEdge, "CASH", TerminalKit.commas(cash), TerminalKit.AMBER);
-		fx = field(g, fx, rEdge, "SLOTS", slots + "/8", slots >= 8 ? TerminalKit.RED : TerminalKit.AMBER);
-		fx = field(g, fx, rEdge, "WORLD", Integer.toString(world), TerminalKit.AMBER);
+		fx = field(g, fx, rEdge, I18n.t("CASH"), TerminalKit.commas(cash), TerminalKit.AMBER);
+		fx = field(g, fx, rEdge, I18n.t("SLOTS"), slots + "/8", slots >= 8 ? TerminalKit.RED : TerminalKit.AMBER);
+		fx = field(g, fx, rEdge, I18n.t("WORLD"), Integer.toString(world), TerminalKit.AMBER);
 		if (pnlToday != Long.MIN_VALUE)
 		{
-			fx = field(g, fx, rEdge, "P&L TODAY",
+			fx = field(g, fx, rEdge, I18n.t("P&L TODAY"),
 				(pnlToday >= 0 ? "+" : "-") + TerminalKit.gp(Math.abs(pnlToday)),
 				pnlToday >= 0 ? TerminalKit.GREEN : TerminalKit.RED);
 		}
@@ -165,7 +165,7 @@ class TerminalStatusOverlay extends Overlay
 
 	private static int field(Graphics2D g, int x, int rEdge, String label, String value, Color vc)
 	{
-		g.setFont(TerminalKit.mono(9));
+		g.setFont(I18n.fit(TerminalKit.mono(9), label));
 		final int lw = g.getFontMetrics().stringWidth(label);
 		g.setFont(TerminalKit.monoB(13));
 		final int vw = g.getFontMetrics().stringWidth(value);
@@ -176,7 +176,7 @@ class TerminalStatusOverlay extends Overlay
 		}
 		g.setFont(TerminalKit.mono(9));
 		g.setColor(TerminalKit.LABEL);
-		g.drawString(label, x, 12);
+		TerminalKit.str(g, label, x, 12);
 		g.setFont(TerminalKit.monoB(13));
 		g.setColor(vc);
 		g.drawString(value, x, 25);

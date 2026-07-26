@@ -305,7 +305,7 @@ final class GeItemInfoPainter
 		g.setFont(TerminalKit.monoB(13)); g.setColor(TerminalKit.AMBERHI);
 		g.drawString(clip(c.itemName == null ? "" : c.itemName.toUpperCase(), g.getFontMetrics(), R - 96 - L), L, y);
 		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
-		TerminalKit.rt(g, "LIVE", R, y);
+		TerminalKit.rt(g, I18n.t("LIVE"), R, y);
 		y += 6;
 		g.setColor(TerminalKit.GRID); g.drawLine(L, y, R, y);
 		y += 18;
@@ -408,17 +408,17 @@ final class GeItemInfoPainter
 			final long edge = lastHighOf(s);
 			final long pnl = edge > 0 ? c.lotQty * GeTax.net(unit, edge) : 0;
 			g.setColor(TerminalKit.GRID); g.drawLine(L, y - 6, R, y - 6);
-			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); g.drawString("HELD", L, y + 6);
+			g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); TerminalKit.str(g, I18n.t("HELD"), L, y + 6);
 			g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.AMBER);
 			g.drawString("x" + c.lotQty + " @ " + Fmt.compact(unit), L + 40, y + 6);
 			if (edge > 0)
 			{
-				g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); g.drawString("NOW", L + 176, y + 6);
+				g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); TerminalKit.str(g, I18n.t("NOW"), L + 176, y + 6);
 				g.setFont(TerminalKit.monoB(11)); g.setColor(TerminalKit.AMBER); g.drawString(Fmt.compact(edge), L + 210, y + 6);
 				final String v = (pnl >= 0 ? "+" : "") + Fmt.compact(pnl);
 				g.setFont(TerminalKit.monoB(13)); final int vw = g.getFontMetrics().stringWidth(v);
 				g.setColor(pnl >= 0 ? TerminalKit.GREEN : TerminalKit.RED); TerminalKit.rt(g, v, R, y + 7);
-				g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); TerminalKit.rt(g, "uP&L", R - vw - 6, y + 6);
+				g.setFont(TerminalKit.mono(10)); g.setColor(TerminalKit.LABEL); TerminalKit.rt(g, I18n.t("uP&L"), R - vw - 6, y + 6);
 			}
 			y += 20;
 		}
@@ -437,7 +437,7 @@ final class GeItemInfoPainter
 		if (s == null || s.high == null || s.high.length < 2 || hi <= lo)
 		{
 			g.setColor(TerminalKit.DIM); g.setFont(TerminalKit.mono(9));
-			g.drawString("building the corridor...", x, y + hh / 2);
+			g.drawString(I18n.t("building the corridor..."), x, y + hh / 2);
 			return y + hh;
 		}
 		final double pad = (hi - lo) * 0.08 + 1;
@@ -492,7 +492,7 @@ final class GeItemInfoPainter
 		tapeRows = Math.max(0, Math.min(tapeRows, c.prints == null ? 0 : c.prints.size()));
 		g.setColor(TerminalKit.GRID); g.drawLine(L, y - 4, R, y - 4);
 		g.setFont(TerminalKit.mono(9)); g.setColor(TerminalKit.LABEL);
-		g.drawString("TIME & SALES", L, y + 7);
+		TerminalKit.str(g, I18n.t("TIME & SALES"), L, y + 7);
 		final int titleW = g.getFontMetrics().stringWidth("TIME & SALES");
 		int nBuy = 0;
 		for (int i = 0; i < tapeRows; i++) { if (c.prints.get(c.prints.size() - 1 - i).buySide) { nBuy++; } }
@@ -511,7 +511,7 @@ final class GeItemInfoPainter
 		}
 		y += 18;   // more room below the counts so the sub-header can't overlap them
 		g.setFont(TerminalKit.mono(8)); g.setColor(TerminalKit.DIM);
-		TerminalKit.rt(g, "PRICE", L + 128, y); g.drawString("Δ VS YOU", L + 144, y); TerminalKit.rt(g, "AGE", R, y);
+		TerminalKit.rt(g, I18n.t("PRICE"), L + 128, y); TerminalKit.str(g, I18n.t("Δ VS YOU"), L + 144, y); TerminalKit.rt(g, I18n.t("AGE"), R, y);
 		y += 14;   // (18 + 14 keeps the header a constant 32px, matching the height calc)
 		for (int i = 0; i < tapeRows; i++)
 		{

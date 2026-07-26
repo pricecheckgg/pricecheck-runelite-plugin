@@ -44,6 +44,10 @@ public final class TerminalRadarPreview
 	public static void main(String[] args) throws Exception
 	{
 		System.setProperty("java.awt.headless", "true");
+		// -Dpc.lang=ja renders the panel in Japanese, so the real layout can be
+		// checked for clipping without launching a client. A property, not an
+		// arg: some previews already parse their own positional args.
+		if ("ja".equals(System.getProperty("pc.lang"))) { I18n.setLanguage(PriceCheckConfig.Language.JAPANESE); }
 		final String out = args.length > 0 ? args[0] : "radar.png";
 
 		final List<FlipData> flips = new ArrayList<>();

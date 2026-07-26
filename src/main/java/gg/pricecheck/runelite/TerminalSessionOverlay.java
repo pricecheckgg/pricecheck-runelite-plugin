@@ -84,7 +84,7 @@ class TerminalSessionOverlay extends Overlay
 	static int paintStrip(Graphics2D g, int w, FlipLogEngine.Summary s)
 	{
 		TerminalKit.hints(g);
-		TerminalKit.panel(g, 0, 0, w, H, "SESSION  ·  FLOW");
+		TerminalKit.panel(g, 0, 0, w, H, I18n.t("SESSION  ·  FLOW"));
 
 		final String today = (s.todayProfit >= 0 ? "+" : "-") + TerminalKit.gp(Math.abs(s.todayProfit));
 		final String gphr = s.sessionGpHr == Long.MIN_VALUE ? "-"
