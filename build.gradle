@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'gg.pricecheck'
-version = '0.5.1'
+version = '0.6.0'
 
 repositories {
     exclusiveContent {
@@ -20,7 +20,7 @@ repositories {
 def runeLiteVersion = 'latest.release'
 
 dependencies {
-    // Provided at runtime by the RuneLite client — compileOnly, never bundled.
+    // Provided at runtime by the RuneLite client - compileOnly, never bundled.
     // This includes OkHttp + Gson + Guice, so the sideload JAR stays tiny and
     // can't clash with the client's own copies.
     compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
@@ -53,7 +53,7 @@ tasks.named('jar') {
 
 // Auto-install: every build drops the fresh JAR into ~/.runelite/sideloaded-plugins,
 // so the "RuneLite Flip" desktop launcher (which loads whatever jar sits there)
-// always starts the latest build — no manual copy step to forget.
+// always starts the latest build - no manual copy step to forget.
 tasks.register('sideload', Copy) {
     dependsOn 'shadowJar'
     // Clear stale pricecheck jars first: a version bump changes the filename,
