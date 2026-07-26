@@ -605,14 +605,15 @@ public class PriceCheckPlugin extends Plugin
 			poller.shutdownNow();
 			poller = null;
 		}
-		if (navButton != null)
-		{
-			if (geLabelOverlay != null)
+		if (geLabelOverlay != null)
 		{
 			overlayManager.remove(geLabelOverlay);
-			GeLabelOverlay.clear();
+			geLabelOverlay = null;
 		}
-		clientToolbar.removeNavigation(navButton);
+		GeLabelOverlay.clear();
+		if (navButton != null)
+		{
+			clientToolbar.removeNavigation(navButton);
 		}
 		mouseManager.unregisterMouseListener(advisorMouse);
 		keyManager.unregisterKeyListener(autofillHotkey);
