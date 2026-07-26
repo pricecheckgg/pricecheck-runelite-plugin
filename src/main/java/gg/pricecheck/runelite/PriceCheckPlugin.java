@@ -1207,7 +1207,7 @@ public class PriceCheckPlugin extends Plugin
 
 	boolean geOffersPanelVisible()
 	{
-		if ((!config.geOffersPanel() && !config.terminalOffers() && !config.terminalDesk()) || !marketDataOk() || !isGrandExchangeOpen())
+		if (!deskBlotter() || !marketDataOk() || !isGrandExchangeOpen())
 		{
 			return false;
 		}
