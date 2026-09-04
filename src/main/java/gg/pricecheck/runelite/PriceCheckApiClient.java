@@ -588,6 +588,7 @@ public class PriceCheckApiClient
 		}
 		final Map<String, Object> body = new HashMap<>(4);
 		body.put("accountHash", String.valueOf(batch.accountHash));
+		body.put("lotsMutMs", batch.lotsMutMs);
 		final List<Map<String, Object>> fills = new java.util.ArrayList<>(batch.fills.size());
 		for (final FlipLogEngine.Fill f : batch.fills)
 		{

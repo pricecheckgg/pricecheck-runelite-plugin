@@ -1056,6 +1056,18 @@ class PriceCheckPanel extends PluginPanel
 				logList.add(logFlipRow(group));
 				logList.add(gap(5));
 			}
+			if (s.untracked != null && !s.untracked.isEmpty())
+			{
+				logList.add(gap(4));
+				logList.add(sectionHeader(I18n.f("Sold without a tracked buy · %d", s.untracked.size())));
+				logList.add(note(I18n.t("Logged, not counted: no buy of the item was on record when the sale filled."), Palette.SUBTLE));
+				logList.add(gap(4));
+				for (final FlipLogEngine.Untracked u : s.untracked)
+				{
+					logList.add(untrackedRow(u));
+					logList.add(gap(5));
+				}
+			}
 			logList.add(Box.createVerticalGlue());
 			I18n.applyFonts(logList);
 			logList.revalidate();
@@ -1095,6 +1107,42 @@ class PriceCheckPanel extends PluginPanel
 		attachDeleteMenu(rowP, I18n.t("Remove position…"),
 			"Remove " + lotLabel + " from tracking?\nA later sell of it will show as untracked instead of a flip.",
 			() -> listener.onDeleteLot(l.itemId, l.qty, l.cost, l.openedAt));
+		return rowP;
+	}
+
+	/** A sale with no cost basis: the coins it brought in, the size, and when.
+	 *  No profit figure, because none is known. */
+	private JPanel untrackedRow(FlipLogEngine.Untracked u)
+	{
+		final JPanel rowP = new JPanel(new BorderLayout(6, 0));
+		rowP.setBackground(CARD);
+		rowP.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+		rowP.setAlignmentX(Component.LEFT_ALIGNMENT);
+		final JLabel icon = new JLabel();
+		icon.setPreferredSize(new Dimension(28, 30));
+		icon.setHorizontalAlignment(SwingConstants.CENTER);
+		if (itemManager != null) { itemManager.getImage(u.itemId).addTo(icon); }
+		final JLabel name = new JLabel("<html><body style='width:110px'><b>"
+			+ escHtml(u.name != null ? u.name : ("#" + u.itemId)) + "</b></body></html>");
+		name.setForeground(Color.WHITE);
+		final JLabel got = mono(I18n.f("sold for %s", Fmt.compact(u.gross - u.tax)), Palette.SUBTLE);
+		got.setHorizontalAlignment(SwingConstants.RIGHT);
+		final JPanel line1 = row();
+		line1.add(name, BorderLayout.CENTER);
+		line1.add(got, BorderLayout.EAST);
+		final JLabel amt = mono(Fmt.full(u.qty) + " @ " + Fmt.compact(u.qty > 0 ? u.gross / u.qty : u.gross), Palette.SUBTLE);
+		final JLabel when = mono(I18n.f("%s ago", dur(Math.max(0, System.currentTimeMillis() - u.ts))), Palette.SUBTLE);
+		when.setHorizontalAlignment(SwingConstants.RIGHT);
+		final JPanel line2 = row();
+		line2.add(amt, BorderLayout.CENTER);
+		line2.add(when, BorderLayout.EAST);
+		final JPanel center = new JPanel(new BorderLayout());
+		center.setOpaque(false);
+		center.add(line1, BorderLayout.NORTH);
+		center.add(line2, BorderLayout.SOUTH);
+		rowP.add(icon, BorderLayout.WEST);
+		rowP.add(center, BorderLayout.CENTER);
+		rowP.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowP.getPreferredSize().height));
 		return rowP;
 	}
 

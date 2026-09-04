@@ -539,6 +539,10 @@ final class I18n
 		JA.put("back up in Setup", "設定でバックアップ");
 		JA.put("Completed flips · last %d", "完了フリップ · 直近%d件");
 		JA.put("Completed flips", "完了フリップ");
+		JA.put("Sold without a tracked buy · %d", "買い記録のない売却 · %d件");
+		JA.put("Logged, not counted: no buy of the item was on record when the sale filled.", "記録済み・集計外：売却時にこのアイテムの買い記録がありませんでした。");
+		JA.put("sold for %s", "売却額 %s");
+		JA.put("%s ago", "%s前");
 		JA.put("Your tracked items + best flips, ranked. Click here to type a search instead.", "追跡中のアイテムと注目フリップ（ランク順）。ここをクリックすると通常の検索に戻ります。");
 		JA.put("rec buy: %s", "推奨買値: %s");
 		JA.put("rec sell: %s", "推奨売値: %s");

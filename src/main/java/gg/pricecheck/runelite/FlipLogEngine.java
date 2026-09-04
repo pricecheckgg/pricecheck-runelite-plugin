@@ -52,6 +52,11 @@ class FlipLogEngine
 	private static final int MAX_PENDING_FILLS = 2000;
 	private static final int MAX_OPEN_LOTS = 400;
 	private static final long FLIP_MERGE_MS = 5 * 60_000L;   // fold a nibbling sell offer's fills into one flip
+	// A margin check is a PAIR of probes: a qty-1 buy that crossed at once and
+	// a qty-1 sell that crossed at once, minutes apart. One fast side alone is
+	// how a real 1-item position (a bow, an orb) is normally opened or closed.
+	private static final long CHECK_PAIR_MS = 10 * 60_000L;
+	private static final int MAX_UNTRACKED = 200;
 
 	static class SlotSnap
 	{
@@ -76,6 +81,9 @@ class FlipLogEngine
 		long slotsUpdatedAt;
 		List<Lot> lots;
 		long lotsUpdatedAt;
+		// The uploading client's own lotsMutMs (its clock), 0 when the server
+		// has no stamp for the row yet.
+		long lotsMutMs;
 		// Flips deleted on the web or on another machine; applied on adoption so
 		// a delete anywhere is a delete everywhere.
 		List<String> deletions;
@@ -143,6 +151,19 @@ class FlipLogEngine
 		boolean check;
 	}
 
+	/** A sell that found no open lot of the item: real coins, unknown cost.
+	 *  Kept visible in the log so a sale never silently disappears; never
+	 *  counted as profit and never sent to the server as a flip. */
+	static class Untracked
+	{
+		int itemId;
+		String name;
+		int qty;
+		long gross;
+		long tax;
+		long ts;
+	}
+
 	static class Flip
 	{
 		String id;
@@ -176,6 +197,7 @@ class FlipLogEngine
 		int allWins;
 		int checks;
 		long untrackedSells;                            // sold qty with no tracked cost basis
+		List<Untracked> untracked = new ArrayList<>();  // the sells behind that count, oldest first
 		// Dedupe keys ("item:side:qty:gross") for the GE-history import: every
 		// live fill and every import records one, so re-opening the history tab
 		// can never import the same trade twice.
@@ -189,6 +211,9 @@ class FlipLogEngine
 		// When the local open-lot list last changed (multi-machine adoption
 		// only replaces lots with a server copy that is strictly newer).
 		long lotsMutMs;
+		// The lotsMutMs the server last acknowledged; equal to lotsMutMs when
+		// nothing local is unsynced.
+		long lotsSyncedMutMs;
 		// Slot snapshots changed since the last successful sync.
 		boolean slotsDirty;
 	}
@@ -213,6 +238,7 @@ class FlipLogEngine
 		List<Flip> recent;                   // newest first
 		int pendingSync;
 		long untrackedSells;
+		List<Untracked> untracked;           // newest first
 	}
 
 	private final Gson gson;
@@ -278,9 +304,29 @@ class FlipLogEngine
 
 	synchronized void beginLoginHold()
 	{
+		// Re-arming (CONNECTION_LOST, then LOGGING_IN) keeps whatever is already
+		// queued: those are real slot states and replay on release. Clearing
+		// them here dropped fills on the floor.
 		holdActive = true;
 		holdStartedMs = System.currentTimeMillis();
-		held.clear();
+	}
+
+	/** Adopt the server's open lots only when they are provably newer than
+	 *  ours. The stamp is the uploading client's own lotsMutMs, so it is a
+	 *  client clock against a client clock. A row with no stamp yet (server
+	 *  or jar from before the stamp) falls back to the row's server write
+	 *  time, and then only while nothing local is unsynced: comparing the
+	 *  server's clock to this machine's let a relog seconds after a fill
+	 *  replace the fresh lot list with the copy uploaded just before it (a
+	 *  buy's lot vanished, a sell's came back), and the next sell of that item
+	 *  was logged as untracked instead of a flip. */
+	private boolean adoptLots(RemoteState remote)
+	{
+		if (remote.lotsMutMs > 0)
+		{
+			return remote.lotsMutMs > data.lotsMutMs;
+		}
+		return remote.lotsUpdatedAt > data.lotsMutMs && data.lotsMutMs <= data.lotsSyncedMutMs;
 	}
 
 	/** Adopt whatever the server has that is fresher than us, then replay the
@@ -318,10 +364,11 @@ class FlipLogEngine
 			}
 			// Lots follow the same rule: only a strictly-newer server copy wins,
 			// so unsynced local mutations are never thrown away.
-			if (remote.lots != null && remote.lotsUpdatedAt > data.lotsMutMs)
+			if (remote.lots != null && adoptLots(remote))
 			{
 				data.openLots = new ArrayList<>(remote.lots);
-				data.lotsMutMs = remote.lotsUpdatedAt;
+				data.lotsMutMs = remote.lotsMutMs > 0 ? remote.lotsMutMs : remote.lotsUpdatedAt;
+				data.lotsSyncedMutMs = data.lotsMutMs;
 				changed = true;
 			}
 			// Deletes made on the web or another machine reach this one here.
@@ -513,29 +560,28 @@ class FlipLogEngine
 		}
 		if (holdActive)
 		{
-			// Safety valve: a hung fetch must never dam events forever.
-			if (System.currentTimeMillis() - holdStartedMs > HOLD_MAX_MS)
+			// Safety valves: a hung fetch must never dam events forever, and a
+			// busy login must never overflow the queue and lose a fill. Either
+			// way the queue replays now and this event goes straight through.
+			if (System.currentTimeMillis() - holdStartedMs > HOLD_MAX_MS || held.size() >= HOLD_MAX_EVENTS)
 			{
 				releaseHold();
 			}
 			else
 			{
-				if (held.size() < HOLD_MAX_EVENTS)
-				{
-					final HeldEvent h = new HeldEvent();
-					h.slot = slot;
-					h.itemId = o.getItemId();
-					h.qtySold = o.getQuantitySold();
-					h.total = o.getTotalQuantity();
-					h.price = o.getPrice();
-					h.spent = o.getSpent();
-					h.st = o.getState();
-					h.loggedIn = gameState == GameState.LOGGED_IN;
-					h.tick = tick;
-					h.lastLoginTick = lastLoginTick;
-					h.name = itemName;
-					held.add(h);
-				}
+				final HeldEvent h = new HeldEvent();
+				h.slot = slot;
+				h.itemId = o.getItemId();
+				h.qtySold = o.getQuantitySold();
+				h.total = o.getTotalQuantity();
+				h.price = o.getPrice();
+				h.spent = o.getSpent();
+				h.st = o.getState();
+				h.loggedIn = gameState == GameState.LOGGED_IN;
+				h.tick = tick;
+				h.lastLoginTick = lastLoginTick;
+				h.name = itemName;
+				held.add(h);
 				return;
 			}
 		}
@@ -567,6 +613,14 @@ class FlipLogEngine
 		// New offer placement: remember when, for margin-check detection.
 		if (qtySold == 0)
 		{
+			// The client replays every live offer on login and after a hop, and
+			// a replay looks exactly like a placement. Keep the placement time
+			// already on record for the same offer, and never invent one inside
+			// the login burst: a qty-1 sale that completed a couple of seconds
+			// after a hop was being tagged as a margin check and kept out of
+			// the totals.
+			final boolean sameOffer = snap != null && snap.itemId == itemId && snap.price == price && snap.total == totalQty;
+			final long placed = sameOffer ? snap.placedMs : (tick <= lastLoginTick + LOGIN_BURST_TICKS ? 0 : now);
 			snap = new SlotSnap();
 			snap.itemId = itemId;
 			snap.qtySold = 0;
@@ -574,7 +628,7 @@ class FlipLogEngine
 			snap.price = price;
 			snap.spent = 0;
 			snap.state = st.name();
-			snap.placedMs = now;
+			snap.placedMs = placed;
 			snap.updatedMs = now;
 			data.slots[slot] = snap;
 			data.slotsDirty = true;
@@ -775,18 +829,36 @@ class FlipLogEngine
 		}
 		final int matched = f.qty - remaining;
 		data.lotsMutMs = now;
+		// Proportional slice of the sell for the matched quantity.
+		final long sellGross = matched <= 0 ? 0 : (matched == f.qty ? f.gross : f.gross * matched / f.qty);
+		final long tax = matched <= 0 ? 0 : (matched == f.qty ? f.tax : f.tax * matched / f.qty);
 		if (remaining > 0)
 		{
 			data.untrackedSells += remaining;
+			// Keep the sale itself on the log. Whatever lost the buy (a lot removed
+			// by hand, a position opened before the plugin, a handoff that went
+			// wrong), the coins were real and the user must be able to see them.
+			final Untracked u = new Untracked();
+			u.itemId = f.itemId;
+			u.name = name;
+			u.qty = remaining;
+			u.gross = f.gross - sellGross;
+			u.tax = f.tax - tax;
+			u.ts = f.ts;
+			data.untracked.add(u);
+			while (data.untracked.size() > MAX_UNTRACKED)
+			{
+				data.untracked.remove(0);
+			}
 		}
 		if (matched <= 0)
 		{
 			return;
 		}
-		// Proportional slice of the sell for the matched quantity.
-		final long sellGross = matched == f.qty ? f.gross : f.gross * matched / f.qty;
-		final long tax = matched == f.qty ? f.tax : f.tax * matched / f.qty;
 		final long profit = sellGross - tax - buyShare;
+		// A margin check needs BOTH probes fast and close together; a real
+		// position that merely closed on an instant sell is a flip.
+		final boolean isCheck = f.check && checkLot && openedAt != Long.MAX_VALUE && f.ts - openedAt <= CHECK_PAIR_MS;
 
 		// Fold a nibbling sell offer into ONE flip: if the newest flip is the same
 		// item, closed moments ago, at the same sell unit price and on the same
@@ -795,7 +867,7 @@ class FlipLogEngine
 		// changes, the log just stops spamming one line per fill.
 		final Flip prev = data.flips.isEmpty() ? null : data.flips.get(data.flips.size() - 1);
 		final boolean mergeInto = prev != null && prev.itemId == f.itemId && prev.qty > 0
-			&& !prev.check && !(f.check || checkLot)
+			&& !prev.check && !isCheck
 			&& f.ts - prev.closedAt <= FLIP_MERGE_MS
 			&& prev.sellGross / prev.qty == sellGross / matched
 			&& (prev.profit > 0) == (profit > 0);
@@ -837,7 +909,7 @@ class FlipLogEngine
 		flip.profit = profit;
 		flip.openedAt = openedAt == Long.MAX_VALUE ? f.ts : openedAt;
 		flip.closedAt = f.ts;
-		flip.check = f.check || checkLot;
+		flip.check = isCheck;
 		data.flips.add(flip);
 		while (data.flips.size() > MAX_FLIPS_KEPT)
 		{
@@ -926,6 +998,11 @@ class FlipLogEngine
 			s.recent.add(data.flips.get(i));
 		}
 		s.pendingSync = data.pendingFills.size();
+		s.untracked = new ArrayList<>();
+		for (int i = data.untracked.size() - 1; i >= 0 && s.untracked.size() < 20; i--)
+		{
+			s.untracked.add(data.untracked.get(i));
+		}
 		return s;
 	}
 
@@ -939,6 +1016,7 @@ class FlipLogEngine
 		List<Lot> lots;
 		List<SlotExport> slots;
 		List<String> deletes;
+		long lotsMutMs;   // stamp of the lots in this batch (this client's clock)
 	}
 
 	synchronized SyncBatch syncBatch()
@@ -973,6 +1051,7 @@ class FlipLogEngine
 		b.flips = flips;
 		b.deletes = new ArrayList<>(data.pendingDeletes);
 		b.lots = copyLots(data.openLots);
+		b.lotsMutMs = data.lotsMutMs;
 		b.slots = new ArrayList<>();
 		for (int i = 0; i < SLOTS; i++)
 		{
@@ -1032,6 +1111,10 @@ class FlipLogEngine
 		if (b.deletes != null)
 		{
 			data.pendingDeletes.removeAll(b.deletes);
+		}
+		if (b.lotsMutMs > data.lotsSyncedMutMs)
+		{
+			data.lotsSyncedMutMs = b.lotsMutMs;
 		}
 		data.slotsDirty = false;
 		save();
@@ -1108,6 +1191,10 @@ class FlipLogEngine
 			if (d.pendingDeletes == null)
 			{
 				d.pendingDeletes = new ArrayList<>();
+			}
+			if (d.untracked == null)
+			{
+				d.untracked = new ArrayList<>();
 			}
 			return d;
 		}
