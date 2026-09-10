@@ -229,12 +229,15 @@ class PriceCheckPanel extends PluginPanel
 		disc.add(dText, BorderLayout.CENTER);
 
 		disc.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		disc.setToolTipText("discord.gg/pricecheck");
+		// Our own short link, not a discord.gg code: a Hub release cannot be
+		// updated on demand, so a code that later expires would strand every
+		// installed jar on a dead invite. The site redirects to the live one.
+		disc.setToolTipText("pricecheck.gg/discord");
 		disc.addMouseListener(new MouseAdapter()
 		{
 			public void mousePressed(MouseEvent e)
 			{
-				LinkBrowser.browse("https://discord.gg/pricecheck");
+				LinkBrowser.browse("https://pricecheck.gg/discord");
 			}
 		});
 		return disc;
