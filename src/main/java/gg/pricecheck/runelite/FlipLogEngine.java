@@ -63,7 +63,7 @@ class FlipLogEngine
 		int itemId;
 		int qtySold;
 		int total;
-		int price;
+		long price;
 		long spent;
 		String state;
 		// Wall-clock placement time; 0 = placement never seen (first sight
@@ -96,7 +96,7 @@ class FlipLogEngine
 		int itemId;
 		int qtySold;
 		int total;
-		int price;
+		long price;
 		long spent;
 		String state;
 		long placedMs;
@@ -110,7 +110,7 @@ class FlipLogEngine
 		int itemId;
 		int qtySold;
 		int total;
-		int price;
+		long price;
 		long spent;
 		GrandExchangeOfferState st;
 		boolean loggedIn;
@@ -589,7 +589,7 @@ class FlipLogEngine
 			o.getState(), gameState == GameState.LOGGED_IN, tick, lastLoginTick, itemName);
 	}
 
-	private void process(int slot, int itemId, int qtySold, int totalQty, int price, long spent,
+	private void process(int slot, int itemId, int qtySold, int totalQty, long price, long spent,
 		GrandExchangeOfferState st, boolean loggedIn, int tick, int lastLoginTick, String itemName)
 	{
 		if (st == GrandExchangeOfferState.EMPTY)
